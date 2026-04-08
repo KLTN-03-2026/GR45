@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+BE/node_modules/
+FE/node_modules/
+Mobile/node_modules/
+
+# Expo
+Mobile/.expo/
+Mobile/dist/
+
+# Env
+.env
+BE/.env
+FE/.env
+Mobile/.env
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/
