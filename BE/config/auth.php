@@ -1,7 +1,5 @@
 <?php
 
-use App\Models\User;
-
 return [
 
     /*
@@ -42,6 +40,30 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        // Guard cho Admin (nhân viên nội bộ)
+        'admin' => [
+            'driver' => 'sanctum',
+            'provider' => 'admins',
+        ],
+
+        // Guard cho Tài xế
+        'tai_xe' => [
+            'driver' => 'sanctum',
+            'provider' => 'tai_xes',
+        ],
+
+        // Guard cho Nhà xe
+        'nha_xe' => [
+            'driver' => 'sanctum',
+            'provider' => 'nha_xes',
+        ],
+
+        // Guard cho Khách hàng
+        'khach_hang' => [
+            'driver' => 'sanctum',
+            'provider' => 'khach_hangs',
+        ],
     ],
 
     /*
@@ -62,15 +84,35 @@ return [
     */
 
     'providers' => [
+        // Provider mặc định (không dùng User model, trỏ về KhachHang)
         'users' => [
             'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', User::class),
+            'model' => App\Models\KhachHang::class,
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        // Provider cho Admin (nhân viên nội bộ)
+        'admins' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Admin::class,
+        ],
+
+        // Provider cho Tài xế
+        'tai_xes' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\TaiXe::class,
+        ],
+
+        // Provider cho Nhà xe
+        'nha_xes' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\NhaXe::class,
+        ],
+
+        // Provider cho Khách hàng
+        'khach_hangs' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\KhachHang::class,
+        ],
     ],
 
     /*
