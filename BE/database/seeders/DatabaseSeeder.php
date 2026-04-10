@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -11,15 +10,55 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Thu tu quan trong: cac bang co foreign key phai seed sau bang cha.
+     * 1. ChucVu, ChucNang (doc lap)
+     * 2. PhanQuyen (phu thuoc ChucVu + ChucNang)
+     * 3. Admin (phu thuoc ChucVu)
+     * 4. KhachHang, LoaiXe, LoaiGhe (doc lap)
+     * 5. NhaXe (phu thuoc ChucVu + Admin, tu dong tao vi_nha_xes)
+     * 6. TaiXe (phu thuoc NhaXe, tu dong tao cau_hinh_ai)
+     * 7. Xe (phu thuoc NhaXe + LoaiXe + TaiXe)
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $this->call([
+            // --- Tang 1: Danh muc goc ---
+            ChucVuSeeder::class,
+            ChucNangSeeder::class,
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            // --- Tang 2: Phu thuoc danh muc ---
+            PhanQuyenSeeder::class,
+            AdminSeeder::class,
+
+            // --- Tang 3: Danh muc doc lap ---
+            KhachHangSeeder::class,
+            LoaiXeSeeder::class,
+            LoaiGheSeeder::class,
+
+            // --- Tang 4: Nha xe (phu thuoc Admin + ChucVu) ---
+            NhaXeSeeder::class,
+
+            // --- Tang 4.5: Voucher (co the phu thuoc NhaXe) ---
+            VoucherSeeder::class,
+
+            // --- Tang 5: Tai xe (phu thuoc NhaXe) ---
+            TaiXeSeeder::class,
+
+            // --- Tang 6: Xe (phu thuoc NhaXe + LoaiXe + TaiXe) ---
+            XeSeeder::class,
+
+            // --- Tang 7: Tuyen duong ---
+            TuyenDuongSeeder::class,
+
+            // --- Tang 8: Chuyen xe (phu thuoc TuyenDuong + Xe + TaiXe) ---
+            ChuyenXeSeeder::class,
+
+            // --- Tang 9: Ve (phu thuoc KhachHang + ChuyenXe) ---
+            VeSeeder::class,
+            
+            // --- Tang 10: Thanh toan (phu thuoc Ve + KhachHang) ---
+            ThanhToanSeeder::class,
+            
         ]);
     }
 }
