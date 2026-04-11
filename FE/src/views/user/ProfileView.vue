@@ -121,7 +121,11 @@ const handleUpdateProfile = async () => {
       clientStore.updateUser(res.data);
     }
   } catch (error) {
-    profileMessage.value = { type: "error", text: "Cập nhật thất bại." };
+    const msg =
+      error.response?.data?.errors
+        ? Object.values(error.response.data.errors).flat()[0]
+        : error.response?.data?.message;
+    profileMessage.value = { type: "error", text: msg || "Cập nhật thông tin thất bại. Vui lòng thử lại." };
   } finally {
     isSavingProfile.value = false;
   }
@@ -144,7 +148,11 @@ const handleChangePassword = async () => {
       }, 2000);
     }
   } catch (error) {
-    passwordMessage.value = { type: "error", text: "Đổi mật khẩu thất bại." };
+    const msg =
+      error.response?.data?.errors
+        ? Object.values(error.response.data.errors).flat()[0]
+        : error.response?.data?.message;
+    passwordMessage.value = { type: "error", text: msg || "Đổi mật khẩu thất bại. Vui lòng thử lại." };
   } finally {
     isSavingPassword.value = false;
   }

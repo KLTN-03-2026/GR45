@@ -3,13 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Services\KhachHangService;
+use App\Services\PasswordResetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class KhachHangController extends Controller
 {
-    public function __construct(protected KhachHangService $service) {}
+    public function __construct(
+        protected KhachHangService $service,
+        protected PasswordResetService $passwordResetService,
+    ) {}
 
     // ── AUTH ──────────────────────────────────────────────────────────
 
@@ -55,6 +60,58 @@ class KhachHangController extends Controller
                 'success' => false,
                 'message' => 'Du lieu khong hop le.',
                 'errors'  => $e->errors(),
+            ], 422);
+        }
+    }
+
+    public function requestPasswordReset(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'role' => 'required|in:khach_hang,nha_xe,admin',
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $this->passwordResetService->requestReset($request->role, $request->email);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.',
+        ]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'role' => 'required|in:khach_hang,nha_xe,admin',
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'mat_khau_moi' => 'required|string|min:6|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $this->passwordResetService->resetPassword(
+                $request->role,
+                $request->email,
+                $request->token,
+                $request->mat_khau_moi
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
             ], 422);
         }
     }

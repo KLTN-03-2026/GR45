@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.tai-xe'     => \App\Http\Middleware\CheckTaiXeToken::class,
             'auth.nha-xe'     => \App\Http\Middleware\CheckNhaXeToken::class,
             'auth.khach-hang' => \App\Http\Middleware\CheckKhachHangToken::class,
+            'permission'      => \App\Http\Middleware\CheckAdminPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

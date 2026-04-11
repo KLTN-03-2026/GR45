@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Resources\TaiXeResource;
+use App\Models\NhaXe;
 use App\Models\TaiXe;
 use App\Repositories\TaiXe\TaiXeRepositoryInterface;
 use Illuminate\Support\Facades\Hash;
@@ -251,5 +252,34 @@ class TaiXeService
     public function getByNhaXe(string $maNhaXe, array $filters = [])
     {
         return $this->repo->getByNhaXe($maNhaXe, $filters);
+    }
+
+    public function paginateDriversForNhaXe(NhaXe $nhaXe, array $query): array
+    {
+        $perPage = (int) ($query['per_page'] ?? 15);
+        $perPage = min(200, max(1, $perPage));
+
+        $repoFilters = ['per_page' => $perPage];
+
+        $search = isset($query['search']) ? trim((string) $query['search']) : '';
+        if ($search !== '') {
+            $repoFilters['search'] = $search;
+        }
+
+        $tt = $query['tinh_trang'] ?? null;
+        if ($tt !== null && $tt !== '') {
+            $repoFilters['tinh_trang'] = $tt;
+        }
+
+        $paginator = $this->repo->getByNhaXe($nhaXe->ma_nha_xe, $repoFilters);
+
+        $paginator->getCollection()->transform(static function (TaiXe $t) {
+            return (new TaiXeResource($t))->resolve();
+        });
+
+        return [
+            'success' => true,
+            'data' => $paginator->toArray(),
+        ];
     }
 }
