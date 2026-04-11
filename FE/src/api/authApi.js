@@ -5,6 +5,8 @@ const authApi = {
   clientRegister: (data) => axiosClient.post('/v1/dang-ky', data),
   clientLogin: (data) => axiosClient.post('/v1/dang-nhap', data),
   clientLogout: () => axiosClient.post('/v1/dang-xuat'),
+  requestPasswordReset: (data) => axiosClient.post('/v1/quen-mat-khau', data),
+  resetPassword: (data) => axiosClient.post('/v1/dat-lai-mat-khau', data),
 
   // --- NHÀ XE ---
   operatorLogin: (data) => axiosClient.post('/v1/nha-xe/dang-nhap', data),
@@ -18,6 +20,7 @@ const authApi = {
   adminLogin: (data) => axiosClient.post('/v1/admin/login', data),
   adminLogout: () => axiosClient.post('/v1/admin/logout'),
   adminRefresh: () => axiosClient.post('/v1/admin/refresh'),
+  adminChangePassword: (data) => axiosClient.post('/v1/admin/doi-mat-khau', data),
 };
 
 export default authApi;

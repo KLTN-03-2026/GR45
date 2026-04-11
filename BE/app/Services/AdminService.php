@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Repositories\Admin\AdminRepositoryInterface;
-use Illuminate\Support\Facades\Log;
 
 class AdminService
 {
@@ -19,9 +18,9 @@ class AdminService
         return $this->adminRepo->login($credentials);
     }
 
-    public function logout()
+    public function logout(): void
     {
-        return $this->adminRepo->logout();
+        $this->adminRepo->logout();
     }
 
     public function refresh()

@@ -8,10 +8,12 @@ const ROLE_TOKEN_MAP = {
   driver   : 'auth.driver.token',
 };
 
+const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+
 const axiosClient = axios.create({
-  baseURL :  'http://127.0.0.1:8000/api/',
-  headers : { 'Content-Type': 'application/json' },
-  timeout : 10000,
+  baseURL: `${apiRoot}/api/`,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
 });
 
 // --- REQUEST INTERCEPTOR ---
@@ -25,12 +27,6 @@ axiosClient.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
-
-    // Tự xoá Content-Type nếu dữ liệu là form data để cho phép browser tự gen config Multipart
-    if (config.data instanceof FormData) {
-      delete config.headers['Content-Type'];
-    }
-
     return config;
   },
   (error) => Promise.reject(error)

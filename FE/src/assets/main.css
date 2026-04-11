@@ -1,36 +1,21 @@
-@import 'tailwindcss';
 @import './base.css';
 
-/* CSS Reset & Global Layout cho ứng dụng Dashboard/Admin */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body, #app {
+#app {
   width: 100%;
   min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc; /* Nền sáng dịu mặc định */
-  color: #1e293b;
-  overflow-x: hidden;
+  font-weight: normal;
 }
 
-#app {
-  display: block; /* Xóa thuộc tính grid/flex mặc định của Vue Vite Template */
-  max-width: none !important;
-}
-
-a {
+a,
+.green {
   text-decoration: none;
-  color: inherit;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+  padding: 3px;
 }
 
-input, button, textarea, select {
-  font-family: inherit;
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
 }

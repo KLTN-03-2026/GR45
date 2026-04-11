@@ -2,37 +2,28 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Admin;
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class CheckAdminPermission
 {
-    public function handle(Request $request, Closure $next, $permissionSlug)    
+    public function handle(Request $request, Closure $next, string $permission): Response
     {
-        $admin = auth('admin')->user();
+        $user = $request->user();
 
-        if (!$admin) {
+        if (!$user instanceof Admin) {
             return response()->json([
                 'success' => false,
-                'message' => 'Chưa xác thực',
+                'message' => 'Bạn chưa đăng nhập hoặc token không hợp lệ.',
             ], 401);
         }
 
-        if ($admin->is_master == 1) {
-            return $next($request);
-        }
-
-        $hasPermission = $admin->chucVu 
-            && $admin->chucVu->tinh_trang === 'hoat_dong'
-            && $admin->chucVu->chucNangs()
-                             ->where('slug', $permissionSlug)
-                             ->where('chuc_nangs.tinh_trang', 'hoat_dong')
-                             ->exists();
-
-        if (!$hasPermission) {
+        if (!$user->hasPermission($permission)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Bạn không có quyền: ' . $permissionSlug       
+                'message' => 'Bạn không có quyền thực hiện thao tác này.',
             ], 403);
         }
 
