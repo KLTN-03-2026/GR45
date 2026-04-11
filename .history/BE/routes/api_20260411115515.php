@@ -97,8 +97,11 @@ Route::prefix('v1')->group(function () {
             Route::delete('tuyen-duong/{id}', [TuyenDuongController::class, 'destroy'])->middleware('permission:xoa-tuyen-duong');
 
           // Quản lý Voucher (Nhà xe)
-            Route::get('voucher', [VoucherController::class, 'indexAdmin'])->middleware('permission:xem-voucher');
-            Route::patch('voucher/{id}/duyet', [VoucherController::class, 'duyetVoucherAdmin'])->middleware('permission:duyet-voucher');
+            Route::get('voucher', [VoucherController::class, 'index'])->middleware('permission:xem-voucher');
+            Route::get('voucher/{id}', [VoucherController::class, 'show'])->middleware('permission:xem-voucher');
+            Route::post('voucher', [VoucherController::class, 'store'])->middleware('permission:them-voucher');
+            Route::put('voucher/{id}', [VoucherController::class, 'update'])->middleware('permission:sua-voucher');
+            Route::delete('voucher/{id}', [VoucherController::class, 'destroy'])->middleware('permission:xoa-voucher');  
         });
     });
 
