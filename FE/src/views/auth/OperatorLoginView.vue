@@ -6,13 +6,13 @@ import BaseInput from '@/components/common/BaseInput.vue';
 import BaseButton from '@/components/common/BaseButton.vue';
 import BaseCard from '@/components/common/BaseCard.vue';
 
-const router        = useRouter();
+const router = useRouter();
 const operatorStore = useOperatorStore();
 const form          = reactive({ email: '', password: '' });
 
 const handleLogin = async () => {
-  const success = await operatorStore.login(form);
-  if (success) router.push('/nha-xe');
+  const ok = await operatorStore.login(form);
+  if (ok) await router.push({ name: 'operator-xe' });
 };
 </script>
 
@@ -34,7 +34,7 @@ const handleLogin = async () => {
           <BaseInput v-model="form.password" type="password" label="Mật khẩu" placeholder="••••••••" />
           
           <div class="forgot-link">
-            <a href="#">Quên mật khẩu?</a>
+            <RouterLink :to="{ name: 'forgot-password', query: { role: 'nha_xe' } }">Quên mật khẩu?</RouterLink>
           </div>
           
           <div v-if="operatorStore.error" class="error-msg">{{ operatorStore.error }}</div>

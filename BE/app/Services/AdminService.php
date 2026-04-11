@@ -19,4 +19,19 @@ class AdminService
         return $this->adminRepo->login($credentials);
     }
 
+    public function logout(): void
+    {
+        $this->adminRepo->logout();
+    }
+
+    public function refresh()
+    {
+        return $this->adminRepo->refresh();
+    }
+
+    public function me()
+    {
+        return $this->adminRepo->me();
+    }
+
 }
