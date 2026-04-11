@@ -8,7 +8,7 @@ interface AdminRepositoryInterface
     public function logout();
     public function refresh();
     public function me();
-
+    
     public function getAll(array $filters = []);
     public function getById(int $id);
     public function create(array $data);

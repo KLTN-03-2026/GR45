@@ -1,0 +1,208 @@
+<script setup>
+import { ref, provide, onMounted, onUnmounted } from "vue";
+import OperatorHeader from "@/components/layout/OperatorHeader.vue";
+import OperatorSidebar from "@/components/layout/OperatorSidebar.vue";
+import BaseToast from "@/components/common/BaseToast.vue";
+import { useOperatorStore } from "@/stores/operatorStore";
+import Echo from "laravel-echo";
+import Pusher from "pusher-js";
+
+// Store state
+const operatorStore = useOperatorStore();
+
+// Trạng thái mở/đóng Sidebar trên Mobile
+const isSidebarOpen = ref(false);
+
+// Hàm toggle sidebar
+const toggleSidebar = () => {
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
+
+// Hàm đóng sidebar
+const closeSidebar = () => {
+  isSidebarOpen.value = false;
+};
+
+// Provide cho các component con sử dụng
+provide("isSidebarOpen", isSidebarOpen);
+provide("toggleSidebar", toggleSidebar);
+provide("closeSidebar", closeSidebar);
+
+// ─── Logic Toast ────────────────────────────────────────────────────────────
+const toastVisible = ref(false);
+const toastMessage = ref("");
+const toastType = ref("success");
+
+const showToast = (message, type = "success") => {
+  toastMessage.value = message;
+  toastType.value = type;
+  toastVisible.value = true;
+  setTimeout(() => {
+    toastVisible.value = false;
+  }, 3000);
+};
+
+// ─── Lắng nghe sự kiện Pusher (WebSocket) ──────────────────────────────────
+let echoInstance = null;
+
+onMounted(() => {
+  if (operatorStore.user && operatorStore.token) {
+    // Gán biến global để Echo dùng
+    window.Pusher = Pusher;
+
+    // Lấy config từ môi trường (hoặc fallback mặc định)
+    const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
+    const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
+    let apiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/";
+    if (!apiUrl.endsWith("/")) apiUrl += "/";
+
+    echoInstance = new Echo({
+      broadcaster: "pusher",
+      key: pusherKey,
+      cluster: pusherCluster,
+      forceTLS: true,
+      authEndpoint: `${apiUrl}v1/nha-xe/broadcasting/auth`, // Router API để verify Channel
+      auth: {
+        headers: {
+          Authorization: `Bearer ${operatorStore.token}`,
+          Accept: "application/json",
+        },
+      },
+    });
+
+    const channelName = `nha-xe.${operatorStore.user.ma_nha_xe}`;
+    console.log(`Đang subscribe kênh: ${channelName}`);
+
+    echoInstance
+      .private(channelName)
+      .listen(".ve.moi_dat", (eventVeMoi) => {
+        console.log("Nhan event:", eventVeMoi);
+        const msg =
+          eventVeMoi.message ||
+          `Bạn có 1 chuyến xe nhận vé mới (${eventVeMoi.ma_ve})!`;
+        showToast(msg, "success"); // Hiện Toast thông báo có đặt vé thành công
+      })
+      .listen(".ve.da_thanh_toan", (eventTiendo) => {
+        // Cú pháp bắt event này phụ thuộc vào backend `broadcastAs()` => '.ve.da_thanh_toan'
+        // Object `eventTiendo` chính là mảng `broadcastWith()` trả về
+        const msg =
+          eventTiendo.message || `Vé ${eventTiendo.ma_ve} mới được thanh toán.`;
+        showToast(msg, "success");
+      })
+      .listen(".ve.huy_tu_dong", (eventHuy) => {
+        const msg =
+          eventHuy.message ||
+          `Vé ${eventHuy.ma_ve} vừa bị huỷ do hết thời gian thanh toán`;
+        showToast(msg, "error");
+      })
+      .listen(".bao-dong.vi-pham", (event) => {
+        console.log("🚨 Nhận cảnh báo vi phạm:", event);
+        const msg =
+          event.message ||
+          `⚠️ Phát hiện tài xế vi phạm trên chuyến #${event.id_chuyen_xe}`;
+        showToast(msg, "error");
+      });
+  }
+});
+
+onUnmounted(() => {
+  if (echoInstance && operatorStore.user) {
+    echoInstance.leave(`nha-xe.${operatorStore.user.ma_nha_xe}`);
+  }
+});
+</script>
+
+<template>
+  <div class="operator-layout-wrapper">
+    <BaseToast
+      :visible="toastVisible"
+      :message="toastMessage"
+      :type="toastType"
+    />
+
+    <!-- Sidebar -->
+    <OperatorSidebar />
+
+    <!-- Khu vực Main Content -->
+    <div class="operator-main-container">
+      <OperatorHeader />
+
+      <!-- Vùng hiển thị nội dung chính -->
+      <main class="operator-content-area">
+        <div class="content-wrapper">
+          <RouterView />
+        </div>
+      </main>
+    </div>
+
+    <!-- Overlay che nền khi mở sidebar trên Mobile -->
+    <div
+      class="mobile-overlay"
+      :class="{ show: isSidebarOpen }"
+      @click="closeSidebar"
+    ></div>
+  </div>
+</template>
+
+<style scoped>
+.operator-layout-wrapper {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: #f0fdf4;
+  font-family: "Inter", sans-serif;
+  color: #1e3a2f;
+}
+
+.operator-main-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  min-width: 0;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.operator-content-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
+}
+
+.content-wrapper {
+  max-width: 100%;
+  margin: 0 auto;
+  min-height: 100%;
+}
+
+/* Overlay che nền khi mở sidebar trên Mobile */
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(11, 55, 30, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 40;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease;
+}
+
+.mobile-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (max-width: 1024px) {
+  .operator-content-area {
+    padding: 16px;
+  }
+}
+</style>

@@ -84,7 +84,7 @@ const fetchVouchers = async () => {
     vouchers.value = listData;
   } catch (error) {
     console.error("Lỗi khi tải danh sách voucher:", error);
-    showToast(`Không thể tải danh sách voucher: ${error.message || error.response?.statusText}`, "error");
+    showToast("Không thể tải danh sách voucher!", "error");
   } finally {
     loading.value = false;
   }
@@ -146,7 +146,6 @@ const resetFilters = () => {
   searchQuery.value = "";
   filterStatus.value = "";
   filterType.value = "";
-  fetchVouchers(); // Gọi lại API để làm mới table
 };
 
 onMounted(() => {
@@ -156,7 +155,11 @@ onMounted(() => {
 
 <template>
   <div class="admin-page">
-    <BaseToast :visible="toast.visible" :message="toast.message" :type="toast.type" />
+    <BaseToast
+      :visible="toast.visible"
+      :message="toast.message"
+      :type="toast.type"
+    />
 
     <!-- Tiêu đề trang -->
     <div class="page-header">
@@ -174,13 +177,13 @@ onMounted(() => {
         </div>
         <div class="stat-chip stat-pending">
           <span class="stat-number">{{
-            vouchers.filter((v) => v.trang_thai === "cho_duyet" || v.trang_thai === "pending").length
+            vouchers.filter((v) => v.trang_thai === "cho_duyet").length
           }}</span>
           <span class="stat-label">Chờ duyệt</span>
         </div>
         <div class="stat-chip stat-active">
           <span class="stat-number">{{
-            vouchers.filter((v) => v.trang_thai === "hoat_dong" || v.trang_thai === "active").length
+            vouchers.filter((v) => v.trang_thai === "hoat_dong").length
           }}</span>
           <span class="stat-label">Hoạt động</span>
         </div>
@@ -192,37 +195,54 @@ onMounted(() => {
       <div class="filter-row">
         <div class="search-box">
           <label class="filter-label">Tìm kiếm</label>
-          <BaseInput v-model="searchQuery" placeholder="Tìm mã voucher, tên voucher..." />
+          <BaseInput
+            v-model="searchQuery"
+            placeholder="Tìm mã voucher, tên voucher..."
+          />
         </div>
 
         <div class="filter-group">
-          <BaseSelect v-model="filterStatus" label="Trạng thái" :options="[
-            { value: '', label: 'Tất cả' },
-            { value: 'pending', label: 'Chờ duyệt' },
-            { value: 'active', label: 'Hoạt động' },
-            { value: 'stopped', label: 'Tạm ngưng' },
-            { value: 'expired', label: 'Vô hiệu / Hết hạn' },
-          ]" />
+          <BaseSelect
+            v-model="filterStatus"
+            label="Trạng thái"
+            :options="[
+              { value: '', label: 'Tất cả' },
+              { value: 'cho_duyet', label: 'Chờ duyệt' },
+              { value: 'hoat_dong', label: 'Hoạt động' },
+              { value: 'tam_ngung', label: 'Tạm ngưng' },
+              { value: 'vo_hieu', label: 'Vô hiệu' },
+              { value: 'het_han', label: 'Hết hạn' },
+            ]"
+          />
         </div>
 
         <div class="filter-group">
-          <BaseSelect v-model="filterType" label="Loại" :options="[
-            { value: '', label: 'Tất cả' },
-            { value: 'percent', label: 'Phần trăm' },
-            { value: 'fixed', label: 'Cố định' },
-          ]" />
+          <BaseSelect
+            v-model="filterType"
+            label="Loại"
+            :options="[
+              { value: '', label: 'Tất cả' },
+              { value: 'percent', label: 'Phần trăm' },
+              { value: 'fixed', label: 'Cố định' },
+            ]"
+          />
         </div>
-        <div class="filter-action">
-          <BaseButton type="button" @click.prevent="resetFilters" variant="outline" class="btn-reset">
-            Đặt lại
-          </BaseButton>
+        <div class="filter-group">
+          <label class="filter-label">.</label>
+          <BaseButton @click="resetFilters" variant="outline"
+            >Đặt lại</BaseButton
+          >
         </div>
       </div>
     </div>
 
     <!-- Bảng dữ liệu -->
     <div class="table-card">
-      <BaseTable :columns="tableColumns" :data="filteredVouchers" :loading="loading">
+      <BaseTable
+        :columns="tableColumns"
+        :data="filteredVouchers"
+        :loading="loading"
+      >
         <!-- Mã Voucher -->
         <template #cell(ma_voucher)="{ value }">
           <span class="code-badge">{{ value }}</span>
@@ -238,7 +258,9 @@ onMounted(() => {
 
         <!-- Loại / Giá Trị -->
         <template #cell(loai_gia_tri)="{ item }">
-          <span :class="['mini-badge', loaiVoucherLabel(item.loai_voucher).cls]">
+          <span
+            :class="['mini-badge', loaiVoucherLabel(item.loai_voucher).cls]"
+          >
             {{ loaiVoucherLabel(item.loai_voucher).text }}
           </span>
           <div class="value-display">{{ displayGiaTri(item) }}</div>
@@ -252,12 +274,15 @@ onMounted(() => {
             <span class="qty-total">{{ item.so_luong }}</span>
           </div>
           <div class="qty-bar">
-            <div class="qty-bar-fill" :style="{
-              width:
-                item.so_luong > 0
-                  ? (item.so_luong_con_lai / item.so_luong) * 100 + '%'
-                  : '0%',
-            }"></div>
+            <div
+              class="qty-bar-fill"
+              :style="{
+                width:
+                  item.so_luong > 0
+                    ? (item.so_luong_con_lai / item.so_luong) * 100 + '%'
+                    : '0%',
+              }"
+            ></div>
           </div>
         </template>
 
@@ -293,7 +318,11 @@ onMounted(() => {
         <!-- Hành Động -->
         <template #cell(actions)="{ item }">
           <div class="action-buttons">
-            <BaseButton size="sm" variant="primary" @click="openStatusModal(item)">
+            <BaseButton
+              size="sm"
+              variant="primary"
+              @click="openStatusModal(item)"
+            >
               Duyệt / TT
             </BaseButton>
           </div>
@@ -309,17 +338,23 @@ onMounted(() => {
     </div>
 
     <!-- ===== MODAL DUYỆT / ĐỔI TRẠNG THÁI ===== -->
-    <BaseModal v-model="statusModal.show" title="Duyệt / Thay Đổi Trạng Thái Voucher" maxWidth="480px">
+    <BaseModal
+      v-model="statusModal.show"
+      title="Duyệt / Thay Đổi Trạng Thái Voucher"
+      maxWidth="480px"
+    >
       <div class="status-update-body">
         <p class="voucher-code-label">
           Voucher: <strong>{{ statusModal.ma_voucher }}</strong>
         </p>
         <p class="current-status-label">
           Trạng thái hiện tại:
-          <span :class="[
-            'status-badge',
-            getVoucherStatus(statusModal.current).class,
-          ]">
+          <span
+            :class="[
+              'status-badge',
+              getVoucherStatus(statusModal.current).class,
+            ]"
+          >
             {{ getVoucherStatus(statusModal.current).text }}
           </span>
         </p>
@@ -327,29 +362,54 @@ onMounted(() => {
         <div class="form-group" style="margin-top: 16px">
           <label class="form-label">Trạng Thái Mới *</label>
           <div class="status-options">
-            <label v-for="opt in [
-              { v: 'pending', t: '⏳ Chờ duyệt' },
-              { v: 'active', t: '✅ Hoạt động' },
-              { v: 'stopped', t: '⏸️ Tạm ngưng' },
-              { v: 'expired', t: '🚫 Vô hiệu / Hết hạn' },
-            ]" :key="opt.v" class="status-radio-opt" :class="{ 'opt-active': statusModal.trang_thai === opt.v }">
-              <input type="radio" :value="opt.v" v-model="statusModal.trang_thai" style="display: none" />
+            <label
+              v-for="opt in [
+                { v: 'cho_duyet', t: '⏳ Chờ duyệt' },
+                { v: 'hoat_dong', t: '✅ Hoạt động' },
+                { v: 'tam_ngung', t: '⏸️ Tạm ngưng' },
+                { v: 'vo_hieu', t: '🚫 Vô hiệu' },
+              ]"
+              :key="opt.v"
+              class="status-radio-opt"
+              :class="{ 'opt-active': statusModal.trang_thai === opt.v }"
+            >
+              <input
+                type="radio"
+                :value="opt.v"
+                v-model="statusModal.trang_thai"
+                style="display: none"
+              />
               {{ opt.t }}
             </label>
           </div>
         </div>
 
-        <div class="info-banner" style="margin-top: 12px" v-if="statusModal.trang_thai === 'active'">
+        <div
+          class="info-banner"
+          style="margin-top: 12px"
+          v-if="statusModal.trang_thai === 'hoat_dong'"
+        >
           ✅ Khi duyệt voucher, khách hàng sẽ có thể sử dụng mã này khi đặt vé.
         </div>
-        <div class="info-banner warning-banner" style="margin-top: 12px" v-if="statusModal.trang_thai === 'expired'">
-          ⚠️ Vô hiệu / Hết hạn voucher sẽ khiến mã này không thể sử dụng được nữa.
+        <div
+          class="info-banner warning-banner"
+          style="margin-top: 12px"
+          v-if="statusModal.trang_thai === 'vo_hieu'"
+        >
+          ⚠️ Vô hiệu hóa voucher sẽ khiến mã này không thể sử dụng được nữa.
         </div>
       </div>
 
       <template #footer>
-        <BaseButton variant="secondary" @click="statusModal.show = false">Hủy</BaseButton>
-        <BaseButton variant="primary" :loading="statusModal.loading" @click="submitApprove">Xác Nhận</BaseButton>
+        <BaseButton variant="secondary" @click="statusModal.show = false"
+          >Hủy</BaseButton
+        >
+        <BaseButton
+          variant="primary"
+          :loading="statusModal.loading"
+          @click="submitApprove"
+          >Xác Nhận</BaseButton
+        >
       </template>
     </BaseModal>
   </div>
@@ -360,7 +420,6 @@ onMounted(() => {
   padding: 1.5rem;
   font-family: "Inter", system-ui, sans-serif;
 }
-
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -369,14 +428,12 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 1rem;
 }
-
 .page-title {
   font-size: 1.5rem;
   font-weight: 700;
   color: #1e293b;
   margin: 0 0 0.35rem 0;
 }
-
 .page-sub {
   color: #64748b;
   font-size: 0.925rem;
@@ -388,7 +445,6 @@ onMounted(() => {
   display: flex;
   gap: 0.75rem;
 }
-
 .stat-chip {
   display: flex;
   flex-direction: column;
@@ -397,29 +453,24 @@ onMounted(() => {
   border-radius: 12px;
   min-width: 64px;
 }
-
 .stat-number {
   font-size: 1.25rem;
   font-weight: 700;
 }
-
 .stat-label {
   font-size: 0.7rem;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-
 .stat-total {
   background: #f1f5f9;
   color: #475569;
 }
-
 .stat-pending {
   background: #fef3c7;
   color: #92400e;
 }
-
 .stat-active {
   background: #dcfce7;
   color: #166534;
@@ -435,34 +486,19 @@ onMounted(() => {
   margin-bottom: 1.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
-
 .filter-row {
   display: flex;
-  gap: 1.25rem;
-  align-items: flex-end;
+  gap: 1rem;
+  align-items: flex-start;
   flex-wrap: wrap;
 }
-
 .search-box {
   flex: 1;
-  min-width: 250px;
+  min-width: 220px;
 }
-
 .filter-group {
-  min-width: 170px;
+  min-width: 140px;
 }
-
-.filter-action {
-  display: flex;
-  align-items: flex-end;
-  margin-bottom: 1rem;
-}
-
-.btn-reset {
-  height: 42px;
-  /* Đồng nhất chiều cao */
-}
-
 .filter-label {
   display: block;
   font-size: 0.8rem;
@@ -470,7 +506,6 @@ onMounted(() => {
   color: #475569;
   margin-bottom: 0.35rem;
 }
-
 .custom-select {
   width: 100%;
   padding: 0.625rem 0.875rem;
@@ -482,7 +517,6 @@ onMounted(() => {
   transition: all 0.2s ease-in-out;
   box-sizing: border-box;
 }
-
 .custom-select:focus {
   outline: none;
   border-color: #4f46e5;
@@ -499,7 +533,6 @@ onMounted(() => {
     0 4px 6px -2px rgba(0, 0, 0, 0.025);
   border: 1px solid rgba(226, 232, 240, 0.8);
 }
-
 .table-footer {
   padding: 0.75rem 0.5rem 0;
   font-size: 0.85rem;
@@ -523,7 +556,6 @@ onMounted(() => {
   color: #1e293b;
   font-size: 0.925rem;
 }
-
 .voucher-condition {
   font-size: 0.8rem;
   color: #94a3b8;
@@ -538,17 +570,14 @@ onMounted(() => {
   font-size: 0.75rem;
   font-weight: 600;
 }
-
 .badge-purple {
   background: #f3e8ff;
   color: #7c3aed;
 }
-
 .badge-blue {
   background: #dbeafe;
   color: #2563eb;
 }
-
 .value-display {
   font-weight: 700;
   color: #1e293b;
@@ -561,20 +590,16 @@ onMounted(() => {
   font-size: 0.95rem;
   font-weight: 600;
 }
-
 .qty-remaining {
   color: #16a34a;
 }
-
 .qty-separator {
   color: #94a3b8;
   margin: 0 2px;
 }
-
 .qty-total {
   color: #64748b;
 }
-
 .qty-bar {
   width: 100%;
   height: 4px;
@@ -583,7 +608,6 @@ onMounted(() => {
   margin-top: 4px;
   overflow: hidden;
 }
-
 .qty-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #22c55e, #4ade80);
@@ -597,13 +621,11 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
 }
-
 .time-item {
   font-size: 0.85rem;
   color: #475569;
   white-space: nowrap;
 }
-
 .time-icon {
   margin-right: 2px;
 }
@@ -624,27 +646,22 @@ onMounted(() => {
   display: inline-block;
   white-space: nowrap;
 }
-
 .status-pending {
   background: #fdf6b2;
   color: #8a4b08;
 }
-
 .status-approved {
   background: #dcfce3;
   color: #16a34a;
 }
-
 .status-info {
   background: #dbeafe;
   color: #1e40af;
 }
-
 .status-rejected {
   background: #fee2e2;
   color: #dc2626;
 }
-
 .status-expired {
   background: #f1f5f9;
   color: #64748b;
@@ -656,7 +673,6 @@ onMounted(() => {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
-
 .text-muted {
   color: #64748b;
   font-size: 0.85rem;
@@ -666,23 +682,19 @@ onMounted(() => {
 .status-update-body {
   padding: 0.5rem 0;
 }
-
 .voucher-code-label {
   font-size: 1rem;
   color: #334155;
   margin: 0 0 8px 0;
 }
-
 .current-status-label {
   font-size: 0.925rem;
   color: #475569;
   margin: 0;
 }
-
 .form-group {
   margin-bottom: 0.5rem;
 }
-
 .form-label {
   display: block;
   font-size: 0.875rem;
@@ -690,13 +702,11 @@ onMounted(() => {
   color: #374151;
   margin-bottom: 0.5rem;
 }
-
 .status-options {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-
 .status-radio-opt {
   padding: 0.5rem 1rem;
   border-radius: 8px;
@@ -707,12 +717,10 @@ onMounted(() => {
   transition: all 0.2s ease;
   user-select: none;
 }
-
 .status-radio-opt:hover {
   border-color: #a5b4fc;
   background: #f8fafc;
 }
-
 .status-radio-opt.opt-active {
   border-color: #4f46e5;
   background: #eef2ff;
@@ -720,7 +728,6 @@ onMounted(() => {
   font-weight: 600;
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
 }
-
 .info-banner {
   background: #eff6ff;
   border: 1px solid #bfdbfe;
@@ -730,7 +737,6 @@ onMounted(() => {
   font-size: 0.875rem;
   line-height: 1.5;
 }
-
 .warning-banner {
   background: #fef3c7;
   border-color: #fcd34d;
@@ -743,22 +749,18 @@ onMounted(() => {
     width: 100%;
     justify-content: flex-start;
   }
-
   .filter-row {
     flex-direction: column;
     align-items: stretch;
   }
-
   .search-box {
     min-width: 100%;
   }
 }
-
 @media (max-width: 640px) {
   .admin-page {
     padding: 1rem;
   }
-
   .page-header {
     flex-direction: column;
   }

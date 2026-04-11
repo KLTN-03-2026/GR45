@@ -1,4 +1,4 @@
-# FE
+# DoAnPrivateFE
 
 This template should help get you started developing with Vue 3 in Vite.
 
@@ -39,4 +39,48 @@ npm run dev
 
 ```sh
 npm run build
+```
+
+## Các thư viện được sử dụng (Dependencies)
+Dưới đây là danh sách các lệnh cài đặt chi tiết từng nhóm thư viện để dự án có thể chạy ổn định:
+
+- **Framework & State Management**: 
+  - `vue` (v3.x), `vite`, `vue-router`, `pinia` (Quản lý state)
+  ```sh
+  npm install vue vue-router pinia
+  ```
+
+- **API & Realtime**: 
+  - `axios` (Gọi HTTP requests)
+  - `laravel-echo` & `pusher-js` (Kết nối Websocket thời gian thực)
+  ```sh
+  npm install axios laravel-echo pusher-js
+  ```
+
+- **UI & Biểu đồ (Giao diện & Tiện ích)**:
+  - `bootstrap` (UI framework chính)
+  - `lucide-vue-next` (Thư viện icon hiện đại)
+  - `chart.js` & `vue-chartjs` (Vẽ biểu đồ thống kê)
+  - `leaflet` (Bản đồ hỗ trợ tracking thời gian thực)
+  ```sh
+  npm install bootstrap lucide-vue-next chart.js vue-chartjs leaflet
+  ```
+
+**(Hoặc nếu đã tải đủ mã nguồn từ repo, bạn chỉ cần chạy lệnh `npm install` để Node tự động lấy toàn bộ danh sách dựa trên `package.json`)**
+
+## Cấu hình Môi trường (.env)
+Bạn cần tạo file `.env` ở thư mục gốc của dự án Frontend (ngang hàng `package.json`) và thiết lập các thông số sau:
+
+```env
+# Địa chỉ API của Backend (Ví dụ local: http://127.0.0.1:8000/api/)
+VITE_API_URL=http://127.0.0.1:8000/api/
+
+# Cấu hình Pusher (Websocket Realtime) - Đồng bộ với Backend
+VITE_PUSHER_APP_KEY=YOUR_PUSHER_KEY
+VITE_PUSHER_APP_CLUSTER=ap1
+
+# Cấu hình Thanh toán VietQR
+VITE_BANK_ID=
+VITE_BANK_ACCOUNT=
+VITE_ACCOUNT_NAME=
 ```

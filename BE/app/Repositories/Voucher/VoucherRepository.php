@@ -12,46 +12,14 @@ class VoucherRepository implements VoucherRepositoryInterface
         return Voucher::with('nhaXe')->orderBy('created_at', 'desc')->get();
     }
 
-    public function getAllForNhaXe(int $nhaXeId, array $filters = [])
+    public function getAllForNhaXe(int $nhaXeId)
     {
-        $query = Voucher::where('id_nha_xe', $nhaXeId);
-
-        if (!empty($filters['search'])) {
-            $query->where(function ($q) use ($filters) {
-                $q->where('ten_voucher', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('ma_voucher', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-        if (!empty($filters['trang_thai'])) {
-            $query->where('trang_thai', $filters['trang_thai']);
-        }
-
-        return $query->orderBy('created_at', 'desc')->get();
+        return Voucher::where('id_nha_xe', $nhaXeId)->orderBy('created_at', 'desc')->get();
     }
 
     public function createVoucher(array $data)
     {
-        $voucher = Voucher::create($data);
-        return $voucher->load('nhaXe');
-    }
-
-    public function updateVoucher(int $id, array $data)
-    {
-        $voucher = Voucher::find($id);
-        if ($voucher) {
-            $voucher->update($data);
-            return $voucher;
-        }
-        return null;
-    }
-
-    public function deleteVoucher(int $id)
-    {
-        $voucher = Voucher::find($id);
-        if ($voucher) {
-            return $voucher->delete();
-        }
-        return false;
+        return Voucher::create($data);
     }
 
     public function updateStatus(int $id, string $status)

@@ -77,11 +77,7 @@ const router = createRouter({
           name: 'admin-chuyen-xe',
           component: () => import('../views/admin/chuyen-xe/ChuyenXeView.vue'),
         },
-        {
-          path: 'tracking',
-          name: 'admin-tracking',
-          component: () => import('../views/admin/tracking/TrackingView.vue'),
-        },
+
         {
           path: 've',
           name: 'admin-ve',
@@ -92,26 +88,13 @@ const router = createRouter({
           name: 'admin-voucher',
           component: () => import('../views/admin/voucher/VoucherView.vue'),
         },
-        {
-          path: 'nhan-vien',
-          name: 'admin-nhan-vien',
-          component: () => import('../views/admin/nhan-vien/NhanVienView.vue'),
-        },
+
         {
           path: 'nha-xe',
           name: 'admin-nha-xe',
           component: () => import('../views/admin/nha-xe/NhaXeView.vue'),
         },
-        {
-          path: 'tai-xe',
-          name: 'admin-tai-xe',
-          component: () => import('../views/admin/tai-xe/TaiXeView.vue'),
-        },
-        {
-          path: 'phuong-tien',
-          name: 'admin-phuong-tien',
-          component: () => import('../views/admin/phuong-tien/PhuongTienView.vue'),
-        },
+
         {
           path: 'khach-hang',
           name: 'admin-khach-hang',
@@ -122,21 +105,7 @@ const router = createRouter({
           name: 'admin-phan-quyen',
           component: () => import('../views/admin/phan-quyen/PhanQuyenView.vue'),
         },
-        {
-          path: 'cau-hinh',
-          name: 'admin-cau-hinh',
-          component: () => import('../views/admin/cau-hinh/CauHinhView.vue'),
-        },
-        {
-          path: 'ho-tro',
-          name: 'admin-ho-tro',
-          component: () => import('../views/admin/ho-tro/HoTroView.vue'),
-        },
-        {
-          path: 'thong-ke',
-          name: 'admin-thong-ke',
-          component: () => import('../views/admin/thong-ke/ThongKeView.vue'),
-        },
+
         {
           path: 'cai-dat',
           name: 'admin-cai-dat',
@@ -160,11 +129,7 @@ const router = createRouter({
           name: 'operator-dashboard',
           component: () => import('../views/operator/dashboard/DashboardView.vue'),
         },
-        {
-          path: 've',
-          name: 'operator-ve',
-          component: () => import('../views/operator/ve/VeView.vue'),
-        },
+
         {
           path: 'voucher',
           name: 'operator-voucher',
@@ -180,36 +145,13 @@ const router = createRouter({
           name: 'operator-chuyen-xe',
           component: () => import('../views/operator/chuyen-xe/ChuyenXeView.vue'),
         },
-        {
-          path: 'tracking',
-          name: 'operator-tracking',
-          component: () => import('../views/operator/tracking/TrackingView.vue'),
-        },
-        {
-          path: 'tai-xe',
-          name: 'operator-tai-xe',
-          component: () => import('../views/operator/tai-xe/TaiXeView.vue'),
-        },
-        {
-          path: 'phuong-tien',
-          name: 'operator-phuong-tien',
-          component: () => import('../views/operator/phuong-tien/PhuongTienView.vue'),
-        },
+
         {
           path: 'canh-bao',
           name: 'operator-canh-bao',
           component: () => import('../views/operator/canh-bao/CanhBaoView.vue'),
         },
-        {
-          path: 'ho-tro',
-          name: 'operator-ho-tro',
-          component: () => import('../views/operator/ho-tro/HoTroView.vue'),
-        },
-        {
-          path: 'thong-ke',
-          name: 'operator-thong-ke',
-          component: () => import('../views/operator/thong-ke/ThongKeView.vue'),
-        },
+
         {
           path: 'phan-quyen',
           name: 'operator-phan-quyen',
@@ -233,26 +175,7 @@ const router = createRouter({
       beforeEnter: checkDriverLogin,
       redirect: '/tai-xe/dashboard',
       children: [
-        {
-          path: 'dashboard',
-          name: 'driver-dashboard',
-          component: () => import('../views/driver/DashboardView.vue'),
-        },
-        {
-          path: 'lich-trinh',
-          name: 'driver-lich-trinh',
-          component: () => import('../views/driver/LichTrinhView.vue'),
-        },
-        {
-          path: 'ho-tro',
-          name: 'driver-ho-tro',
-          component: () => import('../views/driver/HoTroView.vue'),
-        },
-        {
-          path: 'cai-dat',
-          name: 'driver-cai-dat',
-          component: () => import('../views/driver/CaiDatView.vue'),
-        },
+
       ],
     },
 

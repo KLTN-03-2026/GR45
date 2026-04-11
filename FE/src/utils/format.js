@@ -1,0 +1,1 @@
+export const formatCurrency = (val) => val; export const formatDateOnly = (val) => val; export const formatDate = (val) => val; export const formatDateTime = (val) => val; export const formatTimeOnly = (val) => val;

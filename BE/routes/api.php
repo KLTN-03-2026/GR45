@@ -1,13 +1,22 @@
 <?php
 
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ChucNangController;
+use App\Http\Controllers\ChucVuController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
-// Chỉ import 4 Controller phục vụ cho chức năng Login / Auth
 use App\Http\Controllers\KhachHangController;
 use App\Http\Controllers\TaiXeController;
 use App\Http\Controllers\NhaXeController;
-use App\Http\Controllers\AdminController;
+use App\Http\Controllers\TuyenDuongController;
+use App\Http\Controllers\ChuyenXeController;
+use App\Http\Controllers\ThanhToanController;
+use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\VeController;
+use App\Http\Controllers\XeController;
+use App\Http\Controllers\LoaiXeController;
+use App\Http\Controllers\LoaiGheController;
+
 
 Route::prefix('v1')->group(function () {
 
@@ -23,6 +32,19 @@ Route::prefix('v1')->group(function () {
         Route::get('profile',       [KhachHangController::class, 'profile']);
         Route::put('profile',       [KhachHangController::class, 'updateProfile']);
         Route::post('doi-mat-khau', [KhachHangController::class, 'doiMatKhau']);
+
+        // Khách hàng có thể quản lý vé của mình - xem thông tin vé, hủy vé (nếu chưa đến ngày khởi hành), không can thiệp được vào vé của người khác
+        Route::get('ve',            [VeController::class, 'indexKhachHang']);
+        Route::get('ve/{id}',       [VeController::class, 'showKhachHang']);
+        Route::post('ve/dat-ve',    [VeController::class, 'datVeKhachHang']);
+        Route::patch('ve/{id}/huy', [VeController::class, 'huyVeKhachHang']);
+
+        //voucher của khách hàng
+        Route::get('voucher', [VoucherController::class, 'indexKhachHang']);
+        Route::get('voucher/{id}', [VoucherController::class, 'showKhachHang']);
+
+        // Khách hàng có thể xem thông tin chuyến xe, lịch trình, tracking của chuyến xe mình đã đặt vé, không can thiệp được vào chuyến xe khác
+        Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
     });
 
     // ==========================================
@@ -52,7 +74,7 @@ Route::prefix('v1')->group(function () {
             Route::post('doi-mat-khau', [NhaXeController::class, 'doiMatKhau']);
         });
 
-            // Quản lý Tuyến đường (Nhà xe) 
+            // Quản lý Tuyến đường (Nhà xe)
             Route::get('tuyen-duong', [TuyenDuongController::class, 'index']);
             Route::get('tuyen-duong/{id}', [TuyenDuongController::class, 'show']);
             Route::post('tuyen-duong', [TuyenDuongController::class, 'store']);
@@ -63,6 +85,18 @@ Route::prefix('v1')->group(function () {
             // Quản lý Voucher (Nhà xe)
             Route::get('voucher', [VoucherController::class, 'indexNhaXe']);
             Route::post('voucher', [VoucherController::class, 'storeNhaXe']);
+
+            // Quản lý chuyến xe (Nhà xe) - có thể xem, thêm, sửa, xóa chuyến xe của nhà xe mình, không can thiệp được vào chuyến xe của nhà xe khác
+            Route::get('chuyen-xe', [ChuyenXeController::class, 'index']);
+            Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show']);
+            Route::post('chuyen-xe', [ChuyenXeController::class, 'store']);
+            Route::put('chuyen-xe/{id}', [ChuyenXeController::class, 'update']);
+            Route::delete('chuyen-xe/{id}', [ChuyenXeController::class, 'destroy']);
+            Route::patch('chuyen-xe/{id}/trang-thai', [ChuyenXeController::class, 'toggleStatus']);
+            Route::get('chuyen-xe/{id}/so-do-ghe', [ChuyenXeController::class, 'getSeatMap']);
+            Route::put('chuyen-xe/{id}/doi-xe', [ChuyenXeController::class, 'changeVehicle']);
+            Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
+            Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
     });
 
     // ==========================================
@@ -99,6 +133,25 @@ Route::prefix('v1')->group(function () {
           // Quản lý Voucher (Nhà xe)
             Route::get('voucher', [VoucherController::class, 'indexAdmin'])->middleware('permission:xem-voucher');
             Route::patch('voucher/{id}/duyet', [VoucherController::class, 'duyetVoucherAdmin'])->middleware('permission:duyet-voucher');
+
+
+            // API lấy danh sách quyền của admin đã đăng nhập (dùng để hiển thị/ẩn các chức năng trên giao diện admin)
+            Route::get('phan-quyen', [AdminController::class, 'getPhanQuyen']);
+
+            // Quản lý Chức Năng (Features). Được sử dụng để hiển thị danh sách quyền cần cấp phát.
+            Route::get('chuc-nangs', [ChucNangController::class, 'index']);
+
+            // Chuyến xe
+            Route::post('chuyen-xe/auto-generate', [ChuyenXeController::class, 'autoGenerate'])->middleware('permission:auto-generate-chuyen-xe');
+            Route::get('chuyen-xe', [ChuyenXeController::class, 'index'])->middleware('permission:xem-chuyen-xe');
+            Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show'])->middleware('permission:xem-chuyen-xe');
+            Route::post('chuyen-xe', [ChuyenXeController::class, 'store'])->middleware('permission:them-chuyen-xe');
+            Route::put('chuyen-xe/{id}', [ChuyenXeController::class, 'update'])->middleware('permission:sua-chuyen-xe');
+            Route::patch('chuyen-xe/{id}/trang-thai', [ChuyenXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-chuyen-xe');
+            Route::delete('chuyen-xe/{id}', [ChuyenXeController::class, 'destroy'])->middleware('permission:xoa-chuyen-xe');
+            Route::get('chuyen-xe/{id}/so-do-ghe', [ChuyenXeController::class, 'getSeatMap']);
+            Route::put('chuyen-xe/{id}/doi-xe', [ChuyenXeController::class, 'changeVehicle'])->middleware('permission:doi-xe');
+
         });
     });
 
