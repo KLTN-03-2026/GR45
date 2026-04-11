@@ -20,16 +20,7 @@ const adminApi = {
   toggleOperatorStatus: (id) => axiosClient.patch(`/v1/admin/nha-xe/${id}/trang-thai`),
   deleteOperator: (id) => axiosClient.delete(`/v1/admin/nha-xe/${id}`),
 
-  // QUẢN LÝ TUYẾN ĐƯỜNG
-  getRoutes: (params) => axiosClient.get('/v1/admin/tuyen-duong', { params }),
-  getRouteDetails: (id) => axiosClient.get(`/v1/admin/tuyen-duong/${id}`),
-  createRoute: (data) => axiosClient.post('/v1/admin/tuyen-duong', data),
-  updateRoute: (id, data) => axiosClient.put(`/v1/admin/tuyen-duong/${id}`, data),
-  approveRoute: (id) => axiosClient.patch(`/v1/admin/tuyen-duong/${id}/duyet`),
-  rejectRoute: (id) => axiosClient.patch(`/v1/admin/tuyen-duong/${id}/tu-choi`),
-  deleteRoute: (id) => axiosClient.delete(`/v1/admin/tuyen-duong/${id}`),
-
-
+  // Q
   // --- QUẢN LÝ VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),
   approveVoucher: (id, data) => axiosClient.patch(`/v1/admin/voucher/${id}/duyet`, data),

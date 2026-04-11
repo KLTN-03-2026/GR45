@@ -52,17 +52,13 @@ Route::prefix('v1')->group(function () {
             Route::post('doi-mat-khau', [NhaXeController::class, 'doiMatKhau']);
         });
 
-            // Quản lý Tuyến đường (Nhà xe) 
+            // Tuyến đường 
             Route::get('tuyen-duong', [TuyenDuongController::class, 'index']);
             Route::get('tuyen-duong/{id}', [TuyenDuongController::class, 'show']);
             Route::post('tuyen-duong', [TuyenDuongController::class, 'store']);
             Route::put('tuyen-duong/{id}', [TuyenDuongController::class, 'update']);
             Route::delete('tuyen-duong/{id}', [TuyenDuongController::class, 'destroy']);
 
-
-            // Quản lý Voucher (Nhà xe)
-            Route::get('voucher', [VoucherController::class, 'indexNhaXe']);
-            Route::post('voucher', [VoucherController::class, 'storeNhaXe']);
     });
 
     // ==========================================
@@ -85,20 +81,6 @@ Route::prefix('v1')->group(function () {
             Route::put('nha-xe/{id}', [NhaXeController::class, 'updateOperator'])->middleware('permission:sua-nha-xe');
             Route::patch('nha-xe/{id}/trang-thai', [NhaXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-nha-xe');
             Route::delete('nha-xe/{id}', [NhaXeController::class, 'destroy'])->middleware('permission:xoa-nha-xe');
-
-
-          // Quản lý Tuyến đường (Nhà xe)
-            Route::get('tuyen-duong', [TuyenDuongController::class, 'index'])->middleware('permission:xem-tuyen-duong');
-            Route::get('tuyen-duong/{id}', [TuyenDuongController::class, 'show'])->middleware('permission:xem-tuyen-duong');
-            Route::post('tuyen-duong', [TuyenDuongController::class, 'store'])->middleware('permission:them-tuyen-duong');
-            Route::put('tuyen-duong/{id}', [TuyenDuongController::class, 'update'])->middleware('permission:sua-tuyen-duong');
-            Route::patch('tuyen-duong/{id}/duyet', [TuyenDuongController::class, 'confirm'])->middleware('permission:duyet-tuyen-duong');
-            Route::patch('tuyen-duong/{id}/tu-choi', [TuyenDuongController::class, 'cancel'])->middleware('permission:duyet-tuyen-duong');
-            Route::delete('tuyen-duong/{id}', [TuyenDuongController::class, 'destroy'])->middleware('permission:xoa-tuyen-duong');
-
-          // Quản lý Voucher (Nhà xe)
-            Route::get('voucher', [VoucherController::class, 'indexAdmin'])->middleware('permission:xem-voucher');
-            Route::patch('voucher/{id}/duyet', [VoucherController::class, 'duyetVoucherAdmin'])->middleware('permission:duyet-voucher');
         });
     });
 
