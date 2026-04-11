@@ -65,6 +65,14 @@ Route::prefix('v1')->group(function () {
             Route::post('logout',     [AdminController::class, 'logout']);
             Route::post('refresh',    [AdminController::class, 'refresh']);
             Route::get('me',          [AdminController::class, 'me']);
+
+        // Nhà xe
+            Route::get('nha-xe', [NhaXeController::class, 'index'])->middleware('permission:xem-nha-xe');
+            Route::get('nha-xe/{id}', [NhaXeController::class, 'show'])->middleware('permission:xem-nha-xe');
+            Route::post('nha-xe', [NhaXeController::class, 'store'])->middleware('permission:them-nha-xe');
+            Route::put('nha-xe/{id}', [NhaXeController::class, 'updateOperator'])->middleware('permission:sua-nha-xe');
+            Route::patch('nha-xe/{id}/trang-thai', [NhaXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-nha-xe');
+            Route::delete('nha-xe/{id}', [NhaXeController::class, 'destroy'])->middleware('permission:xoa-nha-xe');
         });
     });
 
