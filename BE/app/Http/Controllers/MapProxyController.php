@@ -22,10 +22,14 @@ class MapProxyController extends Controller
 
         try {
             $response = Http::timeout(10)->get('https://mapapis.openmap.vn/v1/direction', $params);
+            $status = $response->status();
+            if ($status === 401 || $status === 403) {
+                $status = 400;
+            }
 
-            return response()->json($response->json(), $response->status());
+            return response()->json($response->json(), $status);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Map proxy error: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'Map proxy error: '.$e->getMessage()], 500);
         }
     }
 
@@ -35,7 +39,7 @@ class MapProxyController extends Controller
     public function osrmRoute(Request $request)
     {
         $coords = $request->query('coords');
-        if (!$coords) {
+        if (! $coords) {
             return response()->json(['error' => 'Missing coords'], 400);
         }
 
@@ -45,7 +49,7 @@ class MapProxyController extends Controller
 
             return response()->json($response->json(), $response->status());
         } catch (\Exception $e) {
-            return response()->json(['error' => 'OSRM proxy error: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'OSRM proxy error: '.$e->getMessage()], 500);
         }
     }
 }

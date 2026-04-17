@@ -19,7 +19,8 @@ import {
   FileText,
   Clock,
   BarChart2,
-  Gift
+  Gift,
+  Star
 } from 'lucide-vue-next'
 
 // Inject từ OperatorLayout
@@ -78,6 +79,12 @@ const menuList = [
     name: 'Voucher',
     path: '/nha-xe/voucher',
     icon: Gift
+  },
+  {
+    id: 'danh-gia',
+    name: 'Đánh giá chuyến xe',
+    path: '/nha-xe/danh-gia',
+    icon: Star
   },
 
   // --- Nhân sự ---
@@ -155,6 +162,9 @@ const menuList = [
     <nav class="sidebar-menu">
       <template v-for="item in menuList" :key="item.id">
         <!-- Phân nhóm label theo vị trí -->
+        <div v-if="item.id === 'danh-gia'" class="menu-section-divider">
+          <span>PHẢN HỒI</span>
+        </div>
         <div v-if="item.id === 'nhan-su'" class="menu-section-divider">
           <span>NHÂN SỰ</span>
         </div>

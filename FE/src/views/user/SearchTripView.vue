@@ -255,16 +255,137 @@ const resetFilters = () => {
 // ── Modal chi tiết chuyến xe ────────────────────────────
 const selectedTrip = ref(null);
 const showModal = ref(false);
+const detailRatings = ref([]);
+const ratingSummary = ref({ total_ratings: 0, avg_diem_so: null });
+const ratingLoading = ref(false);
+const showRatingDetailModal = ref(false);
+const selectedRating = ref(null);
+
+/** Chuẩn hóa JSON GET .../chuyen-xe/{id}/danh-gia (có/không paginate). */
+const parseTripRatingsPayload = (rateRes) => {
+  const empty = { total_ratings: 0, avg_diem_so: null, list: [] };
+  if (!rateRes || rateRes.success === false) return empty;
+  const s = rateRes.summary || rateRes.data?.summary || {};
+  const summary = {
+    total_ratings: Number(s.total_ratings) || 0,
+    avg_diem_so:
+      s.avg_diem_so != null && s.avg_diem_so !== ""
+        ? Number(s.avg_diem_so)
+        : null,
+  };
+  const raw = rateRes.data;
+  let list = [];
+  if (Array.isArray(raw?.data)) list = raw.data;
+  else if (Array.isArray(raw?.ratings)) list = raw.ratings;
+  else if (Array.isArray(raw)) list = raw;
+  return { ...summary, list };
+};
+
+const fetchTripRatings = async (tripId) => {
+  if (tripId == null || tripId === "") {
+    detailRatings.value = [];
+    ratingSummary.value = { total_ratings: 0, avg_diem_so: null };
+    return;
+  }
+  try {
+    ratingLoading.value = true;
+    const body = await clientApi.getTripRatings(String(tripId), { per_page: 50 });
+    const parsed = parseTripRatingsPayload(body);
+    detailRatings.value = parsed.list;
+    const paginator = body?.data;
+    const totalFromSummary = Number(parsed.total_ratings);
+    const totalFromPage = Number(paginator?.total);
+    ratingSummary.value = {
+      total_ratings:
+        Number.isFinite(totalFromSummary) && totalFromSummary >= 0
+          ? totalFromSummary
+          : Number.isFinite(totalFromPage) && totalFromPage >= 0
+            ? totalFromPage
+            : detailRatings.value.length,
+      avg_diem_so: parsed.avg_diem_so,
+    };
+  } catch {
+    detailRatings.value = [];
+    ratingSummary.value = { total_ratings: 0, avg_diem_so: null };
+  } finally {
+    ratingLoading.value = false;
+  }
+};
 
 const openTripDetail = (chuyen) => {
   selectedTrip.value = chuyen;
+  detailRatings.value = [];
+  ratingSummary.value = { total_ratings: 0, avg_diem_so: null };
   showModal.value = true;
+  fetchTripRatings(chuyen?.id);
 };
 
 const closeModal = () => {
   showModal.value = false;
   selectedTrip.value = null;
+  detailRatings.value = [];
+  ratingSummary.value = { total_ratings: 0, avg_diem_so: null };
+  ratingLoading.value = false;
+  showRatingDetailModal.value = false;
+  selectedRating.value = null;
 };
+
+const openRatingDetail = (rating) => {
+  selectedRating.value = rating;
+  showRatingDetailModal.value = true;
+};
+
+const getRatingCustomerName = (rating) => {
+  const name =
+    rating?.khach_hang?.ho_va_ten ||
+    rating?.khachHang?.ho_va_ten ||
+    rating?.khach_hang?.ho_ten ||
+    rating?.khachHang?.ho_ten ||
+    rating?.ho_va_ten ||
+    rating?.ho_ten ||
+    rating?.ten_khach_hang ||
+    "";
+  return name.trim() || "—";
+};
+
+/** Điểm sao 0–5 (số nguyên) cho hiển thị ★ */
+const clampRatingScore = (raw) => {
+  const n = Math.round(Number(raw));
+  if (Number.isNaN(n)) return 0;
+  return Math.min(5, Math.max(0, n));
+};
+
+const subRatingStars = (raw) => {
+  if (raw == null || raw === "") return 0;
+  return clampRatingScore(raw);
+};
+
+const subRatingLabel = (raw) => {
+  if (raw == null || raw === "") return "—";
+  return `${clampRatingScore(raw)}/5`;
+};
+
+/** Điểm TB chuyến (header): ưu tiên summary API, fallback từ trang đã tải */
+const tripHeaderAvgScore = computed(() => {
+  const a = ratingSummary.value?.avg_diem_so;
+  if (a != null && !Number.isNaN(Number(a))) return Number(a);
+  const rows = detailRatings.value;
+  if (!rows.length) return null;
+  const sum = rows.reduce((acc, r) => acc + Number(r?.diem_so ?? 0), 0);
+  return Math.round((sum / rows.length) * 10) / 10;
+});
+
+const tripHeaderTotalRatings = computed(() => {
+  const t = Number(ratingSummary.value?.total_ratings);
+  if (Number.isFinite(t) && t >= 0) return t;
+  return detailRatings.value.length;
+});
+
+const tripHeaderStarFill = computed(() => {
+  const avg = tripHeaderAvgScore.value;
+  if (avg == null || Number.isNaN(avg)) return 0;
+  return clampRatingScore(Math.round(avg));
+});
 
 const handleBookTicket = () => {
   if (!selectedTrip.value) return;
@@ -796,12 +917,47 @@ onBeforeUnmount(() => {
           <div class="trip-modal">
             <!-- Header Modal -->
             <div class="trip-modal__header">
-              <div class="trip-modal__header-info">
+              <div class="trip-modal__header-text">
                 <h2 class="trip-modal__title">Chi tiết chuyến xe</h2>
                 <span class="trip-modal__route-badge">
                   {{ selectedTrip.tuyen_duong?.diem_bat_dau }} →
                   {{ selectedTrip.tuyen_duong?.diem_ket_thuc }}
                 </span>
+              </div>
+              <div class="trip-modal__header-rating" aria-live="polite">
+                <template v-if="ratingLoading">
+                  <span class="trip-modal__header-rating-loading">Đang tải…</span>
+                </template>
+                <template
+                  v-else-if="tripHeaderTotalRatings > 0 && tripHeaderAvgScore != null"
+                >
+                  <div class="trip-modal__header-rating-stars">
+                    <span
+                      v-for="star in 5"
+                      :key="`hdr-star-${star}`"
+                      class="trip-modal__header-star"
+                      :class="{
+                        'trip-modal__header-star--on':
+                          star <= tripHeaderStarFill,
+                      }"
+                      aria-hidden="true"
+                      >★</span
+                    >
+                  </div>
+                  <div class="trip-modal__header-rating-meta">
+                    <span class="trip-modal__header-rating-score"
+                      >{{ tripHeaderAvgScore }}/5</span
+                    >
+                    <span class="trip-modal__header-rating-count"
+                      >{{ tripHeaderTotalRatings }} đánh giá</span
+                    >
+                  </div>
+                </template>
+                <template v-else>
+                  <span class="trip-modal__header-rating-empty"
+                    >Chưa có đánh giá</span
+                  >
+                </template>
               </div>
               <button class="trip-modal__close" @click="closeModal">
                 <span class="material-symbols-outlined">close</span>
@@ -810,6 +966,45 @@ onBeforeUnmount(() => {
 
             <!-- Body Modal -->
             <div class="trip-modal__body">
+              <div
+                v-if="ratingLoading || detailRatings.length"
+                class="trip-modal__ratings-top"
+              >
+                <div v-if="ratingLoading" class="trip-modal__ratings-top-loading">
+                  Đang tải đánh giá...
+                </div>
+                <div v-else class="trip-modal__rating-list">
+                  <div
+                    v-for="(rating, idx) in detailRatings"
+                    :key="rating.id ?? `r-${idx}`"
+                    class="trip-modal__rating-item"
+                    @click="openRatingDetail(rating)"
+                  >
+                    <div class="trip-modal__rating-head">
+                      <span class="trip-modal__rating-name">
+                        {{ getRatingCustomerName(rating) }}
+                      </span>
+                    </div>
+                    <div class="trip-modal__rating-stars-row">
+                      <span
+                        v-for="star in 5"
+                        :key="`${rating.id ?? idx}-list-${star}`"
+                        class="trip-modal__rating-star"
+                        :class="{
+                          'trip-modal__rating-star--on':
+                            star <= clampRatingScore(rating.diem_so),
+                        }"
+                        aria-hidden="true"
+                        >★</span
+                      >
+                      <span class="trip-modal__rating-score"
+                        >{{ clampRatingScore(rating.diem_so) }}/5</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <!-- Nhà xe -->
               <div class="trip-modal__section">
                 <div class="trip-modal__section-icon">
@@ -947,6 +1142,141 @@ onBeforeUnmount(() => {
                 >
                 Đặt vé ngay
               </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div
+          v-if="showRatingDetailModal && selectedRating"
+          class="trip-rating-detail-overlay"
+          @click.self="showRatingDetailModal = false"
+        >
+          <div class="trip-rating-detail-modal">
+            <div class="trip-rating-detail-header">
+              <h3>Chi tiết đánh giá</h3>
+              <button type="button" @click="showRatingDetailModal = false">
+                <span class="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div class="trip-rating-detail-body">
+              <div v-if="selectedTrip" class="trip-rating-detail-trip">
+                <div class="trip-rating-detail-trip-title">Chuyến xe</div>
+                <div class="trip-rating-detail-trip-route">
+                  {{ selectedTrip.tuyen_duong?.diem_bat_dau }} →
+                  {{ selectedTrip.tuyen_duong?.diem_ket_thuc }}
+                </div>
+                <div class="trip-rating-detail-trip-meta">
+                  <span>{{ selectedTrip.tuyen_duong?.ten_tuyen_duong }}</span>
+                  <span v-if="selectedTrip.tuyen_duong?.nha_xe?.ten_nha_xe">
+                    · {{ selectedTrip.tuyen_duong.nha_xe.ten_nha_xe }}
+                  </span>
+                </div>
+                <div class="trip-rating-detail-trip-meta">
+                  <span>Ngày: {{ formatFullDate(selectedTrip.ngay_khoi_hanh) }}</span>
+                  <span> · Giờ: {{ formatTime(selectedTrip.gio_khoi_hanh) }}</span>
+                  <span v-if="selectedTrip.xe?.bien_so">
+                    · Xe: {{ selectedTrip.xe.bien_so }}</span
+                  >
+                </div>
+              </div>
+              <div class="trip-rating-detail-top">
+                <span class="trip-rating-detail-name">
+                  {{ getRatingCustomerName(selectedRating) }}
+                </span>
+                <div class="trip-rating-detail-stars-row">
+                  <span
+                    v-for="star in 5"
+                    :key="`detail-main-${star}`"
+                    class="trip-rating-detail-star"
+                    :class="{
+                      'trip-rating-detail-star--on':
+                        star <= clampRatingScore(selectedRating?.diem_so),
+                    }"
+                    aria-hidden="true"
+                    >★</span
+                  >
+                  <span class="trip-rating-detail-score">{{
+                    clampRatingScore(selectedRating?.diem_so)
+                  }}/5</span>
+                </div>
+              </div>
+              <div class="trip-rating-detail-grid">
+                <div class="trip-rating-detail-metric">
+                  <span class="trip-rating-detail-metric-label">Dịch vụ</span>
+                  <div class="trip-rating-detail-metric-stars">
+                    <span
+                      v-for="star in 5"
+                      :key="`dv-${star}`"
+                      class="trip-rating-detail-star trip-rating-detail-star--sm"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          star <= subRatingStars(selectedRating?.diem_dich_vu),
+                      }"
+                      aria-hidden="true"
+                      >★</span
+                    >
+                    <strong>{{ subRatingLabel(selectedRating?.diem_dich_vu) }}</strong>
+                  </div>
+                </div>
+                <div class="trip-rating-detail-metric">
+                  <span class="trip-rating-detail-metric-label">An toàn</span>
+                  <div class="trip-rating-detail-metric-stars">
+                    <span
+                      v-for="star in 5"
+                      :key="`at-${star}`"
+                      class="trip-rating-detail-star trip-rating-detail-star--sm"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          star <= subRatingStars(selectedRating?.diem_an_toan),
+                      }"
+                      aria-hidden="true"
+                      >★</span
+                    >
+                    <strong>{{ subRatingLabel(selectedRating?.diem_an_toan) }}</strong>
+                  </div>
+                </div>
+                <div class="trip-rating-detail-metric">
+                  <span class="trip-rating-detail-metric-label">Sạch sẽ</span>
+                  <div class="trip-rating-detail-metric-stars">
+                    <span
+                      v-for="star in 5"
+                      :key="`ss-${star}`"
+                      class="trip-rating-detail-star trip-rating-detail-star--sm"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          star <= subRatingStars(selectedRating?.diem_sach_se),
+                      }"
+                      aria-hidden="true"
+                      >★</span
+                    >
+                    <strong>{{ subRatingLabel(selectedRating?.diem_sach_se) }}</strong>
+                  </div>
+                </div>
+                <div class="trip-rating-detail-metric">
+                  <span class="trip-rating-detail-metric-label">Thái độ</span>
+                  <div class="trip-rating-detail-metric-stars">
+                    <span
+                      v-for="star in 5"
+                      :key="`td-${star}`"
+                      class="trip-rating-detail-star trip-rating-detail-star--sm"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          star <= subRatingStars(selectedRating?.diem_thai_do),
+                      }"
+                      aria-hidden="true"
+                      >★</span
+                    >
+                    <strong>{{ subRatingLabel(selectedRating?.diem_thai_do) }}</strong>
+                  </div>
+                </div>
+              </div>
+              <p class="trip-rating-detail-note">
+                {{ selectedRating?.noi_dung || "Không có nhận xét." }}
+              </p>
             </div>
           </div>
         </div>
@@ -2124,8 +2454,10 @@ onBeforeUnmount(() => {
 /* Header */
 .trip-modal__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #f1f5f9;
   background: linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%);
@@ -2133,16 +2465,77 @@ onBeforeUnmount(() => {
   border-radius: 24px 24px 0 0;
 }
 
+.trip-modal__header-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .trip-modal__title {
   font-size: 1.1rem;
   font-weight: 800;
-  margin-bottom: 0.35rem;
+  margin: 0 0 0.35rem;
 }
 
 .trip-modal__route-badge {
+  display: inline-block;
   font-size: 0.8rem;
   font-weight: 600;
   opacity: 0.85;
+}
+
+.trip-modal__header-rating {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.trip-modal__header-rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 0.06rem;
+  line-height: 1;
+}
+
+.trip-modal__header-star {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.32);
+  letter-spacing: -0.06em;
+}
+
+.trip-modal__header-star--on {
+  color: #fcd34d;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.trip-modal__header-rating-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+}
+
+.trip-modal__header-rating-score {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #fef08a;
+  line-height: 1.2;
+}
+
+.trip-modal__header-rating-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.trip-modal__header-rating-loading,
+.trip-modal__header-rating-empty {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
 }
 
 .trip-modal__close {
@@ -2210,6 +2603,249 @@ onBeforeUnmount(() => {
   font-size: 0.8rem;
   color: #64748b;
   margin-top: 0.15rem;
+}
+
+.trip-modal__ratings-top {
+  margin: -0.25rem 0 1rem;
+}
+
+.trip-modal__ratings-top-loading {
+  font-size: 0.78rem;
+  color: #64748b;
+  padding: 0.35rem 0;
+}
+
+.trip-modal__rating-list {
+  margin-top: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+  scroll-snap-type: x mandatory;
+}
+
+.trip-modal__rating-item {
+  min-width: 220px;
+  max-width: 240px;
+  flex: 0 0 auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 0.55rem 0.7rem;
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.trip-modal__rating-item:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.trip-modal__rating-head {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.trip-modal__rating-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.trip-modal__rating-stars-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.2rem;
+  margin-top: 0.35rem;
+}
+
+.trip-modal__rating-star {
+  font-size: 0.78rem;
+  line-height: 1;
+  color: #cbd5e1;
+  letter-spacing: -0.06em;
+}
+
+.trip-modal__rating-star--on {
+  color: #f59e0b;
+}
+
+.trip-modal__rating-score {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #d97706;
+  margin-left: 0.25rem;
+}
+
+.trip-rating-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9100;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.trip-rating-detail-modal {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  border: 1px solid #e2e8f0;
+}
+
+.trip-rating-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.trip-rating-detail-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.trip-rating-detail-header button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.trip-rating-detail-body {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.trip-rating-detail-trip {
+  margin-bottom: 0.85rem;
+  padding: 0.65rem 0.75rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.trip-rating-detail-trip-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.trip-rating-detail-trip-route {
+  font-weight: 800;
+  color: #1e40af;
+  font-size: 0.82rem;
+  margin-bottom: 0.25rem;
+}
+
+.trip-rating-detail-trip-meta {
+  line-height: 1.45;
+  color: #475569;
+}
+
+.trip-rating-detail-top {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.trip-rating-detail-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.trip-rating-detail-stars-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.08rem 0.15rem;
+}
+
+.trip-rating-detail-star {
+  font-size: 0.95rem;
+  line-height: 1;
+  color: #cbd5e1;
+  letter-spacing: -0.05em;
+}
+
+.trip-rating-detail-star--sm {
+  font-size: 0.72rem;
+}
+
+.trip-rating-detail-star--on {
+  color: #f59e0b;
+}
+
+.trip-rating-detail-score {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #d97706;
+  margin-left: 0.3rem;
+}
+
+.trip-rating-detail-grid {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.65rem;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.trip-rating-detail-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.trip-rating-detail-metric-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.trip-rating-detail-metric-stars {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.06rem 0.12rem;
+}
+
+.trip-rating-detail-metric-stars strong {
+  margin-left: 0.25rem;
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.trip-rating-detail-note {
+  margin-top: 0.65rem;
+  margin-bottom: 0;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.8rem;
+  color: #334155;
 }
 
 /* Timeline */

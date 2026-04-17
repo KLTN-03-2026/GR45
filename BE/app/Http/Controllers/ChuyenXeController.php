@@ -8,6 +8,7 @@ use App\Services\TrackingHanhTrinhService;
 use App\Http\Requests\ChuyenXe\StoreChuyenXeRequest;
 use App\Http\Requests\ChuyenXe\UpdateChuyenXeRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ChuyenXeController extends Controller
 {
@@ -20,9 +21,19 @@ class ChuyenXeController extends Controller
         $this->trackingService = $trackingService;
     }
 
+    /** Người gọi API đang đăng nhập (đa guard Sanctum). */
+    private function apiActor(): mixed
+    {
+        return Auth::guard('admin')->user()
+            ?? Auth::guard('tai_xe')->user()
+            ?? Auth::guard('nha_xe')->user()
+            ?? Auth::guard('khach_hang')->user()
+            ?? Auth::guard('sanctum')->user();
+    }
+
     public function index(Request $request)
     {
-        $user = auth('sanctum')->user();
+        $user = $this->apiActor();
         try {
             if ($user instanceof \App\Models\TaiXe) {
                 $data = $this->chuyenXeService->getByTaiXe($request->all());
@@ -159,7 +170,7 @@ class ChuyenXeController extends Controller
 
     public function getLichTrinhCaNhan(Request $request)
     {
-        $user = auth('sanctum')->user();
+        $user = $this->apiActor();
         if (!$user || !($user instanceof \App\Models\TaiXe)) {
             return response()->json(['success' => false, 'message' => 'Không được phép truy cập.'], 401);
         }
@@ -262,7 +273,7 @@ class ChuyenXeController extends Controller
     public function getTracking(Request $request, $id)
     {
         try {
-            $user = auth('sanctum')->user();
+            $user = $this->apiActor();
             if (!$user) {
                 throw new \Exception('Ban chua dang nhap.');
             }
@@ -293,7 +304,7 @@ class ChuyenXeController extends Controller
     public function getLiveTracking(Request $request, $id)
     {
         try {
-            $user = auth('sanctum')->user();
+            $user = $this->apiActor();
 
             if ($user) {
                 $data = $this->trackingService->getLiveTrackingForUser((int) $id, $user);
