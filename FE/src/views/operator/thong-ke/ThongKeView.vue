@@ -1,11 +1,14 @@
 <script setup>
+/**
+ * Thống kê nhà xe — ưu tiên GET /v1/nha-xe/bao-cao/*; fallback tổng hợp từ /v1/nha-xe/ve nếu báo cáo thiếu dữ liệu.
+ */
 // Trang Thống Kê & Báo Cáo Doanh Thu – Nhà Xe (dữ liệu riêng của nhà xe đăng nhập)
 import { ref, computed, onMounted } from 'vue'
 import {
   TrendingUp, DollarSign, Ticket, BusFront, Users,
   Calendar, Download, RefreshCw, Filter, MapPin,
   CheckCircle, XCircle, Clock, ArrowUpRight, ArrowDownRight,
-  Star, ChevronLeft, ChevronRight, AlertTriangle
+  Star, ChevronLeft, ChevronRight, AlertTriangle, Percent, FileText, PieChart
 } from 'lucide-vue-next'
 import {
   Chart as ChartJS,
@@ -54,11 +57,25 @@ const buildDateRange = () => {
 
 // ─── KPI tổng hợp ────────────────────────────────────────────────────
 const kpi = ref({
-  tongDoanhThu: 0, tongVe: 0, tongChuyenXe: 0, tongKhachHang: 0,
-  veHoanThanh: 0, veHuy: 0, veCho: 0,
-  tyLeHoanThanh: 0, tyLeHuy: 0, tyLeLapDay: 0,
+  tongDoanhThu: 0,
+  tongVeDaBan: 0,
+  tongVe: 0,
+  tongChuyenXe: 0,
+  /** Khách có tương tác vé trong kỳ (distinct); KH mới thật cần API khách hàng */
+  khachHangMoi: 0,
+  veHoanThanh: 0,
+  veHuy: 0,
+  veCho: 0,
+  tyLeHoanThanh: 0,
+  tyLeHuy: 0,
+  tyLeLapDay: 0,
 })
+const ticketVeSlice = ref({ daThanhToanNonCash: 0, tienMat: 0, daHuy: 0 })
+const routeTop = ref([])
+const routeBottom = ref([])
 const isLoading = ref(false)
+const isExporting = ref(false)
+const isExportingPdf = ref(false)
 
 // ─── Dữ liệu biểu đồ ────────────────────────────────────────────────
 const MONTHS = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']
@@ -84,73 +101,224 @@ const fmt = (n) => {
 const fmtFull = (n) => (Number(n)||0).toLocaleString('vi-VN') + ' ₫'
 const fmtDate = (d) => d ? new Date(d).toLocaleString('vi-VN') : '—'
 
-// ─── Gọi API vé (thực tế) & tính KPI từ đó ──────────────────────────
-const fetchData = async () => {
-  isLoading.value = true
+const unwrapApi = (res) => {
+  if (res == null) return null
+  if (res.success === false) return null
+  return res.data !== undefined ? res.data : res
+}
+
+const normalizeTuyenRow = (x) => {
+  if (!x || typeof x !== 'object') return null
+  const label =
+    x.ten_tuyen_duong ||
+    x.ten_tuyen ||
+    x.label ||
+    [x.diem_bat_dau, x.diem_ket_thuc].filter(Boolean).join(' → ') ||
+    (typeof x.tuyen_duong === 'string' ? x.tuyen_duong : null) ||
+    `Tuyến #${x.id_tuyen_duong ?? x.id ?? ''}`
+  return {
+    ten_tuyen: label,
+    doanh_thu: Number(x.doanh_thu ?? x.tong_doanh_thu ?? 0),
+    so_ve: Number(x.so_ve ?? x.so_luong_ve ?? 0),
+  }
+}
+const mapTuyenList = (raw) => (Array.isArray(raw) ? raw.map(normalizeTuyenRow).filter(Boolean) : [])
+
+const getTinhTrang = (v) => String(v?.tinh_trang ?? v?.trang_thai ?? '').toLowerCase()
+const isHuyVe = (v) => ['huy', 'da_huy'].includes(getTinhTrang(v))
+const isDaTT = (v) => getTinhTrang(v) === 'da_thanh_toan'
+const isCho = (v) => getTinhTrang(v) === 'dang_cho'
+const isTienMat = (v) => String(v?.phuong_thuc_thanh_toan ?? '').toLowerCase() === 'tien_mat'
+
+const fetchBaoCaoOperator = async (range) => {
   try {
-    const range = buildDateRange()
-    // Lấy tất cả vé trong khoảng lọc để tính KPI
+    const [dashRes, tuyenRes, ttRes] = await Promise.all([
+      operatorApi.getBaoCaoDashboard(range),
+      operatorApi.getBaoCaoTheoTuyenDuong(range),
+      operatorApi.getBaoCaoTrangThaiVe(range),
+    ])
+    const d = unwrapApi(dashRes)
+    if (d && typeof d === 'object') {
+      const rev = Number(d.tong_doanh_thu ?? d.tongDoanhThu ?? 0)
+      if (!Number.isNaN(rev) && rev >= 0) kpi.value.tongDoanhThu = rev
+      if (d.tong_ve_da_ban != null) kpi.value.tongVeDaBan = Number(d.tong_ve_da_ban)
+      if (d.ty_le_lap_day_tb != null) kpi.value.tyLeLapDay = Number(d.ty_le_lap_day_tb)
+      if (d.khach_hang_moi != null) kpi.value.khachHangMoi = Number(d.khach_hang_moi)
+      if (d.tong_ve != null) kpi.value.tongVe = Number(d.tong_ve)
+      if (Array.isArray(d.theo_thang) && d.theo_thang.length) {
+        const rev = Array(12).fill(0)
+        const tkt = Array(12).fill(0)
+        d.theo_thang.forEach((item) => {
+          const m =
+            typeof item.thang === 'string'
+              ? parseInt(item.thang.split('-')[1], 10) - 1
+              : Number(item.thang) - 1
+          if (m >= 0 && m < 12) {
+            rev[m] = Number(item.doanh_thu ?? 0)
+            tkt[m] = Number(item.so_ve ?? 0)
+          }
+        })
+        revenueByMonth.value = rev
+        ticketsByMonth.value = tkt
+      }
+      if (Array.isArray(d.top_chuyen_tai_xe) || Array.isArray(d.theo_tai_xe)) {
+        const arr = d.top_chuyen_tai_xe ?? d.theo_tai_xe
+        revenueByDriver.value = arr.slice(0, 5).map((x) => ({
+          ten_tai_xe: x.ten_tai_xe ?? x.ten ?? '—',
+          so_chuyen: Number(x.so_chuyen ?? x.so_chuyen_xe ?? 0),
+          so_ve: Number(x.so_ve ?? 0),
+        }))
+      }
+    }
+    const t = unwrapApi(tuyenRes)
+    if (t) {
+      if (Array.isArray(t.cao) || Array.isArray(t.tuyen_doanh_thu_cao)) {
+        const arr = mapTuyenList(t.cao ?? t.tuyen_doanh_thu_cao)
+        if (arr.length) routeTop.value = arr.slice(0, 8)
+      }
+      if (Array.isArray(t.thap) || Array.isArray(t.tuyen_it_khach)) {
+        const arr = mapTuyenList(t.thap ?? t.tuyen_it_khach)
+        if (arr.length) routeBottom.value = arr.slice(0, 8)
+      }
+      if (!routeTop.value.length && Array.isArray(t.du_lieu)) {
+        const arr = mapTuyenList(t.du_lieu)
+        routeTop.value = [...arr].sort((a, b) => b.doanh_thu - a.doanh_thu).slice(0, 8)
+        routeBottom.value = [...arr].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+      }
+    }
+    const v = unwrapApi(ttRes)
+    if (v && typeof v === 'object') {
+      ticketVeSlice.value = {
+        daThanhToanNonCash: Number(v.da_thanh_toan_khong_tien_mat ?? v.khong_tien_mat ?? 0),
+        tienMat: Number(v.tien_mat ?? v.ve_tien_mat ?? 0),
+        daHuy: Number(v.da_huy ?? v.huy ?? 0),
+      }
+    }
+  } catch (e) {
+    console.warn('[ThongKe] bao-cao nha xe:', e?.message ?? e)
+  }
+}
+
+// ─── Fallback: tổng hợp từ danh sách vé ───────────────────────────────
+const fetchDataFromTickets = async () => {
+  const range = buildDateRange()
+  try {
     const allRes = await operatorApi.getTickets({ ...range, per_page: 9999, page: 1 })
     const allPayload = allRes?.data ?? allRes
-    const allList    = allPayload?.data ?? []
+    const allList = Array.isArray(allPayload?.data) ? allPayload.data : []
 
-    // Tính KPI từ danh sách vé
-    const getSoTien = (v) => Number(v.gia_ve ?? v.so_tien ?? v.tong_tien ?? 0)
-    const veTC = allList.filter(v => v.trang_thai === 'hoan_thanh' || v.trang_thai == 1 || v.trang_thai === 'confirmed')
-    const veHuy = allList.filter(v => v.trang_thai === 'da_huy'    || v.trang_thai == 0 || v.trang_thai === 'cancelled')
-    const veCho  = allList.filter(v => !veTC.includes(v) && !veHuy.includes(v))
+    const getSoTien = (v) => Number(v.tong_tien ?? v.gia_ve ?? v.so_tien ?? 0)
+    const veDaTT = allList.filter(isDaTT)
+    const veHuy = allList.filter(isHuyVe)
+    const veCho = allList.filter((v) => isCho(v) || (!isDaTT(v) && !isHuyVe(v)))
 
-    const tongVe       = allList.length
-    const tongDoanhThu = veTC.reduce((s,v) => s + getSoTien(v), 0)
-    const khachHang    = new Set(allList.map(v => v.khach_hang_id ?? v.ma_khach_hang).filter(Boolean)).size
+    const tongVe = allList.length
+    const tongDoanhThu = veDaTT.reduce((s, v) => s + getSoTien(v), 0)
+    const khachIds = new Set(
+      allList.map((v) => v.id_khach_hang ?? v.khach_hang?.id ?? v.khach_hang_id).filter(Boolean)
+    )
+
+    let nonCash = 0
+    let tm = 0
+    let huyC = 0
+    allList.forEach((v) => {
+      if (isHuyVe(v)) huyC += 1
+      else if (isDaTT(v)) {
+        if (isTienMat(v)) tm += 1
+        else nonCash += 1
+      }
+    })
+    ticketVeSlice.value = { daThanhToanNonCash: nonCash, tienMat: tm, daHuy: huyC }
+
+    const tripSeat = {}
+    const routeMap = {}
+    allList.forEach((v) => {
+      const cx = v.chuyen_xe || {}
+      const td = cx.tuyen_duong || {}
+      const key =
+        [td.diem_bat_dau, td.diem_ket_thuc].filter(Boolean).join(' → ') ||
+        td.ten_tuyen_duong ||
+        v.ten_tuyen ||
+        v.tuyen_duong ||
+        `Tuyến #${td.id ?? v.tuyen_duong_id ?? ''}`
+      if (!routeMap[key]) routeMap[key] = { ten_tuyen: key, doanh_thu: 0, so_ve: 0 }
+      if (isDaTT(v)) routeMap[key].doanh_thu += getSoTien(v)
+      routeMap[key].so_ve += 1
+
+      const cid = cx.id ?? v.chuyen_xe_id
+      if (cid) {
+        const cap0 = Number(cx.xe?.so_cho_ngoi ?? cx.phuong_tien?.so_cho_ngoi ?? cx.tong_so_ghe ?? 40) || 40
+        if (!tripSeat[cid]) tripSeat[cid] = { sold: 0, cap: cap0 }
+        tripSeat[cid].sold += 1
+        const cap = Number(cx.xe?.so_cho_ngoi ?? cx.phuong_tien?.so_cho_ngoi ?? cx.tong_so_ghe ?? tripSeat[cid].cap)
+        if (cap > 0) tripSeat[cid].cap = cap
+      }
+    })
+    const routes = Object.values(routeMap)
+    revenueByRoute.value = [...routes].sort((a, b) => b.doanh_thu - a.doanh_thu).slice(0, 8)
+    routeTop.value = revenueByRoute.value
+    routeBottom.value = [...routes].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+
+    const ratios = Object.values(tripSeat).map((x) =>
+      x.cap > 0 ? Math.min(100, (x.sold / x.cap) * 100) : 0
+    )
+    const tyLeLapDay =
+      ratios.length > 0 ? +((ratios.reduce((a, b) => a + b, 0) / ratios.length).toFixed(1)) : 0
 
     kpi.value = {
       tongDoanhThu,
+      tongVeDaBan: veDaTT.length,
       tongVe,
-      tongChuyenXe: new Set(allList.map(v => v.chuyen_xe_id).filter(Boolean)).size,
-      tongKhachHang: khachHang,
-      veHoanThanh: veTC.length,
+      tongChuyenXe: new Set(allList.map((v) => v.chuyen_xe_id ?? v.chuyen_xe?.id).filter(Boolean)).size,
+      khachHangMoi: khachIds.size,
+      veHoanThanh: veDaTT.length,
       veHuy: veHuy.length,
       veCho: veCho.length,
-      tyLeHoanThanh: tongVe > 0 ? +((veTC.length/tongVe)*100).toFixed(1) : 0,
-      tyLeHuy:       tongVe > 0 ? +((veHuy.length/tongVe)*100).toFixed(1) : 0,
-      tyLeLapDay:    78.4,  // cần API riêng
+      tyLeHoanThanh: tongVe > 0 ? +((veDaTT.length / tongVe) * 100).toFixed(1) : 0,
+      tyLeHuy: tongVe > 0 ? +((veHuy.length / tongVe) * 100).toFixed(1) : 0,
+      tyLeLapDay,
     }
 
-    // Doanh thu theo tháng (group by tháng của ngày đặt)
     const rev = Array(12).fill(0)
     const tkt = Array(12).fill(0)
-    allList.forEach(v => {
-      const m = new Date(v.created_at ?? v.ngay_dat ?? Date.now()).getMonth()
+    allList.forEach((v) => {
+      const m = new Date(v.created_at ?? v.thoi_gian_dat ?? v.ngay_dat ?? Date.now()).getMonth()
       rev[m] += getSoTien(v)
-      tkt[m]++
+      tkt[m] += 1
     })
     revenueByMonth.value = rev
     ticketsByMonth.value = tkt
 
-    // Doanh thu theo tuyến (nhóm)
-    const routeMap = {}
-    allList.forEach(v => {
-      const key = v.ten_tuyen ?? v.tuyen_duong ?? `Tuyến #${v.tuyen_duong_id}`
-      if (!routeMap[key]) routeMap[key] = { ten_tuyen: key, doanh_thu: 0, so_ve: 0 }
-      routeMap[key].doanh_thu += getSoTien(v)
-      routeMap[key].so_ve++
-    })
-    revenueByRoute.value = Object.values(routeMap).sort((a,b)=>b.doanh_thu-a.doanh_thu).slice(0,6)
-
-    // Vé theo tài xế/chuyến
     const driverMap = {}
-    allList.forEach(v => {
+    allList.forEach((v) => {
       const key = v.ten_tai_xe ?? `Chuyến #${v.chuyen_xe_id ?? '?'}`
       if (!driverMap[key]) driverMap[key] = { ten_tai_xe: key, so_chuyen: new Set(), so_ve: 0 }
       if (v.chuyen_xe_id) driverMap[key].so_chuyen.add(v.chuyen_xe_id)
       driverMap[key].so_ve++
     })
     revenueByDriver.value = Object.values(driverMap)
-      .map(d => ({ ...d, so_chuyen: d.so_chuyen.size }))
-      .sort((a,b)=>b.so_ve-a.so_ve).slice(0,5)
+      .map((d) => ({ ...d, so_chuyen: d.so_chuyen.size }))
+      .sort((a, b) => b.so_ve - a.so_ve)
+      .slice(0, 5)
+  } catch (e) {
+    console.error('[ThongKe Operator] fallback vé:', e)
+  }
+}
 
-  } catch(e) {
+// ─── Tải thống kê: báo cáo BE → vé nếu cần ───────────────────────────
+const fetchData = async () => {
+  isLoading.value = true
+  try {
+    const range = buildDateRange()
+    await fetchBaoCaoOperator(range)
+    const pie =
+      ticketVeSlice.value.daThanhToanNonCash +
+      ticketVeSlice.value.tienMat +
+      ticketVeSlice.value.daHuy
+    if (!kpi.value.tongDoanhThu && pie === 0 && !routeTop.value.length) {
+      await fetchDataFromTickets()
+    }
+  } catch (e) {
     console.error('[ThongKe Operator] lỗi:', e)
   } finally {
     isLoading.value = false
@@ -163,8 +331,13 @@ const fetchTickets = async () => {
   ticketsError.value   = null
   try {
     const range = buildDateRange()
+    const { trang_thai, ...tfRest } = ticketFilter.value
     const params = Object.fromEntries(
-      Object.entries({ ...range, ...ticketFilter.value }).filter(([,v]) => v !== '' && v !== null)
+      Object.entries({
+        ...range,
+        ...tfRest,
+        ...(trang_thai ? { tinh_trang: trang_thai } : {}),
+      }).filter(([, v]) => v !== '' && v !== null && v !== undefined)
     )
     const res = await operatorApi.getTickets(params)
     const p   = res?.data ?? res
@@ -193,11 +366,12 @@ const tktPageNums = computed(() => {
   return range
 })
 
-// ─── Nhãn trạng thái vé ─────────────────────────────────────────────
+// ─── Nhãn trạng thái vé (API: tinh_trang) ────────────────────────────
 const trangThaiVe = (tt) => {
-  if (tt === 'hoan_thanh'  || tt == 1 || tt === 'confirmed') return { text:'Hoàn thành', cls:'badge-green' }
-  if (tt === 'da_huy'      || tt == 0 || tt === 'cancelled') return { text:'Đã huỷ',     cls:'badge-red' }
-  if (tt === 'cho_xac_nhan'|| tt === 'pending')              return { text:'Chờ xác nhận',cls:'badge-yellow' }
+  const s = String(tt ?? '').toLowerCase()
+  if (s === 'da_thanh_toan') return { text: 'Đã thanh toán', cls: 'badge-green' }
+  if (s === 'dang_cho') return { text: 'Chờ thanh toán', cls: 'badge-yellow' }
+  if (s === 'huy' || s === 'da_huy') return { text: 'Đã hủy', cls: 'badge-red' }
   return { text: tt ?? '—', cls: '' }
 }
 
@@ -235,15 +409,27 @@ const barOpts = {
   scales: { x: { grid: { display: false } }, y: { beginAtZero: true } }
 }
 
-// ─── Biểu đồ donut trạng thái vé ─────────────────────────────────────
-const donutData = computed(() => ({
-  labels: ['Hoàn thành', 'Đã huỷ', 'Đang chờ'],
-  datasets: [{
-    data: [kpi.value.veHoanThanh, kpi.value.veHuy, kpi.value.veCho],
-    backgroundColor: ['#22c55e','#ef4444','#f59e0b'],
-    borderColor: ['#16a34a','#dc2626','#d97706'], borderWidth: 2, hoverOffset: 8,
-  }]
-}))
+// ─── Biểu đồ donut: Đã TT (không TM) | Tiền mặt | Đã hủy ─────────────
+const donutData = computed(() => {
+  const s = ticketVeSlice.value
+  const sum = s.daThanhToanNonCash + s.tienMat + s.daHuy
+  if (!sum) {
+    return {
+      labels: ['Chưa có dữ liệu'],
+      datasets: [{ data: [1], backgroundColor: ['#e2e8f0'], borderColor: ['#cbd5e1'], borderWidth: 2 }],
+    }
+  }
+  return {
+    labels: ['Đã TT (không TM)', 'Tiền mặt', 'Đã hủy'],
+    datasets: [{
+      data: [s.daThanhToanNonCash, s.tienMat, s.daHuy],
+      backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+      borderColor: ['#16a34a', '#d97706', '#dc2626'],
+      borderWidth: 2,
+      hoverOffset: 8,
+    }],
+  }
+})
 
 const donutOpts = {
   responsive: true, maintainAspectRatio: false, cutout: '68%',
@@ -251,6 +437,107 @@ const donutOpts = {
 }
 
 const activeChartTab = ref('revenue')
+
+const handleExportPdf = async () => {
+  const range = buildDateRange()
+  const k = kpi.value
+  const v = ticketVeSlice.value
+  isExportingPdf.value = true
+  try {
+    const blob = await operatorApi.exportBaoCao({ ...range, format: 'pdf' })
+    if (blob instanceof Blob && blob.size > 0 && (blob.type.includes('pdf') || blob.type === 'application/octet-stream')) {
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 120000)
+      isExportingPdf.value = false
+      return
+    }
+  } catch (e) {
+    console.warn('[ThongKe] export PDF BE:', e)
+  }
+  const w = window.open('', '_blank')
+  if (!w) {
+    isExportingPdf.value = false
+    alert('Trình duyệt chặn popup — cho phép để in PDF.')
+    return
+  }
+  const rt = routeTop.value.map((r) => `<tr><td>${r.ten_tuyen}</td><td style="text-align:right">${r.doanh_thu}</td><td style="text-align:right">${r.so_ve}</td></tr>`).join('')
+  const rb = routeBottom.value.map((r) => `<tr><td>${r.ten_tuyen}</td><td style="text-align:right">${r.doanh_thu}</td><td style="text-align:right">${r.so_ve}</td></tr>`).join('')
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Thống kê nhà xe</title>
+  <style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px}table{border-collapse:collapse;width:100%;margin:12px 0}th,td{border:1px solid #ccc;padding:8px;font-size:13px}</style></head><body>
+  <h1>Báo cáo thống kê — Nhà xe</h1><p>${range.tu_ngay} → ${range.den_ngay}</p>
+  <p>Doanh thu: ${k.tongDoanhThu.toLocaleString('vi-VN')} ₫ · Vé đã TT: ${k.tongVeDaBan} · Lấp đầy TB: ${k.tyLeLapDay}% · Khách (kỳ): ${k.khachHangMoi}</p>
+  <p>Vé: Đã TT không TM ${v.daThanhToanNonCash} · Tiền mặt ${v.tienMat} · Hủy ${v.daHuy}</p>
+  <h2>Tuyến doanh thu cao</h2><table><tr><th>Tuyến</th><th>Doanh thu</th><th>Vé</th></tr>${rt}</table>
+  <h2>Tuyến ít khách</h2><table><tr><th>Tuyến</th><th>Doanh thu</th><th>Vé</th></tr>${rb}</table>
+  </body></html>`)
+  w.document.close()
+  w.focus()
+  setTimeout(() => {
+    w.print()
+    isExportingPdf.value = false
+  }, 300)
+}
+
+const handleExportExcel = async () => {
+  isExporting.value = true
+  try {
+    const range = buildDateRange()
+    try {
+      const blob = await operatorApi.exportBaoCao({ ...range, format: 'xlsx' })
+      if (blob instanceof Blob && blob.size > 0 && !blob.type.includes('json')) {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `BaoCao_NhaXe_${range.tu_ngay}_${range.den_ngay}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        return
+      }
+    } catch (e) {
+      console.warn('[ThongKe] export Excel BE:', e)
+    }
+
+    const k = kpi.value
+    const v = ticketVeSlice.value
+    const esc = (x) => String(x ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const rows = [
+      ['BÁO CÁO THỐNG KÊ NHÀ XE', '', ''],
+      [`Kỳ: ${range.tu_ngay} → ${range.den_ngay}`, '', ''],
+      [],
+      ['Tổng doanh thu', k.tongDoanhThu],
+      ['Vé đã thanh toán', k.tongVeDaBan],
+      ['Lấp đầy ghế TB (%)', k.tyLeLapDay],
+      ['Khách (có vé trong kỳ)', k.khachHangMoi],
+      [],
+      ['Đã TT không TM', v.daThanhToanNonCash],
+      ['Tiền mặt', v.tienMat],
+      ['Đã hủy', v.daHuy],
+    ]
+    routeTop.value.forEach((r) => rows.push([`TOP: ${r.ten_tuyen}`, r.doanh_thu, r.so_ve]))
+    routeBottom.value.forEach((r) => rows.push([`ÍT KH: ${r.ten_tuyen}`, r.doanh_thu, r.so_ve]))
+    let xml = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="ThongKe"><Table>`
+    rows.forEach((row) => {
+      xml += '<Row>'
+      row.forEach((c) => {
+        const t = typeof c === 'number' ? 'Number' : 'String'
+        xml += `<Cell><Data ss:Type="${t}">${typeof c === 'number' ? c : esc(c)}</Data></Cell>`
+      })
+      xml += '</Row>'
+    })
+    xml += '</Table></Worksheet></Workbook>'
+    const blob = new Blob([xml], { type: 'application/vnd.ms-excel' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `ThongKe_NhaXe_${range.tu_ngay}_${range.den_ngay}.xls`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  } finally {
+    isExporting.value = false
+  }
+}
 
 onMounted(() => { fetchData(); fetchTickets() })
 </script>
@@ -273,8 +560,11 @@ onMounted(() => { fetchData(); fetchTickets() })
         <button class="btn-icon-only" :class="{ spinning: isLoading }" @click="handleApply" title="Làm mới">
           <RefreshCw class="ic16" />
         </button>
-        <button class="btn-export" id="btn-export">
-          <Download class="ic16" /> Xuất Excel
+        <button type="button" class="btn-export btn-export--light" id="btn-export-pdf" @click="handleExportPdf" :disabled="isExportingPdf">
+          <FileText class="ic16" /> {{ isExportingPdf ? '...' : 'PDF' }}
+        </button>
+        <button type="button" class="btn-export" id="btn-export" @click="handleExportExcel" :disabled="isExporting">
+          <Download class="ic16" /> {{ isExporting ? '...' : 'Excel' }}
         </button>
       </div>
     </div>
@@ -331,31 +621,31 @@ onMounted(() => { fetchData(); fetchTickets() })
       </div>
     </div>
 
-    <!-- KPI CARDS -->
+    <!-- KPI (tiêu chí chấp nhận) -->
     <div class="kpi-grid">
       <div class="kpi-card kc-green">
-        <div class="kpi-top"><div class="kpi-icon-w kig-green"><DollarSign class="kpi-ic" /></div><span class="kbadge up"><ArrowUpRight class="ic12"/>+0%</span></div>
-        <p class="kpi-label">Doanh Thu</p>
+        <div class="kpi-top"><div class="kpi-icon-w kig-green"><DollarSign class="kpi-ic" /></div></div>
+        <p class="kpi-label">Tổng doanh thu</p>
         <h2 class="kpi-val">{{ fmt(kpi.tongDoanhThu) }}</h2>
-        <p class="kpi-sub">{{ fmtFull(kpi.tongDoanhThu) }}</p>
+        <p class="kpi-sub">{{ fmtFull(kpi.tongDoanhThu) }} · vé đã thanh toán</p>
       </div>
       <div class="kpi-card kc-blue">
-        <div class="kpi-top"><div class="kpi-icon-w kig-blue"><Ticket class="kpi-ic" /></div><span class="kbadge up"><ArrowUpRight class="ic12"/>+0%</span></div>
-        <p class="kpi-label">Tổng Vé Bán</p>
-        <h2 class="kpi-val">{{ kpi.tongVe.toLocaleString() }}</h2>
-        <p class="kpi-sub">Vé trong kỳ lọc</p>
+        <div class="kpi-top"><div class="kpi-icon-w kig-blue"><Ticket class="kpi-ic" /></div></div>
+        <p class="kpi-label">Tổng số vé đã bán</p>
+        <h2 class="kpi-val">{{ kpi.tongVeDaBan.toLocaleString() }}</h2>
+        <p class="kpi-sub">Trạng thái đã thanh toán</p>
       </div>
       <div class="kpi-card kc-indigo">
-        <div class="kpi-top"><div class="kpi-icon-w kig-indigo"><BusFront class="kpi-ic" /></div></div>
-        <p class="kpi-label">Chuyến Xe</p>
-        <h2 class="kpi-val">{{ kpi.tongChuyenXe.toLocaleString() }}</h2>
-        <p class="kpi-sub">Tổng chuyến có vé</p>
+        <div class="kpi-top"><div class="kpi-icon-w kig-indigo"><Percent class="kpi-ic" /></div></div>
+        <p class="kpi-label">Lấp đầy ghế TB</p>
+        <h2 class="kpi-val">{{ kpi.tyLeLapDay }}%</h2>
+        <p class="kpi-sub">Ước từ vé / sức chứa chuyến</p>
       </div>
       <div class="kpi-card kc-orange">
         <div class="kpi-top"><div class="kpi-icon-w kig-orange"><Users class="kpi-ic" /></div></div>
-        <p class="kpi-label">Khách Hàng</p>
-        <h2 class="kpi-val">{{ kpi.tongKhachHang.toLocaleString() }}</h2>
-        <p class="kpi-sub">Khách đặt vé kỳ này</p>
+        <p class="kpi-label">Khách hàng (kỳ)</p>
+        <h2 class="kpi-val">{{ kpi.khachHangMoi.toLocaleString() }}</h2>
+        <p class="kpi-sub">Distinct khách có vé · KH mới cần API riêng</p>
       </div>
     </div>
 
@@ -376,31 +666,44 @@ onMounted(() => { fetchData(); fetchTickets() })
           </div>
         </div>
         <div class="chart-side">
-          <p class="side-title">Tỉ lệ vé</p>
+          <p class="side-title"><PieChart class="ic14" style="vertical-align:-2px;margin-right:4px"/> Trạng thái vé</p>
           <div class="donut-wrap"><Doughnut :data="donutData" :options="donutOpts" /></div>
         </div>
       </div>
     </div>
 
-    <!-- DOANH THU THEO TUYẾN & HIỆU SUẤT -->
-    <div class="bottom-grid">
+    <!-- TUYẾN CAO / TUYẾN ÍT KHÁCH & HIỆU SUẤT -->
+    <div class="bottom-grid bottom-grid--triple">
 
-      <!-- Doanh thu theo tuyến -->
       <div class="panel">
-        <div class="panel-hd"><h3 class="panel-title"><MapPin class="panel-ic" /> Doanh Thu Theo Tuyến</h3></div>
+        <div class="panel-hd"><h3 class="panel-title"><MapPin class="panel-ic" /> Tuyến doanh thu cao</h3></div>
         <div class="route-list">
-          <div v-if="revenueByRoute.length === 0" class="empty-state">Chưa có dữ liệu</div>
-          <div v-for="(r, idx) in revenueByRoute" :key="r.ten_tuyen" class="route-item">
+          <div v-if="routeTop.length === 0" class="empty-state">Chưa có dữ liệu</div>
+          <div v-for="(r, idx) in routeTop" :key="'t-'+r.ten_tuyen" class="route-item">
             <div class="route-rank" :class="idx===0?'gold':idx===1?'silver':idx===2?'bronze':''">{{ idx+1 }}</div>
             <div class="route-info">
               <p class="route-name">{{ r.ten_tuyen }}</p>
               <div class="route-bar-wrap">
-                <div class="route-bar" :style="{width: Math.min(r.doanh_thu/(revenueByRoute[0]?.doanh_thu||1)*100,100)+'%', background: idx<3?'#22c55e':'#3b82f6'}"></div>
+                <div class="route-bar" :style="{width: Math.min(r.doanh_thu/(routeTop[0]?.doanh_thu||1)*100,100)+'%', background: idx<3?'#22c55e':'#3b82f6'}"></div>
               </div>
             </div>
             <div class="route-nums">
               <p class="rn-rev">{{ fmt(r.doanh_thu) }}</p>
               <p class="rn-tkt">{{ r.so_ve }} vé</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hd"><h3 class="panel-title"><MapPin class="panel-ic" /> Tuyến ít khách</h3></div>
+        <div class="route-list">
+          <div v-if="routeBottom.length === 0" class="empty-state">—</div>
+          <div v-for="(r, idx) in routeBottom" :key="'b-'+r.ten_tuyen" class="route-item">
+            <div class="route-rank">{{ idx+1 }}</div>
+            <div class="route-info">
+              <p class="route-name">{{ r.ten_tuyen }}</p>
+              <p class="route-meta">{{ r.so_ve }} vé · {{ fmt(r.doanh_thu) }}</p>
             </div>
           </div>
         </div>
@@ -412,7 +715,7 @@ onMounted(() => { fetchData(); fetchTickets() })
         <div class="rates-body">
           <!-- Tỉ lệ hoàn thành -->
           <div class="rate-card success">
-            <div class="rate-hd"><CheckCircle class="ric green" /><span>Hoàn thành</span></div>
+            <div class="rate-hd"><CheckCircle class="ric green" /><span>Đã thanh toán</span></div>
             <div class="rate-circle-wrap">
               <svg class="rate-circle" viewBox="0 0 80 80">
                 <circle cx="40" cy="40" r="34" fill="none" stroke="#dcfce7" stroke-width="8"/>
@@ -423,7 +726,7 @@ onMounted(() => { fetchData(); fetchTickets() })
                 <text x="40" y="44" text-anchor="middle" class="rate-txt">{{ kpi.tyLeHoanThanh }}%</text>
               </svg>
             </div>
-            <p class="rate-desc">{{ kpi.veHoanThanh }} vé hoàn thành</p>
+            <p class="rate-desc">{{ kpi.veHoanThanh }} vé đã thanh toán</p>
           </div>
           <!-- Tỉ lệ huỷ -->
           <div class="rate-card danger">
@@ -488,9 +791,9 @@ onMounted(() => { fetchData(); fetchTickets() })
         <input v-model="ticketFilter.search" class="tfi" placeholder="Tìm mã vé, khách hàng..." id="tkt-search" @keyup.enter="()=>{ticketFilter.page=1;fetchTickets()}" />
         <select v-model="ticketFilter.trang_thai" class="tfs" id="tkt-status">
           <option value="">Tất cả trạng thái</option>
-          <option value="hoan_thanh">Hoàn thành</option>
-          <option value="da_huy">Đã huỷ</option>
-          <option value="cho_xac_nhan">Chờ xác nhận</option>
+          <option value="da_thanh_toan">Đã thanh toán</option>
+          <option value="dang_cho">Chờ thanh toán</option>
+          <option value="huy">Đã hủy</option>
         </select>
         <button class="btn-apply-sm" @click="()=>{ticketFilter.page=1;fetchTickets()}" id="btn-tkt-filter">
           <Filter class="ic14" /> Lọc
@@ -523,7 +826,7 @@ onMounted(() => { fetchData(); fetchTickets() })
               <td>{{ v.ten_tuyen ?? v.tuyen_duong ?? '—' }}</td>
               <td>{{ v.ma_chuyen ?? v.chuyen_xe_id ?? '—' }}</td>
               <td class="money">{{ fmtFull(v.gia_ve ?? v.so_tien ?? 0) }}</td>
-              <td><span class="badge" :class="trangThaiVe(v.trang_thai).cls">{{ trangThaiVe(v.trang_thai).text }}</span></td>
+              <td><span class="badge" :class="trangThaiVe(v.tinh_trang ?? v.trang_thai).cls">{{ trangThaiVe(v.tinh_trang ?? v.trang_thai).text }}</span></td>
               <td>{{ fmtDate(v.created_at ?? v.ngay_dat) }}</td>
             </tr>
           </tbody>
@@ -565,6 +868,8 @@ onMounted(() => { fetchData(); fetchTickets() })
 .btn-icon-only.spinning .ic16 { animation:spin .8s linear infinite; }
 .btn-export { display:flex; align-items:center; gap:6px; padding:0 18px; height:40px; border-radius:10px; background:linear-gradient(135deg,#22c55e,#15803d); color:white; font-weight:700; font-size:13px; border:none; cursor:pointer; box-shadow:0 3px 10px rgba(34,197,94,.3); transition:all .25s; }
 .btn-export:hover { transform:translateY(-1px); }
+.btn-export--light { background:white; color:#0f172a; border:1.5px solid #e2e8f0; box-shadow:none; }
+.btn-export--light:hover { background:#f8fafc; }
 @keyframes spin { to { transform:rotate(360deg); } }
 
 /* ── FILTER ── */
@@ -618,6 +923,8 @@ onMounted(() => { fetchData(); fetchTickets() })
 
 /* ── BOTTOM GRID ── */
 .bottom-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
+.bottom-grid--triple { grid-template-columns: repeat(3, 1fr); }
+.route-meta { font-size:11px; color:#94a3b8; margin:4px 0 0; }
 
 /* ── PANEL CHUNG ── */
 .panel { background:white; border-radius:16px; box-shadow:0 2px 12px rgba(0,0,0,.05); border:1px solid #f1f5f9; margin-bottom:24px; overflow:hidden; }
@@ -712,12 +1019,15 @@ onMounted(() => { fetchData(); fetchTickets() })
   .kpi-grid    { grid-template-columns: repeat(2,1fr); }
   .chart-body  { grid-template-columns: 1fr; }
   .bottom-grid { grid-template-columns: 1fr; }
+  .bottom-grid--triple { grid-template-columns: 1fr; }
 }
-
-.page-content {
-  background: white;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .rates-body { justify-content:flex-start; }
+  .tfi { min-width:140px; }
+}
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .tk-title { font-size:18px; }
 }
 </style>
