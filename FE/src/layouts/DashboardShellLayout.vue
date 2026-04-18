@@ -41,12 +41,28 @@ function logout() {
           Xe &amp; ghế
         </RouterLink>
         <RouterLink
-          v-else
+          v-if="isAdmin"
+          :to="{ name: 'admin-danh-gia' }"
+          class="shell-link"
+          active-class="shell-link-active"
+        >
+          Đánh giá
+        </RouterLink>
+        <RouterLink
+          v-if="!isAdmin"
           :to="{ name: 'operator-xe' }"
           class="shell-link"
           active-class="shell-link-active"
         >
           Xe &amp; ghế
+        </RouterLink>
+        <RouterLink
+          v-if="!isAdmin"
+          :to="{ name: 'operator-danh-gia' }"
+          class="shell-link"
+          active-class="shell-link-active"
+        >
+          Đánh giá
         </RouterLink>
         <button type="button" class="shell-logout" @click="logout">Đăng xuất</button>
       </nav>

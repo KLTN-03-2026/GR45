@@ -98,6 +98,9 @@ const adminApi = {
 
   // --- TIỆN ÍCH ---
   autoGenerateSeats: () => axiosClient.post('/v1/admin/xe/auto-generate-seats'),
+
+  // --- ĐÁNH GIÁ ---
+  getRatings: (params) => axiosClient.get('/v1/admin/ratings', { params }),
 };
 
 export default adminApi;

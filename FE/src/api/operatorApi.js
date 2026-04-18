@@ -49,6 +49,9 @@ const operatorApi = {
   // --- VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/nha-xe/voucher'),
   createVoucher: (data) => axiosClient.post('/v1/nha-xe/voucher', data),
+
+  // --- ĐÁNH GIÁ ---
+  getRatings: () => axiosClient.get('/v1/nha-xe/ratings'),
 };
 
 export default operatorApi;

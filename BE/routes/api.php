@@ -4,7 +4,9 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ChucNangController;
 use App\Http\Controllers\ChuyenXeController;
 use App\Http\Controllers\KhachHangController;
+use App\Http\Controllers\MapProxyController;
 use App\Http\Controllers\NhaXeController;
+use App\Http\Controllers\RatingController;
 use App\Http\Controllers\TaiXeController;
 use App\Http\Controllers\VeController;
 use App\Http\Controllers\VoucherController;
@@ -36,7 +38,25 @@ Route::prefix('v1')->group(function () {
         Route::get('voucher/{id}', [VoucherController::class, 'showKhachHang']);
 
         Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
+
+        Route::post('rating', [RatingController::class, 'submitRating']);
+        Route::get('rating/{ticketCode}', [RatingController::class, 'getRating']);
+        Route::get('rating/trip/{tripId}', [RatingController::class, 'getRatingByTrip']);
+        Route::get('pending-rating', [RatingController::class, 'getPendingRating']);
+        Route::get('my-ratings', [RatingController::class, 'getMyRatings']);
     });
+
+    Route::get('tinh-thanh', [KhachHangController::class, 'getProvinces']);
+    Route::get('chuyen-xe/search', [KhachHangController::class, 'searchChuyenXe']);
+    Route::get('chuyen-xe/{id}/ghe', [KhachHangController::class, 'getGheChuyenXe']);
+    Route::get('chuyen-xe/{id}/tram-dung', [KhachHangController::class, 'getTramDungChuyenXe']);
+    Route::get('voucher/public', [KhachHangController::class, 'getVoucherCongKhai']);
+
+    Route::get('chuyen-xe/{id}/danh-gia', [RatingController::class, 'listRatingsByTrip']);
+
+    // Proxy bản đồ (driver dashboard / map) — tránh CORS
+    Route::get('map/direction', [MapProxyController::class, 'direction']);
+    Route::get('map/osrm-route', [MapProxyController::class, 'osrmRoute']);
 
     // ==========================================
     // 2. API TÀI XẾ (DRIVER)
@@ -49,6 +69,17 @@ Route::prefix('v1')->group(function () {
             Route::post('dang-xuat', [TaiXeController::class, 'logout']);
             Route::get('profile', [TaiXeController::class, 'profile']);
             Route::post('doi-mat-khau', [TaiXeController::class, 'doiMatKhau']);
+
+            Route::get('stats', [TaiXeController::class, 'stats']);
+            Route::get('upcoming-trips', [TaiXeController::class, 'upcomingTrips']);
+
+            Route::get('chuyen-xe/lich-trinh-ca-nhan', [ChuyenXeController::class, 'getLichTrinhCaNhan']);
+            Route::get('chuyen-xe', [ChuyenXeController::class, 'index']);
+            Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show']);
+            Route::patch('chuyen-xe/{id}/trang-thai', [ChuyenXeController::class, 'toggleStatus']);
+            Route::get('chuyen-xe/{id}/lich-trinh', [ChuyenXeController::class, 'getLichTrinh']);
+            Route::post('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'postTracking']);
+            Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
         });
     });
 
@@ -99,6 +130,8 @@ Route::prefix('v1')->group(function () {
             Route::put('chuyen-xe/{id}/doi-xe', [ChuyenXeController::class, 'changeVehicle']);
             Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
             Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
+
+            Route::get('ratings', [RatingController::class, 'getCompanyRatings']);
         });
     });
 
@@ -159,6 +192,8 @@ Route::prefix('v1')->group(function () {
             Route::delete('xe/{id}/ghe', [AdminController::class, 'adminXeClearSeats'])->middleware('permission:sua-xe');
             Route::put('xe/{id}/ghe/{seatId}', [AdminController::class, 'adminXeUpdateSeat'])->middleware('permission:sua-xe');
             Route::delete('xe/{id}/ghe/{seatId}', [AdminController::class, 'adminXeDeleteSeat'])->middleware('permission:sua-xe');
+
+            Route::get('ratings', [RatingController::class, 'getAdminRatings']);
         });
     });
 

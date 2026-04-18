@@ -17,7 +17,8 @@ import {
   UserCog,
   Settings,
   Database,
-  Gift
+  Gift,
+  Star
 } from 'lucide-vue-next'
 
 // Inject từ AdminLayout
@@ -106,7 +107,15 @@ const menuList = [
     permissionSlugs: ['xem-voucher'],
     permissionHints: ['voucher'],
   },
-  
+  {
+    id: 'danh-gia',
+    name: 'Đánh giá chuyến xe',
+    path: '/admin/danh-gia',
+    icon: Star,
+    permissionSlugs: ['xem-chuyen-xe'],
+    permissionHints: ['chuyen-xe', 'danh-gia'],
+  },
+
   // Dropdown quản lý user
   { 
     id: 'quan-ly', 

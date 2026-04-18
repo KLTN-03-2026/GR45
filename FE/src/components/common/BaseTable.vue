@@ -4,6 +4,12 @@ defineProps({
   data: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
 });
+
+const emit = defineEmits(['row-click']);
+
+const onRowClick = (item) => {
+  emit('row-click', item);
+};
 </script>
 
 <template>
@@ -17,7 +23,16 @@ defineProps({
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(item, idx) in data" :key="item.id ?? idx">
+          <tr
+            v-for="(item, idx) in data"
+            :key="item.id ?? idx"
+            class="base-table__row"
+            role="button"
+            tabindex="0"
+            @click="onRowClick(item)"
+            @keydown.enter.prevent="onRowClick(item)"
+            @keydown.space.prevent="onRowClick(item)"
+          >
             <td v-for="col in columns" :key="col.key">
               <slot :name="`cell(${col.key})`" :value="item[col.key]" :item="item">
                 {{ item[col.key] }}
@@ -69,8 +84,12 @@ defineProps({
   white-space: nowrap;
 }
 
-.base-table tbody tr:hover {
-  background: #f8fafc;
+.base-table tbody tr.base-table__row {
+  cursor: pointer;
+}
+
+.base-table tbody tr.base-table__row:hover {
+  background: #f1f5f9;
 }
 
 .base-table-empty {

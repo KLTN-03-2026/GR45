@@ -121,7 +121,10 @@ class KhachHangController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $this->service->logout($request->user('sanctum'));
+        $khachHang = auth('khach_hang')->user();
+        if ($khachHang) {
+            $this->service->logout($khachHang);
+        }
 
         return response()->json([
             'success' => true,
@@ -136,11 +139,11 @@ class KhachHangController extends Controller
      */
     public function profile(Request $request): JsonResponse
     {
-        $khachHang = $this->service->getProfile($request->user('sanctum'));
+        $profile = $this->service->getProfile(auth('khach_hang')->user());
 
         return response()->json([
             'success' => true,
-            'data'    => $khachHang,
+            'data'    => $profile,
         ]);
     }
 
@@ -151,7 +154,7 @@ class KhachHangController extends Controller
     {
         try {
             $khachHang = $this->service->updateProfile(
-                $request->user('sanctum')->id,
+                auth('khach_hang')->id(),
                 $request->all()
             );
 
@@ -176,7 +179,7 @@ class KhachHangController extends Controller
     public function doiMatKhau(Request $request): JsonResponse
     {
         try {
-            $this->service->doiMatKhau($request->user('sanctum'), $request->all());
+            $this->service->doiMatKhau(auth('khach_hang')->user(), $request->all());
 
             return response()->json([
                 'success' => true,
@@ -189,6 +192,72 @@ class KhachHangController extends Controller
                 'errors'  => $e->errors(),
             ], 422);
         }
+    }
+
+    // ── CONG KHAI: TIM CHUYEN / DAT VE ───────────────────────────────
+
+    public function getProvinces(): JsonResponse
+    {
+        $data = $this->service->getTinhThanhs();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    public function searchChuyenXe(Request $request): JsonResponse
+    {
+        $data = $this->service->searchChuyenXe($request->all());
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    public function getGheChuyenXe(int $id): JsonResponse
+    {
+        try {
+            $data = $this->service->getGheChuyenXe($id);
+
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 404);
+        }
+    }
+
+    public function getTramDungChuyenXe(int $id): JsonResponse
+    {
+        try {
+            $data = $this->service->getTramDungChuyenXe($id);
+
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 404);
+        }
+    }
+
+    public function getVoucherCongKhai(Request $request): JsonResponse
+    {
+        $data = $this->service->getVoucherCongKhai($request->all());
+
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
     }
 
     // ── ADMIN CRUD ────────────────────────────────────────────────────

@@ -1,18 +1,46 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 import AuthLayout from '../layouts/AuthLayout.vue';
-import BlankLayout from '../layouts/BlankLayout.vue';
 import DashboardShellLayout from '../layouts/DashboardShellLayout.vue';
+import DefaultLayout from '../layouts/DefaultLayout.vue';
+import DriverLayout from '../layouts/DriverLayout.vue';
 
 import { checkClientLogin } from './guards/checkClientLogin';
 import { checkAdminLogin } from './guards/checkAdminLogin';
 import { checkOperatorLogin } from './guards/checkOperatorLogin';
+import { checkDriverLogin } from './guards/checkDriverLogin.js';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', redirect: '/auth/login' },
 
+    {
+      path: '/dat-ve',
+      component: DefaultLayout,
+      beforeEnter: checkClientLogin,
+      children: [
+        {
+          path: '',
+          name: 'booking',
+          meta: { title: 'Đặt vé' },
+          component: () => import('../views/user/BookingView.vue'),
+        },
+      ],
+    },
+
+    {
+      path: '/search',
+      component: DefaultLayout,
+      children: [
+        {
+          path: '',
+          name: 'search-trip',
+          meta: { title: 'Tìm chuyến xe' },
+          component: () => import('../views/user/SearchTripView.vue'),
+        },
+      ],
+    },
     {
       path: '/admin',
       component: DashboardShellLayout,
@@ -24,6 +52,12 @@ const router = createRouter({
           name: 'admin-xe',
           meta: { title: 'Quản lý xe & ghế (Admin)' },
           component: () => import('../views/admin/phuong-tien/PhuongTienView.vue'),
+        },
+        {
+          path: 'danh-gia',
+          name: 'admin-danh-gia',
+          meta: { title: 'Đánh giá chuyến xe (Admin)' },
+          component: () => import('../views/admin/ratings/RatingsView.vue'),
         },
       ],
     },
@@ -39,6 +73,12 @@ const router = createRouter({
           name: 'operator-xe',
           meta: { title: 'Quản lý xe & ghế (Nhà xe)' },
           component: () => import('../views/operator/phuong-tien/PhuongTienView.vue'),
+        },
+        {
+          path: 'danh-gia',
+          name: 'operator-danh-gia',
+          meta: { title: 'Đánh giá chuyến xe (Nhà xe)' },
+          component: () => import('../views/operator/ratings/RatingsView.vue'),
         },
       ],
     },
@@ -81,8 +121,41 @@ const router = createRouter({
     },
 
     {
+      path: '/tai-xe',
+      component: DriverLayout,
+      beforeEnter: checkDriverLogin,
+      redirect: '/tai-xe/dashboard',
+      children: [
+        {
+          path: 'dashboard',
+          name: 'driver-dashboard',
+          meta: { title: 'Điều khiển chuyến (Tài xế)' },
+          component: () => import('../views/driver/DashboardView.vue'),
+        },
+        {
+          path: 'lich-trinh',
+          name: 'driver-lich-trinh',
+          meta: { title: 'Lịch trình chuyến xe' },
+          component: () => import('../views/driver/LichTrinhView.vue'),
+        },
+        {
+          path: 'ho-tro',
+          name: 'driver-ho-tro',
+          meta: { title: 'Hỗ trợ khẩn cấp' },
+          component: () => import('../views/driver/HoTroView.vue'),
+        },
+        {
+          path: 'cai-dat',
+          name: 'driver-cai-dat',
+          meta: { title: 'Cài đặt tài xế' },
+          component: () => import('../views/driver/CaiDatView.vue'),
+        },
+      ],
+    },
+
+    {
       path: '/profile',
-      component: BlankLayout,
+      component: DefaultLayout,
       beforeEnter: checkClientLogin,
       children: [
         {

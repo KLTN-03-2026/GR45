@@ -1,14 +1,19 @@
 <script setup>
 import { reactive } from 'vue';
+import { useRouter } from 'vue-router';
 import { useDriverStore } from '@/stores/driverStore.js';
 import BaseInput from '@/components/common/BaseInput.vue';
 import BaseButton from '@/components/common/BaseButton.vue';
 
 const driverStore = useDriverStore();
+const router      = useRouter();
 const form        = reactive({ email: '', password: '' });
 
 const handleLogin = async () => {
-  await driverStore.login(form);
+  const ok = await driverStore.login(form);
+  if (ok) {
+    await router.push({ name: 'driver-dashboard' });
+  }
 };
 </script>
 
