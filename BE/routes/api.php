@@ -10,6 +10,7 @@ use App\Http\Controllers\RatingController;
 use App\Http\Controllers\TaiXeController;
 use App\Http\Controllers\VeController;
 use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\ThanhToanController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -207,6 +208,11 @@ Route::prefix('v1')->group(function () {
             Route::put('tai-xe/{id}', [TaiXeController::class, 'update'])->middleware('permission:sua-tai-xe');
             Route::patch('tai-xe/{id}/trang-thai', [TaiXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-tai-xe');
             Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy'])->middleware('permission:xoa-tai-xe');
+
+             // Thanh toán
+            Route::get('thanh-toan/thong-ke',            [ThanhToanController::class, 'thongKe']);
+            Route::get('thanh-toan',                     [ThanhToanController::class, 'index']);
+            Route::get('thanh-toan/{id}',                [ThanhToanController::class, 'show']);
 
 
             Route::get('ratings', [RatingController::class, 'getAdminRatings']);
