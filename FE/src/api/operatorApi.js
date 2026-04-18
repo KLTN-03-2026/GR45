@@ -49,6 +49,21 @@ const operatorApi = {
   // --- VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/nha-xe/voucher'),
   createVoucher: (data) => axiosClient.post('/v1/nha-xe/voucher', data),
+
+  // --- TÀI XẾ ---
+  getDrivers: (params) => axiosClient.get('/v1/nha-xe/tai-xe', { params }),
+  getDriverDetails: (id) => axiosClient.get(`/v1/nha-xe/tai-xe/${id}`),
+  createDriver: (data) => axiosClient.post('/v1/nha-xe/tai-xe', data),
+  updateDriver: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has("_method")) data.append("_method", "PUT");
+      return axiosClient.post(`/v1/nha-xe/tai-xe/${id}`, data);
+    }
+    return axiosClient.put(`/v1/nha-xe/tai-xe/${id}`, data);
+  },
+  toggleDriverStatus: (id) =>
+    axiosClient.patch(`/v1/nha-xe/tai-xe/${id}/trang-thai`),
+  deleteDriver: (id) => axiosClient.delete(`/v1/nha-xe/tai-xe/${id}`),
 };
 
 export default operatorApi;

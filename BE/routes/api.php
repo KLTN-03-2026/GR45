@@ -21,7 +21,7 @@ Route::prefix('v1')->group(function () {
     Route::post('dat-lai-mat-khau', [KhachHangController::class, 'resetPassword']);
 
     Route::middleware('auth.khach-hang')->group(function () {
-        Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
+        Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
         Route::post('dang-xuat', [KhachHangController::class, 'logout']);
         Route::get('profile', [KhachHangController::class, 'profile']);
         Route::put('profile', [KhachHangController::class, 'updateProfile']);
@@ -45,7 +45,7 @@ Route::prefix('v1')->group(function () {
         Route::post('dang-nhap', [TaiXeController::class, 'login']);
 
         Route::middleware('auth.tai-xe')->group(function () {
-            Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
+            Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
             Route::post('dang-xuat', [TaiXeController::class, 'logout']);
             Route::get('profile', [TaiXeController::class, 'profile']);
             Route::post('doi-mat-khau', [TaiXeController::class, 'doiMatKhau']);
@@ -59,13 +59,14 @@ Route::prefix('v1')->group(function () {
         Route::post('dang-nhap', [NhaXeController::class, 'login']);
 
         Route::middleware('auth.nha-xe')->group(function () {
-            Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
+            Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
             Route::post('dang-xuat', [NhaXeController::class, 'logout']);
             Route::get('profile', [NhaXeController::class, 'profile']);
             Route::post('doi-mat-khau', [NhaXeController::class, 'doiMatKhau']);
-
+        
             Route::get('tai-xe', [NhaXeController::class, 'operatorTaiXeIndex']);
 
+            // Quản lý xe
             Route::get('loai-xe', [NhaXeController::class, 'operatorLoaiXeIndex']);
             Route::get('loai-ghe', [NhaXeController::class, 'operatorLoaiGheIndex']);
             Route::get('xe', [NhaXeController::class, 'operatorXeIndex']);
@@ -80,15 +81,18 @@ Route::prefix('v1')->group(function () {
             Route::put('xe/{id}/ghe/{seatId}', [NhaXeController::class, 'operatorXeUpdateSeat']);
             Route::delete('xe/{id}/ghe/{seatId}', [NhaXeController::class, 'operatorXeDeleteSeat']);
 
+            // Quản lý tuyến đường
             Route::get('tuyen-duong', [NhaXeController::class, 'nhaXeTuyenDuongIndex']);
             Route::get('tuyen-duong/{id}', [NhaXeController::class, 'nhaXeTuyenDuongShow']);
             Route::post('tuyen-duong', [NhaXeController::class, 'nhaXeTuyenDuongStore']);
             Route::put('tuyen-duong/{id}', [NhaXeController::class, 'nhaXeTuyenDuongUpdate']);
             Route::delete('tuyen-duong/{id}', [NhaXeController::class, 'nhaXeTuyenDuongDestroy']);
 
+            // Quản lý voucher
             Route::get('voucher', [NhaXeController::class, 'nhaXeVoucherIndex']);
             Route::post('voucher', [NhaXeController::class, 'nhaXeVoucherStore']);
 
+            // Quản lý chuyến xe
             Route::get('chuyen-xe', [ChuyenXeController::class, 'index']);
             Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show']);
             Route::post('chuyen-xe', [ChuyenXeController::class, 'store']);
@@ -99,6 +103,14 @@ Route::prefix('v1')->group(function () {
             Route::put('chuyen-xe/{id}/doi-xe', [ChuyenXeController::class, 'changeVehicle']);
             Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
             Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
+
+            // Quản lý tài xế
+            Route::get('tai-xe', [TaiXeController::class, 'index']);
+            Route::get('tai-xe/{id}', [TaiXeController::class, 'show']);
+            Route::post('tai-xe', [TaiXeController::class, 'store']);
+            Route::put('tai-xe/{id}', [TaiXeController::class, 'update']);
+            Route::patch('tai-xe/{id}/trang-thai', [TaiXeController::class, 'toggleStatus']);
+            Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy']);
         });
     });
 
@@ -109,12 +121,13 @@ Route::prefix('v1')->group(function () {
         Route::post('login', [AdminController::class, 'login']);
 
         Route::middleware('auth.admin')->group(function () {
-            Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
+            Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
             Route::get('phan-quyen', [AdminController::class, 'getPhanQuyen']);
             Route::post('logout', [AdminController::class, 'logout']);
             Route::post('refresh', [AdminController::class, 'refresh']);
             Route::get('me', [AdminController::class, 'me']);
 
+            // Quản lý nhà xe
             Route::get('nha-xe', [AdminController::class, 'adminNhaXeIndex'])->middleware('permission:xem-nha-xe');
             Route::get('nha-xe/{id}', [AdminController::class, 'adminNhaXeShow'])->middleware('permission:xem-nha-xe');
             Route::post('nha-xe', [AdminController::class, 'adminNhaXeStore'])->middleware('permission:them-nha-xe');
@@ -122,6 +135,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('nha-xe/{id}/trang-thai', [AdminController::class, 'adminNhaXeToggleStatus'])->middleware('permission:cap-nhat-trang-thai-nha-xe');
             Route::delete('nha-xe/{id}', [AdminController::class, 'adminNhaXeDestroy'])->middleware('permission:xoa-nha-xe');
 
+            // Quản lý tuyến đường
             Route::get('tuyen-duong', [AdminController::class, 'adminTuyenDuongIndex'])->middleware('permission:xem-tuyen-duong');
             Route::get('tuyen-duong/{id}', [AdminController::class, 'adminTuyenDuongShow'])->middleware('permission:xem-tuyen-duong');
             Route::post('tuyen-duong', [AdminController::class, 'adminTuyenDuongStore'])->middleware('permission:them-tuyen-duong');
@@ -130,6 +144,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('tuyen-duong/{id}/tu-choi', [AdminController::class, 'adminTuyenDuongCancel'])->middleware('permission:duyet-tuyen-duong');
             Route::delete('tuyen-duong/{id}', [AdminController::class, 'adminTuyenDuongDestroy'])->middleware('permission:xoa-tuyen-duong');
 
+            // Quản lý voucher
             Route::get('voucher', [AdminController::class, 'adminVoucherIndex'])->middleware('permission:xem-voucher');
             Route::patch('voucher/{id}/duyet', [AdminController::class, 'adminVoucherDuyet'])->middleware('permission:duyet-voucher');
 
@@ -159,7 +174,14 @@ Route::prefix('v1')->group(function () {
             Route::delete('xe/{id}/ghe', [AdminController::class, 'adminXeClearSeats'])->middleware('permission:sua-xe');
             Route::put('xe/{id}/ghe/{seatId}', [AdminController::class, 'adminXeUpdateSeat'])->middleware('permission:sua-xe');
             Route::delete('xe/{id}/ghe/{seatId}', [AdminController::class, 'adminXeDeleteSeat'])->middleware('permission:sua-xe');
+
+            // Quản lý tài xế 
+            Route::get('tai-xe', [TaiXeController::class, 'index'])->middleware('permission:xem-tai-xe');
+            Route::get('tai-xe/{id}', [TaiXeController::class, 'show'])->middleware('permission:xem-tai-xe');
+            Route::post('tai-xe', [TaiXeController::class, 'store'])->middleware('permission:them-tai-xe');
+            Route::put('tai-xe/{id}', [TaiXeController::class, 'update'])->middleware('permission:sua-tai-xe');
+            Route::patch('tai-xe/{id}/trang-thai', [TaiXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-tai-xe');
+            Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy'])->middleware('permission:xoa-tai-xe');
         });
     });
-
 });
