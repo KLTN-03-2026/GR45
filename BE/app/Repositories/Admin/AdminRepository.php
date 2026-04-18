@@ -2,10 +2,10 @@
 
 namespace App\Repositories\Admin;
 
-use App\Http\Resources\AdminResource;
 use App\Models\Admin;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use App\Http\Resources\AdminResource;
 
 class AdminRepository implements AdminRepositoryInterface
 {
@@ -23,14 +23,15 @@ class AdminRepository implements AdminRepositoryInterface
         if (!$admin || !Hash::check($credentials['password'], $admin->password)) {
             return [
                 'success' => false,
-                'message' => 'Email hoặc mật khẩu không chính xác.',
+                'message' => 'Email hoặc mật khẩu không chính xác.'
             ];
         }
+        // kiểm tra tài khoản có bị khoá  
 
         if ($admin->tinh_trang !== 'hoat_dong') {
             return [
                 'success' => false,
-                'message' => 'Tài khoản của bạn đã bị khóa hoặc chưa kích hoạt.',
+                'message' => 'Tài khoản của bạn đã bị khóa hoặc chưa kích hoạt.'
             ];
         }
 
@@ -40,7 +41,7 @@ class AdminRepository implements AdminRepositoryInterface
             'success' => true,
             'message' => 'Đăng nhập thành công',
             'token' => $token,
-            'user' => new AdminResource($admin->load('chucVu')),
+            'user' => new AdminResource($admin->load('chucVu'))
         ];
     }
 
@@ -50,7 +51,6 @@ class AdminRepository implements AdminRepositoryInterface
         if ($user) {
             $user->tokens()->delete();
         }
-
         return true;
     }
 
@@ -59,22 +59,19 @@ class AdminRepository implements AdminRepositoryInterface
         $user = Auth::guard('sanctum')->user();
         if ($user) {
             $user->tokens()->delete();
-            $token = $user->createToken('admin_token')->plainTextToken;
-
+            $token = $user->createToken('admin_token')->plainTextToken; //cấp token mới
             return [
                 'success' => true,
                 'token' => $token,
-                'user' => $user->load('chucVu'),
+                'user' =>  $user->load('chucVu')
             ];
         }
-
         return ['success' => false, 'message' => 'Lỗi xác thực.'];
     }
 
     public function me()
     {
         $user = Auth::guard('sanctum')->user();
-
         return new AdminResource($user->load('chucVu'));
     }
 
@@ -103,7 +100,6 @@ class AdminRepository implements AdminRepositoryInterface
         if (!$admin) {
             throw new \Exception('Nhân viên không tồn tại.');
         }
-
         return $admin;
     }
 
@@ -122,6 +118,7 @@ class AdminRepository implements AdminRepositoryInterface
     {
         $admin = $this->getById($id);
 
+        // Chỉ Admin Master hoặc chính Admin đó mới được sửa thông tin cá nhân
         $currentUser = Auth::guard('sanctum')->user();
         if ($currentUser->is_master !== 1 && $currentUser->id !== $id) {
             throw new \Exception('Bạn không có quyền sửa thông tin nhân viên khác.');
@@ -131,15 +128,16 @@ class AdminRepository implements AdminRepositoryInterface
             $data['password'] = Hash::make($data['password']);
         }
 
+        // Không cho phép sửa quyền Master nếu không phải là Master
         if (isset($data['is_master']) && $currentUser->is_master !== 1) {
             unset($data['is_master']);
         }
+        // Không cho phép tự tước quyền Master của chính mình
         if (isset($data['is_master']) && $data['is_master'] == 0 && $currentUser->id === $admin->id && $admin->is_master == 1) {
             throw new \Exception('Không thể tự tước quyền Master của chính mình.');
         }
 
         $admin->update($data);
-
         return $admin->load('chucVu');
     }
 
@@ -149,6 +147,7 @@ class AdminRepository implements AdminRepositoryInterface
 
         $admin = $this->getById($id);
 
+        // Không cho xóa Master Admin
         if ($admin->is_master === 1) {
             throw new \Exception('Không thể xóa tài khoản Quản trị cấp cao (Master).');
         }
@@ -162,17 +161,17 @@ class AdminRepository implements AdminRepositoryInterface
 
         $admin = $this->getById($id);
 
+        // Không cho khóa Master Admin
         if ($admin->is_master === 1) {
             throw new \Exception('Không thể khóa tài khoản Quản trị cấp cao (Master).');
         }
 
         $admin->tinh_trang = $admin->tinh_trang === 'hoat_dong' ? 'khoa' : 'hoat_dong';
         $admin->save();
-
         return $admin;
     }
 
-    protected function checkMasterPermission(): void
+    protected function checkMasterPermission()
     {
         $user = Auth::guard('sanctum')->user();
         if (!$user instanceof \App\Models\Admin || $user->is_master !== 1) {

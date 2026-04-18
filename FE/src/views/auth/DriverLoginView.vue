@@ -5,15 +5,13 @@ import { useDriverStore } from '@/stores/driverStore.js';
 import BaseInput from '@/components/common/BaseInput.vue';
 import BaseButton from '@/components/common/BaseButton.vue';
 
-const driverStore = useDriverStore();
 const router      = useRouter();
+const driverStore = useDriverStore();
 const form        = reactive({ email: '', password: '' });
 
 const handleLogin = async () => {
-  const ok = await driverStore.login(form);
-  if (ok) {
-    await router.push({ name: 'driver-dashboard' });
-  }
+  const success = await driverStore.login(form);
+  if (success) router.push('/tai-xe');
 };
 </script>
 

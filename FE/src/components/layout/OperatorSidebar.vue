@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   TrendingUp,
+  Star,
   Settings,
   ChevronDown,
   Bus,
@@ -19,8 +20,7 @@ import {
   FileText,
   Clock,
   BarChart2,
-  Gift,
-  Star
+  Gift
 } from 'lucide-vue-next'
 
 // Inject từ OperatorLayout
@@ -84,7 +84,7 @@ const menuList = [
     id: 'danh-gia',
     name: 'Đánh giá chuyến xe',
     path: '/nha-xe/danh-gia',
-    icon: Star
+    icon: Star,
   },
 
   // --- Nhân sự ---
@@ -162,9 +162,6 @@ const menuList = [
     <nav class="sidebar-menu">
       <template v-for="item in menuList" :key="item.id">
         <!-- Phân nhóm label theo vị trí -->
-        <div v-if="item.id === 'danh-gia'" class="menu-section-divider">
-          <span>PHẢN HỒI</span>
-        </div>
         <div v-if="item.id === 'nhan-su'" class="menu-section-divider">
           <span>NHÂN SỰ</span>
         </div>

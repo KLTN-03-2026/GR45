@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import clientApi from "@/api/clientApi";
 import { useClientStore } from "@/stores/clientStore.js";
@@ -261,39 +261,20 @@ const ratingLoading = ref(false);
 const showRatingDetailModal = ref(false);
 const selectedRating = ref(null);
 
-/** Chuẩn hóa JSON GET .../chuyen-xe/{id}/danh-gia (có/không paginate). */
-const parseTripRatingsPayload = (rateRes) => {
-  const empty = { total_ratings: 0, avg_diem_so: null, list: [] };
-  if (!rateRes || rateRes.success === false) return empty;
-  const s = rateRes.summary || rateRes.data?.summary || {};
-  const summary = {
-    total_ratings: Number(s.total_ratings) || 0,
-    avg_diem_so:
-      s.avg_diem_so != null && s.avg_diem_so !== ""
-        ? Number(s.avg_diem_so)
-        : null,
-  };
-  const raw = rateRes.data;
-  let list = [];
-  if (Array.isArray(raw?.data)) list = raw.data;
-  else if (Array.isArray(raw?.ratings)) list = raw.ratings;
-  else if (Array.isArray(raw)) list = raw;
-  return { ...summary, list };
-};
-
 const fetchTripRatings = async (tripId) => {
-  if (tripId == null || tripId === "") {
+  if (!tripId) {
     detailRatings.value = [];
     ratingSummary.value = { total_ratings: 0, avg_diem_so: null };
     return;
   }
   try {
     ratingLoading.value = true;
-    const body = await clientApi.getTripRatings(String(tripId), { per_page: 50 });
-    const parsed = parseTripRatingsPayload(body);
-    detailRatings.value = parsed.list;
+    const body = await clientApi.getTripRatings(tripId, { per_page: 50 });
     const paginator = body?.data;
-    const totalFromSummary = Number(parsed.total_ratings);
+    const list = paginator?.data ?? (Array.isArray(paginator) ? paginator : []);
+    detailRatings.value = Array.isArray(list) ? list : [];
+    const s = body?.summary;
+    const totalFromSummary = Number(s?.total_ratings);
     const totalFromPage = Number(paginator?.total);
     ratingSummary.value = {
       total_ratings:
@@ -302,9 +283,12 @@ const fetchTripRatings = async (tripId) => {
           : Number.isFinite(totalFromPage) && totalFromPage >= 0
             ? totalFromPage
             : detailRatings.value.length,
-      avg_diem_so: parsed.avg_diem_so,
+      avg_diem_so:
+        s?.avg_diem_so != null && s?.avg_diem_so !== ""
+          ? Number(s.avg_diem_so)
+          : null,
     };
-  } catch {
+  } catch (error) {
     detailRatings.value = [];
     ratingSummary.value = { total_ratings: 0, avg_diem_so: null };
   } finally {
@@ -975,8 +959,8 @@ onBeforeUnmount(() => {
                 </div>
                 <div v-else class="trip-modal__rating-list">
                   <div
-                    v-for="(rating, idx) in detailRatings"
-                    :key="rating.id ?? `r-${idx}`"
+                    v-for="rating in detailRatings"
+                    :key="rating.id"
                     class="trip-modal__rating-item"
                     @click="openRatingDetail(rating)"
                   >
@@ -988,7 +972,7 @@ onBeforeUnmount(() => {
                     <div class="trip-modal__rating-stars-row">
                       <span
                         v-for="star in 5"
-                        :key="`${rating.id ?? idx}-list-${star}`"
+                        :key="`${rating.id}-list-${star}`"
                         class="trip-modal__rating-star"
                         :class="{
                           'trip-modal__rating-star--on':
@@ -1274,9 +1258,7 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
               </div>
-              <p class="trip-rating-detail-note">
-                {{ selectedRating?.noi_dung || "Không có nhận xét." }}
-              </p>
+              <p class="trip-rating-detail-note">{{ selectedRating?.noi_dung || "Không có nhận xét." }}</p>
             </div>
           </div>
         </div>
@@ -2686,7 +2668,6 @@ onBeforeUnmount(() => {
   inset: 0;
   z-index: 9100;
   background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;

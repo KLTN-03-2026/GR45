@@ -6,7 +6,7 @@
  */
 
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
-import driverApi from '@/api/driverApi.js';
+import driverApi from '@/api/driverApi';
 
 // ===== EAR Landmarks Index (MediaPipe 478 landmarks) =====
 // Mắt trái (right eye trong mirror mode)

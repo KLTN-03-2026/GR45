@@ -23,12 +23,16 @@ import {
   EyeOff,
   Camera,
   ShieldAlert,
+  ScanLine,
+  Swords,
+  Cigarette,
 } from "lucide-vue-next";
 import maplibregl from "@openmapvn/openmapvn-gl";
 import "@openmapvn/openmapvn-gl/dist/maplibre-gl.css";
 import driverApi from "@/api/driverApi.js";
 import openmapApi from "@/api/openmap";
 import { DrowsinessAgent } from "@/utils/drowsinessAgent.js";
+import { ViolationDetectionAgent } from "@/utils/violationDetectionAgent.js";
 
 const route = useRoute();
 
@@ -48,7 +52,7 @@ const currentTrip = ref({
 
 const alerts = ref([]);
 
-// --- AI Camera State ---
+// --- AI Camera State (Ngủ gật) ---
 const aiVideoRef = ref(null);
 const aiCanvasRef = ref(null);
 const aiStatus = ref("init"); // init | loading | normal | warning | danger | no_face | error
@@ -57,6 +61,16 @@ const aiFps = ref(0);
 const aiCameraOn = ref(false);
 const aiViolationCount = ref(0);
 let drowsinessAgent = null;
+
+// --- YOLO Camera State (Phát hiện vật thể vi phạm) ---
+const yoloVideoRef = ref(null);
+const yoloCanvasRef = ref(null);
+const yoloStatus = ref("init"); // init | loading | detecting | violation | error
+const yoloCameraOn = ref(false);
+const yoloFps = ref(0);
+const yoloViolationCount = ref(0);
+const yoloDetections = ref([]); // Danh sách detections realtime
+let violationAgent = null;
 
 const aiStatusLabel = computed(() => {
   const map = {
@@ -88,7 +102,30 @@ const earPercent = computed(() =>
   Math.min(100, Math.max(0, (aiEar.value / 0.35) * 100)),
 );
 
-// Start AI Camera
+// --- YOLO Computed ---
+const yoloStatusLabel = computed(() => {
+  const map = {
+    init: "Chưa khởi động",
+    loading: "Đang nạp YOLO...",
+    detecting: "Đang giám sát",
+    violation: "⚠️ PHÁT HIỆN VI PHẠM",
+    error: "Lỗi camera",
+  };
+  return map[yoloStatus.value] || yoloStatus.value;
+});
+
+const yoloStatusColor = computed(() => {
+  const map = {
+    init: "#64748b",
+    loading: "#818cf8",
+    detecting: "#4ade80",
+    violation: "#ef4444",
+    error: "#ef4444",
+  };
+  return map[yoloStatus.value] || "#64748b";
+});
+
+// Start AI Camera (Ngủ gật)
 const toggleAiCamera = async () => {
   if (aiCameraOn.value) {
     drowsinessAgent?.stop();
@@ -146,6 +183,82 @@ const toggleAiCamera = async () => {
       id: Date.now(),
       type: "danger",
       message: `Lỗi camera: ${e.message}`,
+      time: new Date().toLocaleTimeString("vi-VN"),
+    });
+  }
+};
+
+// Start YOLO Camera (Phát hiện vật thể vi phạm)
+const toggleYoloCamera = async () => {
+  if (yoloCameraOn.value) {
+    violationAgent?.stop();
+    yoloCameraOn.value = false;
+    yoloStatus.value = "init";
+    yoloDetections.value = [];
+    return;
+  }
+
+  try {
+    yoloStatus.value = "loading";
+
+    // Khởi tạo agent nếu chưa có hoặc chưa load model thành công
+    if (!violationAgent || !violationAgent.session) {
+      violationAgent = new ViolationDetectionAgent();
+      await violationAgent.init();
+    }
+
+    // Đảm bảo ref video/canvas đã sẵn sàng
+    if (!yoloVideoRef.value || !yoloCanvasRef.value) {
+      throw new Error("Video hoặc Canvas element chưa sẵn sàng. Vui lòng thử lại.");
+    }
+
+    violationAgent.attachElements(yoloVideoRef.value, yoloCanvasRef.value);
+    violationAgent.setTripId(currentTrip.value.id);
+    violationAgent.setPosition(
+      currentPosition.value.lat,
+      currentPosition.value.lng,
+    );
+
+    // Callbacks
+    violationAgent.onStatusChange = (status) => {
+      yoloStatus.value = status;
+    };
+    violationAgent.onFpsUpdate = (fps) => {
+      yoloFps.value = fps;
+    };
+    violationAgent.onDetection = (detections) => {
+      yoloDetections.value = detections;
+    };
+    violationAgent.onViolation = (data) => {
+      yoloViolationCount.value++;
+      alerts.value.unshift({
+        id: Date.now(),
+        type: "danger",
+        message: `${data.label} — độ tin cậy: ${(data.confidence * 100).toFixed(0)}%`,
+        time: new Date().toLocaleTimeString("vi-VN"),
+      });
+      if (alerts.value.length > 20) alerts.value.pop();
+    };
+
+    await violationAgent.start();
+    yoloCameraOn.value = true;
+    yoloStatus.value = "detecting";
+
+    alerts.value.unshift({
+      id: Date.now(),
+      type: "warning",
+      message: "Camera YOLO đã bật — đang giám sát vật thể vi phạm",
+      time: new Date().toLocaleTimeString("vi-VN"),
+    });
+  } catch (e) {
+    console.error("Lỗi khởi động YOLO Camera:", e);
+    yoloStatus.value = "error";
+    // Reset agent nếu init fail để lần sau thử lại
+    violationAgent = null;
+    alerts.value.unshift({
+      id: Date.now(),
+      type: "danger",
+      message: `Lỗi YOLO camera: ${e.message}`,
       time: new Date().toLocaleTimeString("vi-VN"),
     });
   }
@@ -659,6 +772,7 @@ onUnmounted(() => {
   if (watchId) navigator.geolocation.clearWatch(watchId);
   if (trackingInterval) clearInterval(trackingInterval);
   drowsinessAgent?.stop();
+  violationAgent?.stop();
 });
 </script>
 
@@ -956,6 +1070,79 @@ onUnmounted(() => {
               <div class="cam-status-right" v-if="aiCameraOn">
                 <span v-if="aiViolationCount > 0" class="violation-count"
                   >{{ aiViolationCount }} vi phạm</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- YOLO Camera — Phát hiện vật thể vi phạm -->
+        <div class="glass-card yolo-camera-card">
+          <div class="card-header flex-between">
+            <h3 class="card-title">
+              <ScanLine class="icon" /> Camera Giám sát Cabin
+            </h3>
+            <div class="camera-controls">
+              <span v-if="yoloCameraOn" class="live-tag yolo-live">● DETECT</span>
+              <span class="fps-badge" v-if="yoloCameraOn">{{ yoloFps }} FPS</span>
+              <button
+                class="cam-toggle-btn"
+                :class="{ active: yoloCameraOn }"
+                @click="toggleYoloCamera"
+              >
+                <ScanLine :size="16" />
+                {{ yoloCameraOn ? "Tắt" : "Bật" }}
+              </button>
+            </div>
+          </div>
+          <div class="camera-stream-container">
+            <!-- Video + Canvas overlay cho bounding box -->
+            <video
+              ref="yoloVideoRef"
+              class="ai-video yolo-video"
+              autoplay
+              playsinline
+              muted
+            ></video>
+            <canvas ref="yoloCanvasRef" class="ai-canvas-overlay yolo-canvas"></canvas>
+
+            <!-- Placeholder khi chưa bật -->
+            <div v-if="!yoloCameraOn" class="camera-placeholder yolo-placeholder">
+              <div class="cam-placeholder-content">
+                <Swords :size="32" />
+                <span>Nhấn <strong>Bật</strong> để khởi động YOLO Detection</span>
+                <span class="cam-hint">Phát hiện dao, hút thuốc, vi phạm trên xe</span>
+              </div>
+              <div class="scanning-line yolo-scan" v-if="yoloStatus === 'loading'"></div>
+            </div>
+
+            <!-- Danh sách detections realtime -->
+            <div v-if="yoloCameraOn && yoloDetections.length > 0" class="yolo-detections-overlay">
+              <div
+                v-for="(det, idx) in yoloDetections"
+                :key="idx"
+                class="yolo-det-chip"
+                :class="`det-${det.className.replace(' ', '_')}`"
+              >
+                <Swords v-if="det.className === 'knife'" :size="13" />
+                <Cigarette v-else-if="det.className === 'cell phone'" :size="13" />
+                <AlertTriangle v-else :size="13" />
+                <span>{{ det.className === 'knife' ? 'Dao' : det.className === 'cell phone' ? 'Hút thuốc' : 'Vi phạm' }}</span>
+                <span class="det-conf">{{ (det.confidence * 100).toFixed(0) }}%</span>
+              </div>
+            </div>
+
+            <!-- Status overlay -->
+            <div class="camera-status" :class="`cam-status-${yoloStatus === 'violation' ? 'danger' : yoloStatus === 'detecting' ? 'normal' : yoloStatus}`">
+              <div class="cam-status-left">
+                <ScanLine v-if="yoloStatus === 'detecting'" :size="16" />
+                <AlertTriangle v-else-if="yoloStatus === 'violation'" :size="16" />
+                <ShieldAlert v-else :size="16" />
+                <span class="cam-status-text">{{ yoloStatusLabel }}</span>
+              </div>
+              <div class="cam-status-right" v-if="yoloCameraOn">
+                <span v-if="yoloViolationCount > 0" class="violation-count"
+                  >{{ yoloViolationCount }} vi phạm</span
                 >
               </div>
             </div>
@@ -1893,6 +2080,76 @@ onUnmounted(() => {
 .alert-time {
   font-size: 11px;
   color: #94a3b8;
+}
+
+/* ===== YOLO CAMERA ===== */
+.yolo-camera-card {
+  margin-top: 14px;
+}
+.yolo-live {
+  color: #818cf8 !important;
+}
+.yolo-video {
+  transform: none; /* Camera sau không cần mirror */
+}
+.yolo-canvas {
+  transform: none;
+}
+.yolo-placeholder {
+  background: linear-gradient(135deg, #0c0a1a 0%, #1a1145 100%) !important;
+}
+.yolo-scan {
+  background: linear-gradient(90deg, transparent, #6366f1, transparent) !important;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.6) !important;
+}
+
+/* Danh sách phát hiện realtime */
+.yolo-detections-overlay {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.yolo-det-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+  animation: detChipIn 0.3s ease;
+}
+@keyframes detChipIn {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.det-knife {
+  background: rgba(239, 68, 68, 0.85);
+  color: white;
+  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.4);
+}
+.det-cell_phone {
+  background: rgba(245, 158, 11, 0.85);
+  color: white;
+  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.4);
+}
+.det-vi_pham {
+  background: rgba(139, 92, 246, 0.85);
+  color: white;
+  box-shadow: 0 2px 12px rgba(139, 92, 246, 0.4);
+}
+.det-conf {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  opacity: 0.9;
+  background: rgba(255,255,255,0.2);
+  padding: 1px 6px;
+  border-radius: 10px;
 }
 
 /* ===== RESPONSIVE ===== */

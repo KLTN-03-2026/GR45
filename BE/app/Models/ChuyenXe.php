@@ -57,4 +57,9 @@ class ChuyenXe extends Model
     {
         return $this->hasMany(NhatKyBaoDong::class, 'id_chuyen_xe');
     }
+
+    public function danhGias()
+    {
+        return $this->hasMany(DanhGia::class, 'id_chuyen_xe');
+    }
 }

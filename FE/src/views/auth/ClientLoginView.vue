@@ -13,7 +13,7 @@ const form        = reactive({ email: '', password: '' });
 const handleLogin = async () => {
   const success = await clientStore.login(form);
   if (success) {
-    const redirect = route.query.redirect || '/profile';
+    const redirect = route.query.redirect || '/';
     router.push(redirect);
   }
 };
@@ -49,7 +49,7 @@ const handleLogin = async () => {
             <label class="remember-me">
               <input type="checkbox" /> Ghi nhớ
             </label>
-            <RouterLink :to="{ name: 'forgot-password', query: { role: 'khach_hang' } }" class="forgot-link">Quên mật khẩu?</RouterLink>
+            <a href="#" class="forgot-link">Quên mật khẩu?</a>
           </div>
           
           <div v-if="clientStore.error" class="error-msg">{{ clientStore.error }}</div>
@@ -59,7 +59,7 @@ const handleLogin = async () => {
           </BaseButton>
           
           <div class="register-prompt">
-            Chưa có tài khoản? <a href="#">Đăng ký ngay</a>
+            Chưa có tài khoản? <router-link to="/auth/register">Đăng ký ngay</router-link>
           </div>
         </form>
       </div>

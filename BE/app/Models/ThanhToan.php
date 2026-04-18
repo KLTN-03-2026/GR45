@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ThanhToan extends Model
 {
@@ -24,8 +24,10 @@ class ThanhToan extends Model
     ];
 
     protected $casts = [
-        'tong_tien' => 'decimal:2',
-        'so_tien_thuc_thu' => 'decimal:2',
+        'tong_tien'            => 'decimal:2',
+        'so_tien_thuc_thu'     => 'decimal:2',
+        'phuong_thuc'          => 'integer',
+        'trang_thai'           => 'integer',
         'thoi_gian_thanh_toan' => 'datetime',
     ];
 

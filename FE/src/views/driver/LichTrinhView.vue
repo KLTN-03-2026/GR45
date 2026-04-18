@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, watch } from "vue";
-import driverApi from "@/api/driverApi.js";
+import driverApi from "@/api/driverApi";
 import BaseModal from "@/components/common/BaseModal.vue";
 import {
   Calendar,

@@ -50,7 +50,8 @@ class NhatKyBaoDong extends Model
     // Loai_bao_dong: ngu_gat | qua_toc_do | phanh_gap | lac_lan |
     //                roi_khoi_hanh_trinh | khong_phan_hoi |
     //                thiet_bi_loi | bao_hiem_het_han |
-    //                dang_kiem_het_han | gplx_het_han
+    //                dang_kiem_het_han | gplx_het_han |
+    //                phat_hien_dao | hut_thuoc | vi_pham_khac
     //
     // Muc_do: thong_tin | canh_bao | nguy_hiem | khan_cap
     //

@@ -6,13 +6,13 @@ import BaseInput from '@/components/common/BaseInput.vue';
 import BaseButton from '@/components/common/BaseButton.vue';
 import BaseCard from '@/components/common/BaseCard.vue';
 
-const router = useRouter();
+const router    = useRouter();
 const adminStore = useAdminStore();
-const form = reactive({ email: '', password: '' });
+const form      = reactive({ email: '', password: '' });
 
 const handleLogin = async () => {
-  const ok = await adminStore.login(form);
-  if (ok) await router.push({ name: 'admin-xe' });
+  const success = await adminStore.login(form);
+  if (success) router.push('/admin');
 };
 </script>
 
@@ -29,12 +29,9 @@ const handleLogin = async () => {
         <form @submit.prevent="handleLogin" class="login-form">
           <BaseInput v-model="form.email" type="email" label="Email quản trị" placeholder="admin@example.com" />
           <BaseInput v-model="form.password" type="password" label="Mật khẩu" placeholder="••••••••" />
-          <div class="forgot-link">
-            <RouterLink :to="{ name: 'forgot-password', query: { role: 'admin' } }">Quên mật khẩu?</RouterLink>
-          </div>
-
+          
           <div v-if="adminStore.error" class="error-msg">{{ adminStore.error }}</div>
-
+          
           <BaseButton type="submit" variant="primary" block :loading="adminStore.loading" class="mt-6 submit-btn">
             Đăng nhập hệ thống
           </BaseButton>
@@ -50,12 +47,10 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #0f172a;
-  /* Slate 900 */
+  background-color: #0f172a; /* Slate 900 */
   position: relative;
   overflow: hidden;
-  padding: 1.5rem;
-  /* Mobile safe area */
+  padding: 1.5rem; /* Mobile safe area */
 }
 
 .glow-bg {
@@ -63,7 +58,7 @@ const handleLogin = async () => {
   width: 100%;
   max-width: 800px;
   height: 800px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, rgba(15, 23, 42, 0) 60%);
+  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(15,23,42,0) 60%);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -76,17 +71,9 @@ const handleLogin = async () => {
   z-index: 10;
 }
 
-.text-center {
-  text-align: center;
-}
-
-.mb-8 {
-  margin-bottom: 2rem;
-}
-
-.mt-6 {
-  margin-top: 1.75rem;
-}
+.text-center { text-align: center; }
+.mb-8 { margin-bottom: 2rem; }
+.mt-6 { margin-top: 1.75rem; }
 
 .logo-circle {
   width: 72px;
@@ -128,10 +115,7 @@ const handleLogin = async () => {
   padding: 1.5rem 0.5rem;
 }
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-}
+.login-form { display: flex; flex-direction: column; }
 
 /* CSS cho input trong Dark mode */
 .login-form :deep(.base-input) {
@@ -165,7 +149,6 @@ const handleLogin = async () => {
   border: none !important;
   box-shadow: 0 8px 15px -3px rgba(79, 70, 229, 0.3) !important;
 }
-
 .submit-btn:hover {
   background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%) !important;
   transform: translateY(-2px);
@@ -181,21 +164,5 @@ const handleLogin = async () => {
   padding: 0.6rem;
   border-radius: 8px;
   border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.forgot-link {
-  text-align: right;
-  margin-top: -0.25rem;
-}
-
-.forgot-link a {
-  color: #a5b4fc;
-  text-decoration: none;
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.forgot-link a:hover {
-  text-decoration: underline;
 }
 </style>

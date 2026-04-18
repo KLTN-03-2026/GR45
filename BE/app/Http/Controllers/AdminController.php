@@ -17,21 +17,6 @@ class AdminController extends Controller
         $this->adminService = $adminService;
     }
 
-    public function index(Request $request)
-    {
-        try {
-            $filters = $request->only(['search', 'tinh_trang', 'id_chuc_vu', 'per_page']);
-            $admins = $this->adminService->getAll($filters);
-            return response()->json([
-                'success' => true,
-                'data' => $admins,
-                'message' => 'Lấy danh sách nhân viên thành công.'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
-        }
-    }
-
     public function login(LoginAdminRequest $request)
     {
         try {
@@ -216,26 +201,6 @@ class AdminController extends Controller
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
-        }
-    }
-    public function doiMatKhau(Request $request)
-    {
-        try {
-            $admin = auth('admin')->user();
-            $this->adminService->doiMatKhau($admin, $request->all());
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'
-            ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Dữ liệu không hợp lệ.',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
 }

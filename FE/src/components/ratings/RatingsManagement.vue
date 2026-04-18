@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Star, Search, ListChecks, ThumbsUp, ThumbsDown } from "lucide-vue-next";
-import operatorApi from "@/api/operatorApi.js";
-import adminApi from "@/api/adminApi.js";
+import operatorApi from "@/api/operatorApi";
+import adminApi from "@/api/adminApi";
 import BaseTable from "@/components/common/BaseTable.vue";
 import BaseInput from "@/components/common/BaseInput.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
@@ -10,7 +10,7 @@ import {
   formatDateTime,
   formatDateOnly,
   formatTimeOnly,
-} from "@/utils/format.js";
+} from "@/utils/format";
 
 const ratingTableColumns = [
   { key: "id", label: "ID" },
@@ -277,14 +277,14 @@ onUnmounted(() => {
   <div :class="isAdmin ? 'admin-ratings admin-page w-full' : 'ratings-operator'">
     <!-- —— Admin: cùng pattern Quản lý nhà xe / khách hàng —— -->
     <template v-if="isAdmin">
-      <div class="admin-ratings-header">
-        <div class="admin-ratings-header__left">
+      <div class="page-header d-flex align-items-center mb-4 flex-wrap gap-3">
+        <div class="header-left d-flex align-items-center" style="gap: 16px">
           <div class="header-icon-wrap">
             <Star class="header-icon" />
           </div>
           <div>
-            <h1 class="page-title admin-ratings-header__title">{{ title }}</h1>
-            <p class="admin-ratings-header__sub">
+            <h1 class="page-title mb-0">{{ title }}</h1>
+            <p class="text-muted mb-0" style="font-size: 14px">
               Theo dõi đánh giá toàn hệ thống, xem chuyến — khách — nhận xét chi tiết.
             </p>
           </div>
@@ -311,25 +311,11 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="filter-card admin-filter-card">
-        <div class="admin-filter-row">
-          <div class="admin-filter-field admin-filter-field--search">
-            <label class="filter-label" for="admin-ratings-search">Tìm kiếm</label>
-            <div class="admin-search-wrap">
-              <Search class="admin-search-icon" :size="18" aria-hidden="true" />
-              <input
-                id="admin-ratings-search"
-                v-model="searchQuery"
-                type="search"
-                class="admin-search-input"
-                placeholder="Khách hàng, tuyến, nhận xét…"
-                autocomplete="off"
-              />
-            </div>
-          </div>
-          <div class="admin-filter-field admin-filter-field--stars">
-            <label class="filter-label" for="admin-ratings-stars">Số sao</label>
-            <select id="admin-ratings-stars" v-model="ratingFilter" class="custom-select admin-star-select">
+      <div class="filter-card">
+        <div class="filter-grid">
+          <div class="filter-item">
+            <span class="filter-label">Số sao</span>
+            <select v-model="ratingFilter" class="custom-select">
               <option value="all">Tất cả số sao</option>
               <option value="5">5 sao</option>
               <option value="4">4 sao</option>
@@ -337,6 +323,18 @@ onUnmounted(() => {
               <option value="2">2 sao</option>
               <option value="1">1 sao</option>
             </select>
+          </div>
+          <div class="filter-item flex-grow-1" style="min-width: 220px">
+            <span class="filter-label">Tìm kiếm</span>
+            <div class="position-relative">
+              <Search class="input-icon" :size="18" />
+              <input
+                v-model="searchQuery"
+                type="text"
+                class="custom-input pl-10"
+                placeholder="Khách hàng, tuyến, nhận xét..."
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -685,119 +683,6 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.admin-ratings-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 1.25rem;
-}
-
-.admin-ratings-header__left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-width: 0;
-}
-
-.admin-ratings-header__title {
-  margin: 0;
-}
-
-.admin-ratings-header__sub {
-  margin: 0;
-  font-size: 14px;
-  color: #64748b;
-  line-height: 1.45;
-  max-width: 52rem;
-}
-
-.admin-filter-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-}
-
-.admin-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 1rem 1.25rem;
-}
-
-.admin-filter-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-width: 0;
-}
-
-.admin-filter-field--search {
-  flex: 1 1 280px;
-  min-width: min(100%, 260px);
-}
-
-.admin-filter-field--stars {
-  flex: 0 0 auto;
-  width: 100%;
-  max-width: 200px;
-}
-
-.admin-search-wrap {
-  position: relative;
-  width: 100%;
-}
-
-.admin-search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.admin-search-input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 40px;
-  padding: 0 12px 0 40px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  color: #0f172a;
-  background: #fff;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.admin-search-input::placeholder {
-  color: #94a3b8;
-}
-
-.admin-search-input:hover {
-  border-color: #cbd5e1;
-}
-
-.admin-search-input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-}
-
-.admin-star-select {
-  height: 40px;
-  width: 100%;
-  border-radius: 10px;
-}
-
-@media (max-width: 640px) {
-  .admin-filter-field--stars {
-    max-width: none;
-  }
-}
-
 .header-icon-wrap {
   width: 48px;
   height: 48px;
@@ -946,6 +831,34 @@ onUnmounted(() => {
   font-weight: 500;
   color: #475569;
   margin-bottom: 0.4rem;
+}
+.input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.custom-input {
+  width: 100%;
+  padding: 0.55rem 0.75rem 0.55rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #fff;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.custom-input.pl-10 {
+  padding-left: 2.5rem;
+}
+.custom-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 .custom-select {
   width: 100%;
@@ -1122,27 +1035,17 @@ onUnmounted(() => {
 }
 
 .rating-stars-cell {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  flex-wrap: nowrap;
-  gap: 0 2px;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  gap: 1px 3px;
 }
 
 .rating-star-glyph {
-  font-size: 1rem;
+  font-size: 0.85rem;
   line-height: 1;
-  color: #e2e8f0;
-  letter-spacing: 0;
-  font-family:
-    "Segoe UI Symbol",
-    "Apple Color Emoji",
-    "Noto Color Emoji",
-    system-ui,
-    sans-serif;
-  display: inline-block;
-  width: 1em;
-  text-align: center;
+  color: #cbd5e1;
+  letter-spacing: -0.06em;
 }
 
 .rating-star-glyph--on {
@@ -1150,21 +1053,14 @@ onUnmounted(() => {
 }
 
 .rating-score-pill {
-  margin-left: 6px;
-  font-size: 11px;
+  margin-left: 4px;
+  font-size: 12px;
   font-weight: 800;
-  color: #b45309;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  line-height: 1.35;
+  color: #d97706;
 }
 
 .rating-score-pill--op {
-  color: #14532d;
-  background: #ecfdf5;
-  border-color: #bbf7d0;
+  color: #b45309;
 }
 
 .nx-preview {

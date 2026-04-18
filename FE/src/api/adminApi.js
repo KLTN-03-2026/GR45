@@ -83,6 +83,10 @@ const adminApi = {
   // --- QUẢN LÝ VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),
   approveVoucher: (id, data) => axiosClient.patch(`/v1/admin/voucher/${id}/duyet`, data),
+
+  // --- QUẢN LÝ ĐÁNH GIÁ ---
+  getRatings: (params) => axiosClient.get('/v1/admin/ratings', { params }),
+
   // --- PHÂN QUYỀN & CHỨC NĂNG ---
   getMyPermissions: () => axiosClient.get('/v1/admin/phan-quyen'),
   getFunctions: () => axiosClient.get('/v1/admin/chuc-nangs'),

@@ -20,7 +20,7 @@ class TaiXeRepository implements TaiXeRepositoryInterface
             $query->where(function ($q) use ($kw) {
                 $q->where('email', 'like', "%$kw%")
                     ->orWhere('cccd', 'like', "%$kw%")
-                    ->orWhereHas('hoSo', fn ($h) => $h->where('ho_va_ten', 'like', "%$kw%"));
+                    ->orWhereHas('hoSo', fn($h) => $h->where('ho_va_ten', 'like', "%$kw%"));
             });
         }
 
@@ -37,7 +37,7 @@ class TaiXeRepository implements TaiXeRepositoryInterface
 
     public function getById(int $id): ?TaiXe
     {
-        return $this->model->with(['hoSo', 'nhaXe', 'chuyenXes' => fn ($q) => $q->latest()->limit(5)])->find($id);
+        return $this->model->with(['hoSo', 'nhaXe', 'chuyenXes' => fn($q) => $q->latest()->limit(5)])->find($id);
     }
 
     public function findByEmail(string $email): ?TaiXe
@@ -58,21 +58,15 @@ class TaiXeRepository implements TaiXeRepositoryInterface
     public function update(int $id, array $data): ?TaiXe
     {
         $taiXe = $this->model->find($id);
-        if (!$taiXe) {
-            return null;
-        }
+        if (!$taiXe) return null;
         $taiXe->update($data);
-
         return $taiXe->fresh(['hoSo', 'nhaXe']);
     }
 
     public function delete(int $id): bool
     {
         $taiXe = $this->model->find($id);
-        if (!$taiXe) {
-            return false;
-        }
-
+        if (!$taiXe) return false;
         return $taiXe->delete();
     }
 
@@ -88,35 +82,19 @@ class TaiXeRepository implements TaiXeRepositoryInterface
     public function toggleStatus(int $id): ?TaiXe
     {
         $taiXe = $this->model->find($id);
-        if (!$taiXe) {
-            return null;
-        }
+        if (!$taiXe) return null;
         $taiXe->update([
             'tinh_trang' => $taiXe->tinh_trang === 'hoat_dong' ? 'khoa' : 'hoat_dong',
         ]);
-
         return $taiXe->fresh();
     }
 
     public function getByNhaXe(string $maNhaXe, array $filters = []): LengthAwarePaginator
     {
-        $query = $this->model->with('hoSo')
-            ->where('ma_nha_xe', $maNhaXe);
-
-        if (!empty($filters['search'])) {
-            $kw = $filters['search'];
-            $query->where(function ($q) use ($kw) {
-                $q->where('email', 'like', "%{$kw}%")
-                    ->orWhere('cccd', 'like', "%{$kw}%")
-                    ->orWhereHas('hoSo', fn ($h) => $h->where('ho_va_ten', 'like', "%{$kw}%"));
-            });
-        }
-
-        if (array_key_exists('tinh_trang', $filters) && $filters['tinh_trang'] !== '' && $filters['tinh_trang'] !== null) {
-            $query->where('tinh_trang', $filters['tinh_trang']);
-        }
-
-        return $query->orderByDesc('created_at')
+        return $this->model->with('hoSo')
+            ->where('ma_nha_xe', $maNhaXe)
+            ->when(isset($filters['tinh_trang']), fn($q) => $q->where('tinh_trang', $filters['tinh_trang']))
+            ->orderByDesc('created_at')
             ->paginate($filters['per_page'] ?? 15);
     }
 }

@@ -50,17 +50,13 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
     public function getById(int $id)
     {
-        $user = Auth::guard('admin')->user()
-            ?? Auth::guard('tai_xe')->user()
-            ?? Auth::guard('nha_xe')->user()
-            ?? Auth::guard('khach_hang')->user()
-            ?? Auth::guard('sanctum')->user();
+        $user = Auth::guard('sanctum')->user();
         if (!$user) {
             throw new \Exception('Bạn chưa đăng nhập.');
         }
 
         $chuyenXe = $this->model->query()
-            ->with(['tuyenDuong', 'xe', 'taiXe', 'tuyenDuong.tramDungs'])
+            ->with(['tuyenDuong', 'xe', 'taiXe', 'tuyenDuong.tramDungs', 'danhGias.khachHang'])
             ->find($id);
 
         if (!$chuyenXe) {
@@ -119,7 +115,7 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
     public function getByTaiXe(array $filters = [])
     {
-        $taiXe = Auth::guard('tai_xe')->user();
+        $taiXe = Auth::guard('sanctum')->user();
         if (!$taiXe || !($taiXe instanceof \App\Models\TaiXe)) {
             throw new \Exception('Bạn không có quyền truy cập.');
         }

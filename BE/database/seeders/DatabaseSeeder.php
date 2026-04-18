@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
 
             // --- Tang 3: Danh muc doc lap ---
             KhachHangSeeder::class,
+            TestKhachHangExtraSeeder::class,
             LoaiXeSeeder::class,
             LoaiGheSeeder::class,
 
@@ -58,8 +59,7 @@ class DatabaseSeeder extends Seeder
             
             // --- Tang 10: Thanh toan (phu thuoc Ve + KhachHang) ---
             ThanhToanSeeder::class,
-
-            TrucFeatureSeeder::class,
+            
         ]);
     }
 }

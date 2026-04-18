@@ -52,8 +52,6 @@ const operatorApi = {
   // --- VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/nha-xe/voucher'),
   createVoucher: (data) => axiosClient.post('/v1/nha-xe/voucher', data),
-  updateVoucher: (id, data) => axiosClient.put(`/v1/nha-xe/voucher/${id}`, data),
-  deleteVoucher: (id) => axiosClient.delete(`/v1/nha-xe/voucher/${id}`),
 
   // --- TÀI XẾ ---
   getDrivers: (params) => axiosClient.get('/v1/nha-xe/tai-xe', { params }),
@@ -61,20 +59,21 @@ const operatorApi = {
   createDriver: (data) => axiosClient.post('/v1/nha-xe/tai-xe', data),
   updateDriver: (id, data) => {
     if (data instanceof FormData) {
-      if (!data.has("_method")) data.append("_method", "PUT");
+      if (!data.has('_method')) data.append('_method', 'PUT');
       return axiosClient.post(`/v1/nha-xe/tai-xe/${id}`, data);
     }
     return axiosClient.put(`/v1/nha-xe/tai-xe/${id}`, data);
   },
-  toggleDriverStatus: (id) =>
-    axiosClient.patch(`/v1/nha-xe/tai-xe/${id}/trang-thai`),
+  toggleDriverStatus: (id) => axiosClient.patch(`/v1/nha-xe/tai-xe/${id}/trang-thai`),
   deleteDriver: (id) => axiosClient.delete(`/v1/nha-xe/tai-xe/${id}`),
 
   // --- CẢNH BÁO / BÁO ĐỘNG AI ---
   getAlarms: (params) => axiosClient.get('/v1/nha-xe/bao-dong', { params }),
   getAlarmDetails: (id) => axiosClient.get(`/v1/nha-xe/bao-dong/${id}`),
-  toggleAlarmStatus: (id) =>
-    axiosClient.patch(`/v1/nha-xe/bao-dong/${id}/trang-thai`),
+  toggleAlarmStatus: (id) => axiosClient.patch(`/v1/nha-xe/bao-dong/${id}/trang-thai`),
+
+  // --- ĐÁNH GIÁ CHUYẾN XE ---
+  getRatings: (params) => axiosClient.get('/v1/nha-xe/ratings', { params }),
 };
 
 export default operatorApi;

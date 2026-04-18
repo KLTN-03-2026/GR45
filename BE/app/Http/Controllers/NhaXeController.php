@@ -2,18 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Concerns\ResolvesForwardedFormRequests;
 use App\Http\Resources\NhaXeResource;
 use App\Services\NhaXeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\Response;
 
 class NhaXeController extends Controller
 {
-    use ResolvesForwardedFormRequests;
-
     public function __construct(protected NhaXeService $service) {}
 
     // ── AUTH ──────────────────────────────────────────────────────────
@@ -120,110 +116,5 @@ class NhaXeController extends Controller
             return response()->json(['success' => false, 'message' => 'Không tìm thấy nhà xe.'], 404);
         }
         return response()->json(['success' => true, 'message' => 'Xóa nhà xe thành công.']);
-    }
-
-    public function operatorTaiXeIndex(Request $request): JsonResponse
-    {
-        return app(TaiXeController::class)->indexForNhaXe($request);
-    }
-
-    public function operatorLoaiXeIndex(): JsonResponse
-    {
-        return app(LoaiXeController::class)->index();
-    }
-
-    public function operatorLoaiGheIndex(): Response
-    {
-        return app(XeController::class)->indexSeatTypes();
-    }
-
-    public function operatorXeIndex(Request $request): Response
-    {
-        return app(XeController::class)->index($request);
-    }
-
-    public function operatorXeShow($id): Response
-    {
-        return app(XeController::class)->show($id);
-    }
-
-    public function operatorXeStore(Request $request): Response
-    {
-        return app(XeController::class)->store($request);
-    }
-
-    public function operatorXeUpdate(Request $request, $id): Response
-    {
-        return app(XeController::class)->update($request, $id);
-    }
-
-    public function operatorXeDestroy($id): Response
-    {
-        return app(XeController::class)->destroy($id);
-    }
-
-    public function operatorXeToggleStatus(Request $request, $id): Response
-    {
-        return app(XeController::class)->toggleStatus($request, $id);
-    }
-
-    public function operatorXeIndexSeats($id): Response
-    {
-        return app(XeController::class)->indexSeats($id);
-    }
-
-    public function operatorXeStoreSeat(Request $request, $id): Response
-    {
-        return app(XeController::class)->storeSeat($request, $id);
-    }
-
-    public function operatorXeClearSeats($id): Response
-    {
-        return app(XeController::class)->clearSeats($id);
-    }
-
-    public function operatorXeUpdateSeat(Request $request, $id, $seatId): Response
-    {
-        return app(XeController::class)->updateSeat($request, $id, $seatId);
-    }
-
-    public function operatorXeDeleteSeat($id, $seatId): Response
-    {
-        return app(XeController::class)->deleteSeat($id, $seatId);
-    }
-
-    public function nhaXeTuyenDuongIndex(Request $request): Response
-    {
-        return app(TuyenDuongController::class)->index($request);
-    }
-
-    public function nhaXeTuyenDuongShow($id): Response
-    {
-        return app(TuyenDuongController::class)->show($id);
-    }
-
-    public function nhaXeTuyenDuongStore(Request $request): Response
-    {
-        return app(TuyenDuongController::class)->store($this->storeTuyenDuongRequest($request));
-    }
-
-    public function nhaXeTuyenDuongUpdate(Request $request, $id): Response
-    {
-        return app(TuyenDuongController::class)->update($this->updateTuyenDuongRequest($request), $id);
-    }
-
-    public function nhaXeTuyenDuongDestroy($id): Response
-    {
-        return app(TuyenDuongController::class)->destroy($id);
-    }
-
-    public function nhaXeVoucherIndex(Request $request): Response
-    {
-        return app(VoucherController::class)->indexNhaXe($request);
-    }
-
-    public function nhaXeVoucherStore(Request $request): Response
-    {
-        return app(VoucherController::class)->storeNhaXe($this->storeVoucherRequest($request));
     }
 }

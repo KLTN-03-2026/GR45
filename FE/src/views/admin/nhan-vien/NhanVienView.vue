@@ -12,7 +12,6 @@ import BaseButton from '@/components/common/BaseButton.vue';
 import BaseInput from '@/components/common/BaseInput.vue';
 import BaseSelect from '@/components/common/BaseSelect.vue';
 import BaseTable from '@/components/common/BaseTable.vue';
-import BasePagination from '@/components/common/BasePagination.vue';
 import BaseModal from '@/components/common/BaseModal.vue';
 import BaseCard from '@/components/common/BaseCard.vue';
 import BaseToast from '@/components/common/BaseToast.vue';
@@ -24,14 +23,7 @@ const adminStore = useAdminStore();
 const staffs = ref([]);
 const roles = ref([]);
 const loading = ref(false);
-
-// Pagination State
-const pagination = reactive({
-  current_page: 1,
-  last_page: 1,
-  total: 0,
-  per_page: 15
-});
+const totalStaffs = ref(0);
 
 // Toast
 const toast = reactive({ visible: false, message: '', type: 'success' });
@@ -52,8 +44,8 @@ const filters = reactive({
 // Stats Computed
 const stats = computed(() => {
   return {
-    total: pagination.total,
-    active: staffs.value.filter(s => s.tinh_trang === 'hoat_dong').length, // Chỉ tính trên trang hiện tại hoặc cần API trả về tổng
+    total: staffs.value.length,
+    active: staffs.value.filter(s => s.tinh_trang === 'hoat_dong').length,
     blocked: staffs.value.filter(s => s.tinh_trang === 'khoa').length
   };
 });
@@ -106,53 +98,48 @@ const fetchRoles = async () => {
   }
 };
 
-const fetchStaffs = async (page = 1) => {
+const fetchStaffs = async () => {
   loading.value = true;
   try {
     const params = {
       search: filters.search,
       tinh_trang: filters.tinh_trang,
       id_chuc_vu: filters.id_chuc_vu,
-      page: page,
-      per_page: pagination.per_page,
     };
     const res = await adminApi.getStaffs(params);
     
-    // Laravel Paginate response structure: { success: true, data: { data: [], current_page: 1, ... } }
-    // Với axiosClient, 'res' chính là object JSON trả về từ server
-    const responseData = res.data || {};
+    let listData = [];
+    if (res.data?.data && Array.isArray(res.data.data)) {
+      listData = res.data.data;
+    } else if (Array.isArray(res.data)) {
+      listData = res.data;
+    }
     
-    staffs.value = responseData.data || [];
-    pagination.current_page = responseData.current_page || 1;
-    pagination.last_page = responseData.last_page || 1;
-    pagination.total = responseData.total || 0;
-    
+    staffs.value = listData;
+    totalStaffs.value = listData.length;
   } catch (err) {
     console.error('Lỗi lấy danh sách nhân viên:', err);
+    // Không showToast ở đây để tránh hiện lặp thông báo lỗi khi các hàm khác gọi fetchStaffs
   } finally {
     loading.value = false;
   }
-};
-
-const handlePageChange = (page) => {
-  fetchStaffs(page);
 };
 
 const resetFilters = () => {
   filters.search = '';
   filters.tinh_trang = '';
   filters.id_chuc_vu = '';
-  fetchStaffs(1);
+  fetchStaffs();
 };
 
 // Debounce search
 let searchTimeout;
 watch(() => filters.search, () => {
   clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => fetchStaffs(1), 500);
+  searchTimeout = setTimeout(fetchStaffs, 500);
 });
 
-watch([() => filters.tinh_trang, () => filters.id_chuc_vu], () => fetchStaffs(1));
+watch([() => filters.tinh_trang, () => filters.id_chuc_vu], fetchStaffs);
 
 const openCreateModal = () => {
   isEditing.value = false;
@@ -428,16 +415,6 @@ onMounted(() => {
           </div>
         </template>
       </BaseTable>
-
-      <!-- Pagination Component (Giống Quản lý tuyến đường) -->
-      <BasePagination 
-        :current-page="pagination.current_page"
-        :last-page="pagination.last_page"
-        :total="pagination.total"
-        v-model:per-page="pagination.per_page"
-        :loading="loading"
-        @change-page="handlePageChange"
-      />
     </BaseCard>
 
     <!-- Modal Thêm/Sửa -->

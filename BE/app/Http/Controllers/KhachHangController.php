@@ -3,18 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Services\KhachHangService;
-use App\Services\PasswordResetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class KhachHangController extends Controller
 {
-    public function __construct(
-        protected KhachHangService $service,
-        protected PasswordResetService $passwordResetService,
-    ) {}
+    public function __construct(protected KhachHangService $service) {}
 
     // ── AUTH ──────────────────────────────────────────────────────────
 
@@ -64,67 +59,12 @@ class KhachHangController extends Controller
         }
     }
 
-    public function requestPasswordReset(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'role' => 'required|in:khach_hang,nha_xe,admin',
-            'email' => 'required|email',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        $this->passwordResetService->requestReset($request->role, $request->email);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.',
-        ]);
-    }
-
-    public function resetPassword(Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'role' => 'required|in:khach_hang,nha_xe,admin',
-            'email' => 'required|email',
-            'token' => 'required|string',
-            'mat_khau_moi' => 'required|string|min:6|confirmed',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
-
-        try {
-            $this->passwordResetService->resetPassword(
-                $request->role,
-                $request->email,
-                $request->token,
-                $request->mat_khau_moi
-            );
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.',
-            ]);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'errors' => $e->errors(),
-            ], 422);
-        }
-    }
-
     /**
      * POST /api/v1/dang-xuat  (auth:sanctum)
      */
     public function logout(Request $request): JsonResponse
     {
-        $khachHang = auth('khach_hang')->user();
-        if ($khachHang) {
-            $this->service->logout($khachHang);
-        }
+        $this->service->logout($request->user('sanctum'));
 
         return response()->json([
             'success' => true,
@@ -139,11 +79,11 @@ class KhachHangController extends Controller
      */
     public function profile(Request $request): JsonResponse
     {
-        $profile = $this->service->getProfile(auth('khach_hang')->user());
+        $khachHang = $this->service->getProfile($request->user('sanctum'));
 
         return response()->json([
             'success' => true,
-            'data'    => $profile,
+            'data'    => $khachHang,
         ]);
     }
 
@@ -154,7 +94,7 @@ class KhachHangController extends Controller
     {
         try {
             $khachHang = $this->service->updateProfile(
-                auth('khach_hang')->id(),
+                $request->user('sanctum')->id,
                 $request->all()
             );
 
@@ -179,7 +119,7 @@ class KhachHangController extends Controller
     public function doiMatKhau(Request $request): JsonResponse
     {
         try {
-            $this->service->doiMatKhau(auth('khach_hang')->user(), $request->all());
+            $this->service->doiMatKhau($request->user('sanctum'), $request->all());
 
             return response()->json([
                 'success' => true,
@@ -192,72 +132,6 @@ class KhachHangController extends Controller
                 'errors'  => $e->errors(),
             ], 422);
         }
-    }
-
-    // ── CONG KHAI: TIM CHUYEN / DAT VE ───────────────────────────────
-
-    public function getProvinces(): JsonResponse
-    {
-        $data = $this->service->getTinhThanhs();
-
-        return response()->json([
-            'success' => true,
-            'data'    => $data,
-        ]);
-    }
-
-    public function searchChuyenXe(Request $request): JsonResponse
-    {
-        $data = $this->service->searchChuyenXe($request->all());
-
-        return response()->json([
-            'success' => true,
-            'data'    => $data,
-        ]);
-    }
-
-    public function getGheChuyenXe(int $id): JsonResponse
-    {
-        try {
-            $data = $this->service->getGheChuyenXe($id);
-
-            return response()->json([
-                'success' => true,
-                'data'    => $data,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 404);
-        }
-    }
-
-    public function getTramDungChuyenXe(int $id): JsonResponse
-    {
-        try {
-            $data = $this->service->getTramDungChuyenXe($id);
-
-            return response()->json([
-                'success' => true,
-                'data'    => $data,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 404);
-        }
-    }
-
-    public function getVoucherCongKhai(Request $request): JsonResponse
-    {
-        $data = $this->service->getVoucherCongKhai($request->all());
-
-        return response()->json([
-            'success' => true,
-            'data'    => $data,
-        ]);
     }
 
     // ── ADMIN CRUD ────────────────────────────────────────────────────
@@ -342,6 +216,85 @@ class KhachHangController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Xoa khach hang thanh cong.',
+        ]);
+    }
+
+    // ── SEARCH CHUYEN XE ──────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/tinh-thanh
+     */
+    public function getProvinces(): JsonResponse
+    {
+        $data = $this->service->getTinhThanhs();
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/chuyen-xe/search
+     * Query: ?diem_di=...&diem_den=...&ngay_khoi_hanh=...&gia_ve_tu=...&gia_ve_den=...
+     */
+    public function searchChuyenXe(Request $request): JsonResponse
+    {
+        $data = $this->service->searchChuyenXe($request->all());
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    /**
+     * GET /api/v1/chuyen-xe/{id}/ghe
+     */
+    public function getGheChuyenXe(int $id): JsonResponse
+    {
+        try {
+            $data = $this->service->getGheChuyenXe($id);
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 404);
+        }
+    }
+
+    /**
+     * GET /api/v1/chuyen-xe/{id}/tram-dung
+     * Lấy danh sách trạm đón/trả theo tuyến đường của chuyến xe (công khai)
+     */
+    public function getTramDungChuyenXe(int $id): JsonResponse
+    {
+        try {
+            $data = $this->service->getTramDungChuyenXe($id);
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 404);
+        }
+    }
+
+    /**
+     * GET /api/v1/voucher/public?ma_nha_xe=NX001
+     * Lấy danh sách voucher đang hoạt động (công khai cho khách hàng chọn)
+     */
+    public function getVoucherCongKhai(Request $request): JsonResponse
+    {
+        $data = $this->service->getVoucherCongKhai($request->all());
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
         ]);
     }
 }

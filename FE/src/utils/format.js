@@ -14,12 +14,13 @@ export const formatCurrency = (amount) => {
 export const formatDateTime = (value) => {
   if (!value) return '—';
 
+  // Nếu là chuỗi giờ thuần HH:mm:ss hoặc HH:mm (không có ngày)
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
-    return value.slice(0, 5);
+    return value.slice(0, 5); // Chỉ lấy HH:mm
   }
 
   const date = new Date(value);
-  if (isNaN(date.getTime())) return value;
+  if (isNaN(date.getTime())) return value; // Trả về nguyên bản nếu không parse được
 
   return new Intl.DateTimeFormat('vi-VN', {
     timeZone: 'Asia/Ho_Chi_Minh',
@@ -32,6 +33,9 @@ export const formatDateTime = (value) => {
   }).format(date);
 };
 
+/**
+ * Chỉ lấy phần ngày — VD: "2026-04-18T00:00:00.000000Z" → "18/04/2026"
+ */
 export const formatDateOnly = (value) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -44,9 +48,14 @@ export const formatDateOnly = (value) => {
   }).format(date);
 };
 
+/**
+ * Chỉ lấy phần giờ — VD: "2026-04-18T01:00:00.000000Z" → "08:00"
+ * VD: "08:00:00" → "08:00"
+ */
 export const formatTimeOnly = (value) => {
   if (!value) return '—';
 
+  // Chuỗi giờ thuần
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
     return value.slice(0, 5);
   }
@@ -61,5 +70,8 @@ export const formatTimeOnly = (value) => {
   }).format(date);
 };
 
-/** @deprecated Dùng formatDateTime thay thế */
+/**
+ * @deprecated Dùng formatDateTime thay thế
+ */
 export const formatDate = (dateString) => formatDateTime(dateString);
+

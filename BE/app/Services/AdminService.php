@@ -63,33 +63,4 @@ class AdminService
     {
         return $this->adminRepo->toggleStatus($id);
     }
-    public function doiMatKhau(\App\Models\Admin $admin, array $data): void
-    {
-        $validator = \Illuminate\Support\Facades\Validator::make($data, [
-            'mat_khau_cu' => 'required|string',
-            'mat_khau_moi' => 'required|string|min:6|confirmed',
-        ], [
-            'mat_khau_cu.required' => 'Vui lòng nhập mật khẩu hiện tại.',
-            'mat_khau_moi.required' => 'Vui lòng nhập mật khẩu mới.',
-            'mat_khau_moi.min' => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
-            'mat_khau_moi.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
-        ]);
-
-        if ($validator->fails()) {
-            throw new \Illuminate\Validation\ValidationException($validator);
-        }
-
-        if (!\Illuminate\Support\Facades\Hash::check($data['mat_khau_cu'], $admin->password)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'mat_khau_cu' => 'Mật khẩu hiện tại không chính xác.',
-            ]);
-        }
-
-        $this->adminRepo->update($admin->id, [
-            'password' => $data['mat_khau_moi'],
-        ]);
-
-        // Thu hồi tất cả token sau khi đổi mật khẩu để bắt người dùng đăng nhập lại
-        $admin->tokens()->delete();
-    }
 }

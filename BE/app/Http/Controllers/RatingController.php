@@ -8,13 +8,12 @@ use App\Models\NhaXe;
 use App\Models\Ve;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class RatingController extends Controller
 {
     public function submitRating(Request $request): JsonResponse
     {
-        $khachHang = Auth::guard('khach_hang')->user();
+        $khachHang = $request->user('sanctum') ?? auth()->user();
         if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -108,7 +107,7 @@ class RatingController extends Controller
 
     public function getRating(Request $request, string $ticketCode): JsonResponse
     {
-        $khachHang = Auth::guard('khach_hang')->user();
+        $khachHang = $request->user('sanctum') ?? auth()->user();
         if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -134,7 +133,7 @@ class RatingController extends Controller
 
     public function getRatingByTrip(Request $request, int $tripId): JsonResponse
     {
-        $khachHang = Auth::guard('khach_hang')->user();
+        $khachHang = $request->user('sanctum') ?? auth()->user();
         if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -188,7 +187,7 @@ class RatingController extends Controller
 
     public function getPendingRating(Request $request): JsonResponse
     {
-        $khachHang = Auth::guard('khach_hang')->user();
+        $khachHang = $request->user('sanctum') ?? auth()->user();
         if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -243,7 +242,7 @@ class RatingController extends Controller
 
     public function getMyRatings(Request $request): JsonResponse
     {
-        $khachHang = Auth::guard('khach_hang')->user();
+        $khachHang = $request->user('sanctum') ?? auth()->user();
         if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -277,7 +276,7 @@ class RatingController extends Controller
 
     public function getCompanyRatings(Request $request): JsonResponse
     {
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->user('sanctum') ?? auth()->user();
         if (!$nhaXe || !($nhaXe instanceof NhaXe)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -303,7 +302,7 @@ class RatingController extends Controller
 
     public function getAdminRatings(Request $request): JsonResponse
     {
-        $admin = Auth::guard('admin')->user();
+        $admin = $request->user('sanctum') ?? auth()->user();
         if (!$admin || !($admin instanceof \App\Models\Admin)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
