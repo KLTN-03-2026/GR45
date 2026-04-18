@@ -11,6 +11,7 @@ use App\Http\Controllers\TaiXeController;
 use App\Http\Controllers\VeController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\ThanhToanController;
+use App\Http\Controllers\BaoCaoController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -140,6 +141,12 @@ Route::prefix('v1')->group(function () {
             Route::patch('tai-xe/{id}/trang-thai', [TaiXeController::class, 'toggleStatus']);
             Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy']);
             Route::get('ratings', [RatingController::class, 'getCompanyRatings']);
+
+            // Báo cáo / thống kê (phạm vi nhà xe đăng nhập)
+            Route::get('bao-cao/dashboard', [BaoCaoController::class, 'dashboard']);
+            Route::get('bao-cao/theo-tuyen-duong', [BaoCaoController::class, 'theoTuyenDuong']);
+            Route::get('bao-cao/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe']);
+            Route::get('bao-cao/export', [BaoCaoController::class, 'export']);
         });
     });
 
@@ -209,10 +216,16 @@ Route::prefix('v1')->group(function () {
             Route::patch('tai-xe/{id}/trang-thai', [TaiXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-tai-xe');
             Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy'])->middleware('permission:xoa-tai-xe');
 
-             // Thanh toán
-            Route::get('thanh-toan/thong-ke',            [ThanhToanController::class, 'thongKe']);
-            Route::get('thanh-toan',                     [ThanhToanController::class, 'index']);
-            Route::get('thanh-toan/{id}',                [ThanhToanController::class, 'show']);
+             // Giao dịch thanh toán (toàn hệ thống)
+            Route::get('thanh-toan/thong-ke', [ThanhToanController::class, 'thongKe'])->middleware('permission:xem-ve');
+            Route::get('thanh-toan', [ThanhToanController::class, 'index'])->middleware('permission:xem-ve');
+            Route::get('thanh-toan/{id}', [ThanhToanController::class, 'show'])->middleware('permission:xem-ve');
+
+            // Báo cáo / thống kê (toàn hệ thống)
+            Route::get('bao-cao/dashboard', [BaoCaoController::class, 'dashboard'])->middleware('permission:xem-ve');
+            Route::get('bao-cao/theo-tuyen-duong', [BaoCaoController::class, 'theoTuyenDuong'])->middleware('permission:xem-ve');
+            Route::get('bao-cao/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe'])->middleware('permission:xem-ve');
+            Route::get('bao-cao/export', [BaoCaoController::class, 'export'])->middleware('permission:xem-ve');
 
 
             Route::get('ratings', [RatingController::class, 'getAdminRatings']);
