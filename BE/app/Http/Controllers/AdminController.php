@@ -2,18 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Concerns\ResolvesForwardedFormRequests;
-use App\Http\Requests\Admin\LoginAdminRequest;
-use App\Models\Admin;
-use App\Models\ChucNang;
 use App\Services\AdminService;
+use App\Http\Requests\Admin\StoreAdminRequest;
+use App\Http\Requests\Admin\UpdateAdminRequest;
+use App\Http\Requests\Admin\LoginAdminRequest;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
-    use ResolvesForwardedFormRequests;
+    protected $adminService;
 
-    public function __construct(protected AdminService $adminService) {}
+    public function __construct(AdminService $adminService)
+    {
+        $this->adminService = $adminService;
+    }
+
+    public function index(Request $request)
+    {
+        try {
+            $filters = $request->only(['search', 'tinh_trang', 'id_chuc_vu', 'per_page']);
+            $admins = $this->adminService->getAll($filters);
+            return response()->json([
+                'success' => true,
+                'data' => $admins,
+                'message' => 'Lấy danh sách nhân viên thành công.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
 
     public function login(LoginAdminRequest $request)
     {
@@ -22,197 +39,203 @@ class AdminController extends Controller
             if (isset($result['success']) && $result['success'] === false) {
                 return response()->json($result, 401);
             }
-
             return response()->json($result);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
 
-    public function getPhanQuyen(Request $request)
-    {
-        $admin = $request->user();
-        if (! $admin instanceof Admin) {
-            return response()->json(['success' => false, 'message' => 'Không xác định được tài khoản admin.'], 401);
-        }
-        if ((int) $admin->is_master === 1) {
-            $permissions = ChucNang::query()->where('tinh_trang', 'hoat_dong')->orderBy('slug')->pluck('slug')->values()->all();
-        } else {
-            $admin->loadMissing('chucVu.chucNangs');
-            $permissions = $admin->chucVu
-                ? $admin->chucVu->chucNangs()->where('chuc_nangs.tinh_trang', 'hoat_dong')->pluck('slug')->values()->all()
-                : [];
-        }
-
-        return response()->json(['success' => true, 'data' => ['permissions' => $permissions]]);
-    }
-
     public function logout()
     {
-        $this->adminService->logout();
-
-        return response()->json(['success' => true, 'message' => 'Đăng xuất thành công.']);
+        try {
+            $this->adminService->logout();
+            return response()->json(['success' => true, 'message' => 'Đăng xuất thành công.']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
     }
 
     public function refresh()
     {
-        $result = $this->adminService->refresh();
-        if (isset($result['success']) && $result['success'] === false) {
-            return response()->json($result, 401);
+        try {
+            $result = $this->adminService->refresh();
+            if (isset($result['success']) && $result['success'] === false) {
+                return response()->json($result, 401);
+            }
+            return response()->json($result);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
-
-        return response()->json($result);
     }
 
     public function me()
     {
-        $data = $this->adminService->me();
-
-        return response()->json(['success' => true, 'data' => $data]);
+        try {
+            $admin = $this->adminService->me();
+            return response()->json(['success' => true, 'data' => $admin]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
     }
 
-    public function adminNhaXeIndex(Request $request)
+    public function getPhanQuyen(Request $request, \App\Services\AdminAuthService $adminAuthService)
     {
-        return app(NhaXeController::class)->index($request);
+        try {
+            $admin = auth('admin')->user();
+
+            $permissions = $adminAuthService->getDanhSachQuyen($admin);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Lấy danh sách phân quyền thành công',
+                'data' => [
+                    'is_master' => $admin->is_master == 1,
+                    'permissions' => $permissions
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
     }
 
-    public function adminNhaXeShow(int $id)
+    public function show($id)
     {
-        return app(NhaXeController::class)->show($id);
+        try {
+            $admin = $this->adminService->getById($id);
+            return response()->json(['success' => true, 'data' => $admin]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 404);
+        }
     }
 
-    public function adminNhaXeStore(Request $request)
+    public function store(StoreAdminRequest $request)
     {
-        return app(NhaXeController::class)->store($request);
+        try {
+            $admin = $this->adminService->create($request->validated());
+            return response()->json([
+                'success' => true,
+                'data' => $admin,
+                'message' => 'Tạo nhân viên thành công.'
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
     }
 
-    public function adminNhaXeUpdateOperator(Request $request, int $id)
+    public function update(UpdateAdminRequest $request, $id)
     {
-        return app(NhaXeController::class)->updateOperator($request, $id);
+        try {
+            $admin = $this->adminService->update($id, $request->validated());
+            return response()->json([
+                'success' => true,
+                'data' => $admin,
+                'message' => 'Cập nhật nhân viên thành công.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
     }
 
-    public function adminNhaXeToggleStatus(int $id)
+    public function destroy($id)
     {
-        return app(NhaXeController::class)->toggleStatus($id);
+        try {
+            $this->adminService->delete($id);
+            return response()->json(['success' => true, 'message' => 'Xóa tài khoản nhân viên thành công.']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
     }
 
-    public function adminNhaXeDestroy(int $id)
+    public function toggleStatus($id)
     {
-        return app(NhaXeController::class)->destroy($id);
+        try {
+            $admin = $this->adminService->toggleStatus($id);
+            return response()->json([
+                'success' => true,
+                'data' => $admin,
+                'message' => 'Cập nhật trạng thái thành công.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
     }
 
-    public function adminTuyenDuongIndex(Request $request)
+    public function generateSeatsForVehicles()
     {
-        return app(TuyenDuongController::class)->index($request);
-    }
+        try {
+            $user = auth('sanctum')->user();
+            if (!($user instanceof \App\Models\Admin)) {
+                throw new \Exception('Chỉ Admin mới có quyền tự động tạo ghế cho xe.');
+            }
 
-    public function adminTuyenDuongShow($id)
-    {
-        return app(TuyenDuongController::class)->show($id);
-    }
+            $xes = \App\Models\Xe::with('loaiXe')->get();
+            $countNewSeats = 0;
+            $countVehiclesUpdated = 0;
 
-    public function adminTuyenDuongStore(Request $request)
-    {
-        return app(TuyenDuongController::class)->store($this->storeTuyenDuongRequest($request));
-    }
+            foreach ($xes as $xe) {
+                $daCoGhe = \App\Models\Ghe::where('id_xe', $xe->id)->exists();
+                if ($daCoGhe) {
+                    continue; // Bỏ qua nếu xe đã có ghế
+                }
 
-    public function adminTuyenDuongUpdate(Request $request, $id)
-    {
-        return app(TuyenDuongController::class)->update($this->updateTuyenDuongRequest($request), $id);
-    }
+                $loaiXe = $xe->loaiXe;
+                if (!$loaiXe) {
+                    continue;
+                }
 
-    public function adminTuyenDuongConfirm($id)
-    {
-        return app(TuyenDuongController::class)->confirm($id);
-    }
+                $soTang = $loaiXe->so_tang ?? 1;
+                $soGheMacDinh = $loaiXe->so_ghe_mac_dinh ?? 40;
+                $gheMoiTang = ceil($soGheMacDinh / $soTang);
 
-    public function adminTuyenDuongCancel($id)
-    {
-        return app(TuyenDuongController::class)->cancel($id);
-    }
+                // Lấy một loại ghế mặc định từ DB để không bị lỗi null, nếu không có tạm gán 1
+                $loaiGheMacDinh = \App\Models\LoaiGhe::first();
+                $idLoaiGhe = $loaiGheMacDinh ? $loaiGheMacDinh->id : 1;
 
-    public function adminTuyenDuongDestroy($id)
-    {
-        return app(TuyenDuongController::class)->destroy($id);
-    }
+                for ($tang = 1; $tang <= $soTang; $tang++) {
+                    $prefix = $tang == 1 ? 'A' : 'B'; // Tầng 1 là A, Tầng 2 là B
+                    for ($i = 1; $i <= $gheMoiTang; $i++) {
+                        $maGhe = $prefix . str_pad($i, 2, '0', STR_PAD_LEFT);
+                        \App\Models\Ghe::create([
+                            'id_xe' => $xe->id,
+                            'id_loai_ghe' => $idLoaiGhe, // Gán loại ghế mặc định
+                            'ma_ghe' => $maGhe,
+                            'tang' => $tang,
+                            'trang_thai' => 1 // 1: Đang hoạt động thông thường
+                        ]);
+                        $countNewSeats++;
+                    }
+                }
+                $xe->so_ghe_thuc_te = $soGheMacDinh; // Cập nhật số ghế thực tế theo loại xe
+                $xe->save();
+                $countVehiclesUpdated++;
+            }
 
-    public function adminVoucherIndex()
-    {
-        return app(VoucherController::class)->indexAdmin();
+            return response()->json([
+                'success' => true,
+                'message' => "Tạo tự động thành công $countNewSeats ghế cho $countVehiclesUpdated xe chưa có ghế."
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
     }
-
-    public function adminVoucherDuyet(Request $request, $id)
+    public function doiMatKhau(Request $request)
     {
-        return app(VoucherController::class)->duyetVoucherAdmin($this->updateVoucherStatusRequest($request), $id);
-    }
+        try {
+            $admin = auth('admin')->user();
+            $this->adminService->doiMatKhau($admin, $request->all());
 
-    public function adminLoaiXeIndex()
-    {
-        return app(LoaiXeController::class)->index();
-    }
-
-    public function adminLoaiGheIndex()
-    {
-        return app(XeController::class)->indexSeatTypes();
-    }
-
-    public function adminXeIndex(Request $request)
-    {
-        return app(XeController::class)->index($request);
-    }
-
-    public function adminXeShow($id)
-    {
-        return app(XeController::class)->show($id);
-    }
-
-    public function adminXeStore(Request $request)
-    {
-        return app(XeController::class)->store($request);
-    }
-
-    public function adminXeUpdate(Request $request, $id)
-    {
-        return app(XeController::class)->update($request, $id);
-    }
-
-    public function adminXeDestroy($id)
-    {
-        return app(XeController::class)->destroy($id);
-    }
-
-    public function adminXeCanhBaoDoiTrangThai(Request $request, $id)
-    {
-        return app(XeController::class)->canhBaoDoiTrangThai($request, $id);
-    }
-
-    public function adminXeToggleStatus(Request $request, $id)
-    {
-        return app(XeController::class)->toggleStatus($request, $id);
-    }
-
-    public function adminXeIndexSeats($id)
-    {
-        return app(XeController::class)->indexSeats($id);
-    }
-
-    public function adminXeStoreSeat(Request $request, $id)
-    {
-        return app(XeController::class)->storeSeat($request, $id);
-    }
-
-    public function adminXeClearSeats($id)
-    {
-        return app(XeController::class)->clearSeats($id);
-    }
-
-    public function adminXeUpdateSeat(Request $request, $id, $seatId)
-    {
-        return app(XeController::class)->updateSeat($request, $id, $seatId);
-    }
-
-    public function adminXeDeleteSeat($id, $seatId)
-    {
-        return app(XeController::class)->deleteSeat($id, $seatId);
+            return response()->json([
+                'success' => true,
+                'message' => 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.'
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dữ liệu không hợp lệ.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
     }
 }
