@@ -16,6 +16,7 @@
     "chart.js": "^4.5.1",
     "leaflet": "^1.9.4",
     "lucide-vue-next": "^0.577.0",
+    "onnxruntime-web": "^1.24.3",
     "pinia": "^3.0.4",
     "vue": "^3.5.29",
     "vue-chartjs": "^5.3.3",
