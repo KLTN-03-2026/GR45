@@ -704,24 +704,28 @@ onUnmounted(() => {
               </div>
               <h2 class="text-2xl font-bold text-slate-900 mb-2">Kho Voucher</h2>
               <p class="text-slate-500 max-w-md mx-auto mb-8">Ưu đãi độc quyền dành cho thành viên Smart Bus</p>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                <div class="border border-slate-200 rounded-2xl p-5 hover:shadow-md transition">
-                  <div class="flex justify-between items-start mb-3">
-                    <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">Giảm 20%</span>
-                    <span class="text-xs text-slate-400">HSD: 30/12/2025</span>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left items-stretch">
+                <div class="border border-slate-200 rounded-2xl p-5 hover:shadow-md transition flex flex-col h-full">
+                  <div>
+                    <div class="flex justify-between items-start mb-3">
+                      <span class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">Giảm 20%</span>
+                      <span class="text-xs text-slate-400">HSD: 30/12/2025</span>
+                    </div>
+                    <h3 class="font-bold text-slate-900">Giảm giá vé tuyến cố định</h3>
+                    <p class="text-sm text-slate-500 mt-1">Áp dụng cho tất cả tuyến Đà Nẵng - Hội An</p>
                   </div>
-                  <h3 class="font-bold text-slate-900">Giảm giá vé tuyến cố định</h3>
-                  <p class="text-sm text-slate-500 mt-1">Áp dụng cho tất cả tuyến Đà Nẵng - Hội An</p>
-                  <button class="mt-4 w-full bg-blue-600 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition">Nhận ngay</button>
+                  <button class="mt-6 w-full bg-blue-600 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition mt-auto">Nhận ngay</button>
                 </div>
-                <div class="border border-slate-200 rounded-2xl p-5 hover:shadow-md transition">
-                  <div class="flex justify-between items-start mb-3">
-                    <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">Miễn phí</span>
-                    <span class="text-xs text-slate-400">HSD: 15/11/2025</span>
+                <div class="border border-slate-200 rounded-2xl p-5 hover:shadow-md transition flex flex-col h-full">
+                  <div>
+                    <div class="flex justify-between items-start mb-3">
+                      <span class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full">Miễn phí</span>
+                      <span class="text-xs text-slate-400">HSD: 15/11/2025</span>
+                    </div>
+                    <h3 class="font-bold text-slate-900">Phụ kiện xe buýt</h3>
+                    <p class="text-sm text-slate-500 mt-1">Tặng 1 suất nước suối trên xe</p>
                   </div>
-                  <h3 class="font-bold text-slate-900">Phụ kiện xe buýt</h3>
-                  <p class="text-sm text-slate-500 mt-1">Tặng 1 suất nước suối trên xe</p>
-                  <button class="mt-4 w-full bg-blue-600 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition">Nhận ngay</button>
+                  <button class="mt-6 w-full bg-blue-600 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition mt-auto">Nhận ngay</button>
                 </div>
               </div>
             </div>
