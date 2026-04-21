@@ -15,7 +15,13 @@ const profileMenuRef = ref(null);
 const isLoggedIn = computed(() => clientStore.isLoggedIn);
 const userName = computed(() => {
   const user = clientStore.user || {};
-  return user.ho_ten || user.ten_khach_hang || user.name || "Khách hàng";
+  const name =
+    user.ho_va_ten ||
+    user.ho_ten ||
+    user.ten_khach_hang ||
+    user.name ||
+    (typeof user.email === "string" ? user.email.split("@")[0] : "");
+  return name?.trim() || "Khách hàng";
 });
 const avatarLetter = computed(() => userName.value.charAt(0).toUpperCase());
 
@@ -67,17 +73,16 @@ const scrollToSection = (sectionId) => {
 };
 
 onMounted(() => {
-  window.addEventListener("scroll", handleScroll);
-  document.addEventListener("click", handleOutsideClick);
-  // Lấy thông tin profile nếu đã đăng nhập nhưng chưa có dữ liệu user
-  if (isLoggedIn.value && !clientStore.user?.id) {
-    clientApi
-      .getProfile()
-      .then((res) => {
-        const p = res?.data || res?.khach_hang || res;
-        if (p) clientStore.user = p;
-      })
-      .catch(() => {});
+  window.addEventListener('scroll', handleScroll);
+  document.addEventListener('click', handleOutsideClick);
+  // Bổ sung profile khi đăng nhập nhưng store thiếu id hoặc thiếu tên hiển thị
+  const u = clientStore.user || {};
+  const hasDisplayName = !!(u.ho_va_ten || u.ho_ten || u.ten_khach_hang || u.name);
+  if (isLoggedIn.value && (!u.id || !hasDisplayName)) {
+    clientApi.getProfile().then((res) => {
+      const p = res?.success ? res.data : res?.data || res?.khach_hang || res;
+      if (p) clientStore.updateUser(p);
+    }).catch(() => {});
   }
 });
 
@@ -197,14 +202,12 @@ onBeforeUnmount(() => {
                 </RouterLink>
                 <!-- <RouterLink
                   @click="isProfileMenuOpen = false"
-                  to="/profile"
+                  to="/lich-su-dat-ve"
                   class="client-header__dropdown-item"
                 >
-                  <span class="material-symbols-outlined"
-                    >confirmation_number</span
-                  >
-                  Vé của tôi
-                </RouterLink> -->
+                  <span class="material-symbols-outlined">history</span>
+                  Lịch sử đặt vé
+                </RouterLink>
                 <div class="client-header__dropdown-divider"></div>
                 <button
                   @click="handleLogout"
@@ -292,13 +295,9 @@ onBeforeUnmount(() => {
             <span class="material-symbols-outlined">person</span>
             Thông tin cá nhân
           </RouterLink>
-          <RouterLink
-            to="/ve-cua-toi"
-            class="client-header__mobile-link"
-            @click="isMobileMenuOpen = false"
-          >
-            <span class="material-symbols-outlined">confirmation_number</span>
-            Vé của tôi
+          <RouterLink to="/lich-su-dat-ve" class="client-header__mobile-link" @click="isMobileMenuOpen = false">
+            <span class="material-symbols-outlined">history</span>
+            Lịch sử đặt vé
           </RouterLink>
           <button
             @click="handleLogout"
