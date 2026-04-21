@@ -44,53 +44,31 @@ const toggleNotifyMenu = () => {
   if (isNotifyMenuOpen.value) isProfileMenuOpen.value = false
 }
 
-// Dữ liệu thông báo mẫu cho nhà xe
-const notifications = ref([
+// Lấy thông báo từ store và kết hợp với thông báo mẫu
+const notifications = computed(() => {
+  const storeNotes = operatorStore.notifications;
+  return [...storeNotes, ...sampleNotifications.value];
+});
+
+const sampleNotifications = ref([
   {
     id: 1,
     type: 'alert',
-    title: 'Cảnh báo: Tài xế buồn ngủ',
-    message: 'Hệ thống AI phát hiện tài xế Nguyễn Văn A (CX-102) có dấu hiệu mệt mỏi.',
-    time: '2 phút trước',
-    read: false,
+    title: 'Hệ thống AI',
+    message: 'Hệ thống giám sát tài xế đang hoạt động.',
+    time: 'Bắt đầu phiên',
+    read: true,
     icon: 'alert'
   },
   {
     id: 2,
-    type: 'ticket',
-    title: 'Vé mới được đặt',
-    message: 'Khách hàng Trần Thị B vừa đặt 3 vé tuyến TP.HCM → Đà Lạt (12:00 hôm nay).',
-    time: '8 phút trước',
-    read: false,
-    icon: 'info'
-  },
-  {
-    id: 3,
-    type: 'success',
-    title: 'Chuyến xe hoàn thành',
-    message: 'Chuyến xe CX-089 tuyến Hà Nội → Huế đã hoàn thành an toàn.',
-    time: '45 phút trước',
-    read: false,
-    icon: 'success'
-  },
-  {
-    id: 4,
-    type: 'warning',
-    title: 'Xe cần bảo dưỡng',
-    message: 'Phương tiện BKS 51B-12345 sắp đến hạn bảo dưỡng định kỳ (còn 3 ngày).',
-    time: '2 giờ trước',
-    read: true,
-    icon: 'alert'
-  },
-  {
-    id: 5,
     type: 'info',
-    title: 'Yêu cầu hỗ trợ mới',
-    message: 'Hành khách Phạm Văn C yêu cầu hoàn vé chuyến CX-145.',
-    time: '3 giờ trước',
+    title: 'Hỗ trợ',
+    message: 'Chào mừng bạn đến với bảng điều khiển Nhà Xe.',
+    time: 'Hôm nay',
     read: true,
     icon: 'info'
-  },
+  }
 ])
 
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)

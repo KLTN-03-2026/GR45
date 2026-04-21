@@ -24,6 +24,13 @@ const clientApi = {
   getRatingByTrip: (tripId) => axiosClient.get(`/v1/rating/trip/${tripId}`),
   getPendingRatings: () => axiosClient.get('/v1/pending-rating'),
   getMyRatings: () => axiosClient.get('/v1/my-ratings'),
+
+  // chi tiết vé
+  getTicket: (id) => axiosClient.get(`/v1/ve/${id}`),
+
+  // nhà xe công khai
+  getOperators: (params) => axiosClient.get('/v1/nha-xe', { params }),
+  getOperatorDetails: (id) => axiosClient.get(`/v1/nha-xe/${id}`),
 };
 
 export default clientApi;
