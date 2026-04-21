@@ -1,8 +1,8 @@
 <script setup>
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useClientStore } from '@/stores/clientStore.js';
-import clientApi from '@/api/clientApi.js';
+import { computed, ref, onMounted, onBeforeUnmount } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { useClientStore } from "@/stores/clientStore.js";
+import clientApi from "@/api/clientApi.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -26,7 +26,7 @@ const userName = computed(() => {
 const avatarLetter = computed(() => userName.value.charAt(0).toUpperCase());
 
 // Kiểm tra route hiện tại để highlight menu
-const isHomePage = computed(() => route.path === '/');
+const isHomePage = computed(() => route.path === "/");
 
 const handleScroll = () => {
   isScrolled.value = window.scrollY > 10;
@@ -40,35 +40,35 @@ const handleOutsideClick = (e) => {
 
 const goLogin = () => {
   isMobileMenuOpen.value = false;
-  router.push('/auth/login');
+  router.push("/auth/login");
 };
 
 const goRegister = () => {
   isMobileMenuOpen.value = false;
-  router.push('/auth/login');
+  router.push("/auth/login");
 };
 
 const handleLogout = () => {
   isProfileMenuOpen.value = false;
   isMobileMenuOpen.value = false;
   clientStore.logout();
-  router.push('/');
+  router.push("/");
 };
 
 // Cuộn mượt đến section trên trang chủ
 const scrollToSection = (sectionId) => {
   isMobileMenuOpen.value = false;
-  if (route.path !== '/') {
+  if (route.path !== "/") {
     // Nếu không ở trang chủ, chuyển về trang chủ rồi cuộn
-    router.push('/').then(() => {
+    router.push("/").then(() => {
       setTimeout(() => {
         const el = document.getElementById(sectionId);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 300);
     });
   } else {
     const el = document.getElementById(sectionId);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 };
 
@@ -87,20 +87,19 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', handleScroll);
-  document.removeEventListener('click', handleOutsideClick);
+  window.removeEventListener("scroll", handleScroll);
+  document.removeEventListener("click", handleOutsideClick);
 });
 </script>
 
 <template>
-  <nav
-    class="client-header"
-    :class="{ 'client-header--scrolled': isScrolled }"
-  >
+  <nav class="client-header" :class="{ 'client-header--scrolled': isScrolled }">
     <div class="client-header__inner">
       <!-- Logo -->
       <div class="client-header__logo" @click="router.push('/')">
-        <span class="client-header__logo-icon material-symbols-outlined">directions_bus</span>
+        <span class="client-header__logo-icon material-symbols-outlined"
+          >directions_bus</span
+        >
         <span class="client-header__logo-text">Vigilant Fleet</span>
       </div>
 
@@ -111,7 +110,9 @@ onBeforeUnmount(() => {
           class="client-header__nav-link"
           :class="{ 'client-header__nav-link--active': isHomePage }"
         >
-          <span class="material-symbols-outlined client-header__nav-icon">home</span>
+          <span class="material-symbols-outlined client-header__nav-icon"
+            >home</span
+          >
           Trang chủ
         </RouterLink>
         <a
@@ -119,7 +120,9 @@ onBeforeUnmount(() => {
           class="client-header__nav-link"
           @click="scrollToSection('tuyen-pho-bien')"
         >
-          <span class="material-symbols-outlined client-header__nav-icon">schedule</span>
+          <span class="material-symbols-outlined client-header__nav-icon"
+            >schedule</span
+          >
           Lịch trình
         </a>
         <a
@@ -127,7 +130,9 @@ onBeforeUnmount(() => {
           class="client-header__nav-link"
           @click="scrollToSection('tim-chuyen')"
         >
-          <span class="material-symbols-outlined client-header__nav-icon">search</span>
+          <span class="material-symbols-outlined client-header__nav-icon"
+            >search</span
+          >
           Tìm chuyến
         </a>
         <a
@@ -135,7 +140,9 @@ onBeforeUnmount(() => {
           class="client-header__nav-link"
           @click="scrollToSection('hop-tac')"
         >
-          <span class="material-symbols-outlined client-header__nav-icon">handshake</span>
+          <span class="material-symbols-outlined client-header__nav-icon"
+            >handshake</span
+          >
           Hợp tác với chúng tôi
         </a>
       </div>
@@ -144,8 +151,12 @@ onBeforeUnmount(() => {
       <div class="client-header__actions">
         <!-- Chưa đăng nhập -->
         <template v-if="!isLoggedIn">
-          <button @click="goLogin" class="client-header__btn-login">Đăng nhập</button>
-          <button @click="goRegister" class="client-header__btn-register">Đăng ký</button>
+          <button @click="goLogin" class="client-header__btn-login">
+            Đăng nhập
+          </button>
+          <button @click="goRegister" class="client-header__btn-register">
+            Đăng ký
+          </button>
         </template>
 
         <!-- Đã đăng nhập: hiển thị avatar + dropdown -->
@@ -160,17 +171,24 @@ onBeforeUnmount(() => {
               <span
                 class="material-symbols-outlined client-header__chevron"
                 :class="{ 'client-header__chevron--open': isProfileMenuOpen }"
-              >expand_more</span>
+                >expand_more</span
+              >
             </button>
 
             <!-- Dropdown menu -->
             <Transition name="dropdown">
               <div v-show="isProfileMenuOpen" class="client-header__dropdown">
                 <div class="client-header__dropdown-header">
-                  <div class="client-header__dropdown-avatar">{{ avatarLetter }}</div>
+                  <div class="client-header__dropdown-avatar">
+                    {{ avatarLetter }}
+                  </div>
                   <div class="client-header__dropdown-info">
-                    <span class="client-header__dropdown-name">{{ userName }}</span>
-                    <span class="client-header__dropdown-role">Khách hàng thành viên</span>
+                    <span class="client-header__dropdown-name">{{
+                      userName
+                    }}</span>
+                    <span class="client-header__dropdown-role"
+                      >Khách hàng thành viên</span
+                    >
                   </div>
                 </div>
                 <div class="client-header__dropdown-divider"></div>
@@ -182,7 +200,7 @@ onBeforeUnmount(() => {
                   <span class="material-symbols-outlined">person</span>
                   Thông tin cá nhân
                 </RouterLink>
-                <RouterLink
+                <!-- <RouterLink
                   @click="isProfileMenuOpen = false"
                   to="/lich-su-dat-ve"
                   class="client-header__dropdown-item"
@@ -191,7 +209,10 @@ onBeforeUnmount(() => {
                   Lịch sử đặt vé
                 </RouterLink>
                 <div class="client-header__dropdown-divider"></div>
-                <button @click="handleLogout" class="client-header__dropdown-item client-header__dropdown-item--danger">
+                <button
+                  @click="handleLogout"
+                  class="client-header__dropdown-item client-header__dropdown-item--danger"
+                >
                   <span class="material-symbols-outlined">logout</span>
                   Đăng xuất
                 </button>
@@ -225,15 +246,27 @@ onBeforeUnmount(() => {
           <span class="material-symbols-outlined">home</span>
           Trang chủ
         </RouterLink>
-        <a href="javascript:void(0)" class="client-header__mobile-link" @click="scrollToSection('tuyen-pho-bien')">
+        <a
+          href="javascript:void(0)"
+          class="client-header__mobile-link"
+          @click="scrollToSection('tuyen-pho-bien')"
+        >
           <span class="material-symbols-outlined">schedule</span>
           Lịch trình
         </a>
-        <a href="javascript:void(0)" class="client-header__mobile-link" @click="scrollToSection('tim-chuyen')">
+        <a
+          href="javascript:void(0)"
+          class="client-header__mobile-link"
+          @click="scrollToSection('tim-chuyen')"
+        >
           <span class="material-symbols-outlined">search</span>
           Tìm chuyến
         </a>
-        <a href="javascript:void(0)" class="client-header__mobile-link" @click="scrollToSection('hop-tac')">
+        <a
+          href="javascript:void(0)"
+          class="client-header__mobile-link"
+          @click="scrollToSection('hop-tac')"
+        >
           <span class="material-symbols-outlined">handshake</span>
           Hợp tác với chúng tôi
         </a>
@@ -245,13 +278,20 @@ onBeforeUnmount(() => {
             <span class="material-symbols-outlined">login</span>
             Đăng nhập
           </button>
-          <button @click="goRegister" class="client-header__mobile-btn-register">
+          <button
+            @click="goRegister"
+            class="client-header__mobile-btn-register"
+          >
             <span class="material-symbols-outlined">person_add</span>
             Đăng ký tài khoản
           </button>
         </template>
         <template v-else>
-          <RouterLink to="/profile" class="client-header__mobile-link" @click="isMobileMenuOpen = false">
+          <RouterLink
+            to="/profile"
+            class="client-header__mobile-link"
+            @click="isMobileMenuOpen = false"
+          >
             <span class="material-symbols-outlined">person</span>
             Thông tin cá nhân
           </RouterLink>
@@ -259,7 +299,10 @@ onBeforeUnmount(() => {
             <span class="material-symbols-outlined">history</span>
             Lịch sử đặt vé
           </RouterLink>
-          <button @click="handleLogout" class="client-header__mobile-link client-header__mobile-link--danger">
+          <button
+            @click="handleLogout"
+            class="client-header__mobile-link client-header__mobile-link--danger"
+          >
             <span class="material-symbols-outlined">logout</span>
             Đăng xuất
           </button>
@@ -274,14 +317,14 @@ onBeforeUnmount(() => {
 .client-header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1000;
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
   border-bottom: 1px solid rgba(148, 163, 184, 0.1);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  font-family: 'Manrope', sans-serif;
+  font-family: "Manrope", sans-serif;
 }
 
 .client-header--scrolled {
@@ -372,7 +415,7 @@ onBeforeUnmount(() => {
 }
 
 .client-header__nav-link--active::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: -2px;
   left: 50%;
@@ -577,7 +620,12 @@ onBeforeUnmount(() => {
 
 .client-header__dropdown-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.15), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 163, 184, 0.15),
+    transparent
+  );
   margin: 0.25rem 0;
 }
 
@@ -732,7 +780,12 @@ onBeforeUnmount(() => {
 
 .client-header__mobile-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.15), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(148, 163, 184, 0.15),
+    transparent
+  );
   margin: 0.35rem 0;
 }
 

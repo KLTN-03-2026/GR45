@@ -76,7 +76,7 @@ class VeService
                 if (!$kh) {
                     $kh = KhachHang::create([
                         'so_dien_thoai' => $data['sdt_khach_hang'],
-                        'ho_va_ten' => 'Khách vãng lai',
+                        'ho_va_ten' => $data['ten_khach_hang'] ?? 'Khách vãng lai',
                         'tinh_trang' => 'chua_xac_nhan',
                     ]);
                 }
@@ -130,7 +130,6 @@ class VeService
                     $tienKhuyenMai = $voucher->gia_tri;
                 }
 
-                // Giới hạn max KM nếu cần (chi tiết phụ thuộc vào DB)
                 if ($tienKhuyenMai > $tienBanDau) {
                     $tienKhuyenMai = $tienBanDau;
                 }
@@ -138,14 +137,17 @@ class VeService
 
             $tongTien = $tienBanDau - $tienKhuyenMai;
 
-            // Khách mặc định dang_cho, Admin/Nhà xe có thể truyền da_thanh_toan.
             $tinhTrang = $data['tinh_trang'] ?? 'dang_cho';
             $phuongThucThanhToan = $data['phuong_thuc_thanh_toan'] ?? 'tien_mat';
 
             // Check logic thanh_toan_sau
-            if ($phuongThucThanhToan === 'tien_mat' && $chuyenXe->thanh_toan_sau == 0) {
-                // Ngoại lệ: Nhà xe và Admin có thể thu tiền mặt ngay tại quầy cho chuyến xe này mà không lo thanh_toan_sau (Tuỳ request user, nhưng cứ cấm hết theo yêu cầu)
+            if ($role === 'khach_hang' && $phuongThucThanhToan === 'tien_mat' && $chuyenXe->thanh_toan_sau == 0) {
                 throw new Exception("Chuyến xe này không cho phép thanh toán tiền mặt (Thanh toán sau). Vui lòng chuyển khoản.");
+            }
+
+            // Với Admin/Nhà xe, nếu chọn tiền mặt thì mặc định là đã thu tiền tại quầy
+            if (($role === 'admin' || $role === 'nha_xe') && $phuongThucThanhToan === 'tien_mat') {
+                $tinhTrang = $data['tinh_trang'] ?? 'da_thanh_toan';
             }
 
             // Xử lý loại vé theo role (1: khách đặt, 2: nhà xe, 3: admin)
