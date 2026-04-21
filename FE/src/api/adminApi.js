@@ -24,7 +24,7 @@ const adminApi = {
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
   createOperator: (data) => axiosClient.post('/v1/admin/nha-xe', data),
- updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
+  updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
   toggleOperatorStatus: (id) => axiosClient.patch(`/v1/admin/nha-xe/${id}/trang-thai`),
   deleteOperator: (id) => axiosClient.delete(`/v1/admin/nha-xe/${id}`),
 

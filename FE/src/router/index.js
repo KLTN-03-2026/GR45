@@ -49,6 +49,16 @@ const router = createRouter({
           component: () => import('../views/user/ProfileView.vue'),
           beforeEnter: checkClientLogin,
         },
+        {
+          path: 'lich-su-dat-ve',
+          name: 'client-ticket-history',
+          component: () => import('../views/user/TicketHistoryView.vue'),
+          beforeEnter: checkClientLogin,
+        },
+        {
+          path: 've-cua-toi',
+          redirect: { name: 'client-ticket-history' },
+        },
       ],
     },
 

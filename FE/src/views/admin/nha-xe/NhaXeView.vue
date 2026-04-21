@@ -1,302 +1,583 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref, nextTick } from 'vue'
 import adminApi from '@/api/adminApi'
+import { Modal } from 'bootstrap'
 import {
-  Building2, Plus, Edit2, Trash2, CheckCircle, XCircle,
-  Eye, Save, RefreshCw, AlertTriangle, ShieldAlert, BadgePercent,
-  Search, Info, CreditCard, MapPin, Phone, Mail, User
+  AlertTriangle,
+  BadgePercent,
+  Building2,
+  CheckCircle,
+  Eye,
+  Info,
+  Lock,
+  Mail,
+  MapPin,
+  Phone,
+  Plus,
+  RefreshCw,
+  Save,
+  Search,
+  ShieldAlert,
+  Trash2,
+  Unlock,
+  User
 } from 'lucide-vue-next'
 
-// --- State Danh sách & Phân trang ---
-const nhaXes = ref([])
+const operatorList = ref([])
 const loading = ref(false)
-const searchKeyword = ref('')
-const selectedStatus = ref('')
-const meta = ref({ current_page: 1, last_page: 1, total: 0 })
+const filters = reactive({
+  keyword: '',
+  status: '',
+  page: 1,
+  perPage: 10
+})
+const meta = reactive({
+  current_page: 1,
+  last_page: 1,
+  total: 0
+})
 
-// --- State Modal Thêm/Sửa ---
-const showModal = ref(false)
-const modalMode = ref('add') // 'add' | 'edit'
+const activeTab = ref('all')
+
+const formModalRef = ref(null)
+const confirmModalRef = ref(null)
+const formMode = ref('add')
 const submitLoading = ref(false)
-const formError = ref(null)
+const formError = ref('')
 
-const defaultForm = {
+const confirmLoading = ref(false)
+const confirmAction = ref('')
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+const confirmTarget = ref(null)
+
+let formModalInstance = null
+let confirmModalInstance = null
+
+const toast = reactive({
+  visible: false,
+  type: 'success',
+  message: ''
+})
+let toastTimer = null
+
+const form = reactive({
   id: null,
   ten_nha_xe: '',
-  giay_phep_kinh_doanh: '',
-  nguoi_dai_dien: '',
-  so_dien_thoai: '',
   email: '',
-  dia_chi: '',
+  password: '',
+  so_dien_thoai: '',
+  nguoi_dai_dien: '',
+  giay_phep_kinh_doanh: '',
+  dia_chi_van_phong: '',
   tai_khoan_ngan_hang: '',
-  chiet_khau: 0
+  ty_le_chiet_khau: 0,
+  dia_chi_nha_xe_label: ''
+})
+
+const statusOptions = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'hoat_dong', label: 'Hoạt động' },
+  { value: 'cho_duyet', label: 'Chờ duyệt' },
+  { value: 'khoa', label: 'Đã khóa' }
+]
+
+const safeNumber = (value) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
 }
-const formData = ref({ ...defaultForm })
 
-// --- State Modal Xác nhận (Xoá / Duyệt / Khoá) ---
-const showConfirm = ref(false)
-const confirmAction = ref('') // 'delete' | 'toggleStatus'
-const confirmTarget = ref(null)
-const confirmLoading = ref(false)
+const showToast = (message, type = 'success') => {
+  toast.message = message
+  toast.type = type
+  toast.visible = true
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.visible = false
+  }, 3000)
+}
 
-// --- Lifecycle & Fetch ---
-const fetchNhaXes = async (page = 1) => {
+const extractResponseData = (response) => {
+  if (!response) return null
+  const firstLayer = response.data ?? response
+  if (firstLayer?.data && Array.isArray(firstLayer.data.data)) return firstLayer.data
+  if (Array.isArray(firstLayer?.data)) return firstLayer
+  if (Array.isArray(firstLayer)) return { data: firstLayer }
+  return firstLayer?.data ?? firstLayer
+}
+
+const normalizeOperator = (item) => {
+  const firstOffice = Array.isArray(item.dia_chi_nha_xe) ? item.dia_chi_nha_xe[0] : null
+  return {
+    ...item,
+    giay_phep_kinh_doanh: item.ho_so?.so_dang_ky_kinh_doanh || item.giay_phep_kinh_doanh || '',
+    dia_chi_van_phong: firstOffice?.dia_chi || item.ho_so?.dia_chi || item.ho_so?.dia_chi_chi_tiet || item.dia_chi_van_phong || '',
+    nguoi_dai_dien: item.ho_so?.nguoi_dai_dien || item.nguoi_dai_dien || '',
+    tai_khoan_ngan_hang:
+      item.tai_khoan_ngan_hang ||
+      item.thong_tin_tai_khoan_nhan_tien ||
+      item.tai_khoan_nhan_tien ||
+      '',
+    ty_le_chiet_khau: safeNumber(item.ty_le_chiet_khau ?? item.chiet_khau ?? item.hoa_hong),
+    tong_sos: safeNumber(item.tong_sos),
+    tong_ngu_gat: safeNumber(item.tong_ngu_gat)
+  }
+}
+
+const getStatusKey = (status) => {
+  if (status === 'hoat_dong' || status === 1) return 'hoat_dong'
+  if (status === 'cho_duyet') return 'cho_duyet'
+  if (status === 'khoa' || status === 0) return 'khoa'
+  return 'unknown'
+}
+
+const getStatusMeta = (status) => {
+  const key = getStatusKey(status)
+  if (key === 'hoat_dong') return { text: 'Hoạt động', cls: 'badge-green' }
+  if (key === 'cho_duyet') return { text: 'Chờ duyệt', cls: 'badge-yellow' }
+  if (key === 'khoa') return { text: 'Đã khóa', cls: 'badge-red' }
+  return { text: 'Không rõ', cls: 'badge-gray' }
+}
+
+const canApprove = (item) => getStatusKey(item.tinh_trang) === 'cho_duyet'
+
+const displayedOperators = computed(() => {
+  if (activeTab.value === 'all') return operatorList.value
+  if (activeTab.value === 'approval') return operatorList.value.filter((item) => canApprove(item))
+  if (activeTab.value === 'safety') return operatorList.value
+  return operatorList.value
+})
+
+const dashboardStats = computed(() => {
+  const total = meta.total || operatorList.value.length
+  const pending = operatorList.value.filter((item) => canApprove(item)).length
+  const active = operatorList.value.filter((item) => getStatusKey(item.tinh_trang) === 'hoat_dong').length
+  const totalSos = operatorList.value.reduce((sum, item) => sum + safeNumber(item.tong_sos), 0)
+  const totalDrowsy = operatorList.value.reduce((sum, item) => sum + safeNumber(item.tong_ngu_gat), 0)
+  return { total, pending, active, totalSos, totalDrowsy }
+})
+
+const fetchOperators = async (page = 1) => {
   loading.value = true
   try {
     const params = {
       page,
-      search: searchKeyword.value || undefined,
-      tinh_trang: selectedStatus.value || undefined,
-      per_page: 10
+      per_page: filters.perPage,
+      search: filters.keyword || undefined,
+      tinh_trang: filters.status || undefined
     }
     const res = await adminApi.getOperators(params)
-    const payload = res?.data ?? res
-    nhaXes.value = payload?.data ?? []
-    meta.value = {
-      current_page: payload?.current_page ?? 1,
-      last_page: payload?.last_page ?? 1,
-      total: payload?.total ?? 0
-    }
+    const payload = extractResponseData(res) || {}
+    operatorList.value = Array.isArray(payload.data) ? payload.data.map(normalizeOperator) : []
+    meta.current_page = payload.current_page || 1
+    meta.last_page = payload.last_page || 1
+    meta.total = payload.total || operatorList.value.length
+    filters.page = meta.current_page
   } catch (error) {
-    console.error('Lỗi lấy danh sách nhà xe:', error)
+    console.error('Lỗi tải danh sách nhà xe:', error)
+    showToast('Không thể tải danh sách nhà xe.', 'error')
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  fetchNhaXes()
-})
-
-// --- Hàm xử lý Modal Thêm/Sửa ---
-const openAddModal = () => {
-  modalMode.value = 'add'
-  formData.value = { ...defaultForm }
-  formError.value = null
-  showModal.value = true
+const resetForm = () => {
+  form.id = null
+  form.ten_nha_xe = ''
+  form.email = ''
+  form.password = ''
+  form.so_dien_thoai = ''
+  form.nguoi_dai_dien = ''
+  form.giay_phep_kinh_doanh = ''
+  form.dia_chi_van_phong = ''
+  form.tai_khoan_ngan_hang = ''
+  form.ty_le_chiet_khau = 0
+  form.dia_chi_nha_xe_label = ''
+  formError.value = ''
 }
 
-const openEditModal = (item) => {
-  modalMode.value = 'edit'
-  formData.value = {
-    id: item.id,
-    ten_nha_xe: item.ten_nha_xe || '',
-    giay_phep_kinh_doanh: item.giay_phep_kinh_doanh || '',
-    nguoi_dai_dien: item.nguoi_dai_dien || '',
-    so_dien_thoai: item.so_dien_thoai || '',
-    email: item.email || '',
-    dia_chi: item.dia_chi || '',
-    tai_khoan_ngan_hang: item.tai_khoan_ngan_hang || '',
-    chiet_khau: item.chiet_khau || 0
+const openAddModal = async () => {
+  formMode.value = 'add'
+  resetForm()
+  await nextTick()
+  formModalInstance?.show()
+}
+
+const openEditModal = async (item) => {
+  formMode.value = 'edit'
+  resetForm()
+  form.id = item.id
+  form.ten_nha_xe = item.ten_nha_xe || ''
+  form.email = item.email || ''
+  form.so_dien_thoai = item.so_dien_thoai || ''
+  form.nguoi_dai_dien = item.nguoi_dai_dien || ''
+  form.giay_phep_kinh_doanh = item.giay_phep_kinh_doanh || ''
+  form.dia_chi_van_phong = item.dia_chi_van_phong || ''
+  form.tai_khoan_ngan_hang = item.tai_khoan_ngan_hang || ''
+  form.ty_le_chiet_khau = safeNumber(item.ty_le_chiet_khau)
+  form.dia_chi_nha_xe_label = item.dia_chi_van_phong || item.ho_so?.dia_chi || ''
+  await nextTick()
+  formModalInstance?.show()
+}
+
+const buildFormPayload = () => {
+  const payload = {
+    ten_nha_xe: form.ten_nha_xe,
+    email: form.email,
+    so_dien_thoai: form.so_dien_thoai,
+    nguoi_dai_dien: form.nguoi_dai_dien,
+    so_dang_ky_kinh_doanh: form.giay_phep_kinh_doanh,
+    dia_chi_chi_tiet: form.dia_chi_van_phong,
+    tai_khoan_nhan_tien: form.tai_khoan_ngan_hang,
+    ty_le_chiet_khau: safeNumber(form.ty_le_chiet_khau)
   }
-  formError.value = null
-  showModal.value = true
+  if (formMode.value === 'add') payload.password = form.password
+  return payload
 }
 
-const handleSave = async () => {
+const saveForm = async () => {
+  if (!form.ten_nha_xe || !form.email) {
+    formError.value = 'Vui lòng nhập đầy đủ tên doanh nghiệp và email.'
+    return
+  }
+  if (formMode.value === 'add' && !form.password) {
+    formError.value = 'Vui lòng nhập mật khẩu cho nhà xe mới.'
+    return
+  }
+  if (formMode.value === 'add' && String(form.password).length < 6) {
+    formError.value = 'Mật khẩu phải có ít nhất 6 ký tự.'
+    return
+  }
+  if (!Number.isFinite(Number(form.ty_le_chiet_khau)) || Number(form.ty_le_chiet_khau) < 0 || Number(form.ty_le_chiet_khau) > 100) {
+    formError.value = 'Tỷ lệ chiết khấu/hoa hồng phải là số trong khoảng 0 đến 100.'
+    return
+  }
+
   submitLoading.value = true
-  formError.value = null
+  formError.value = ''
   try {
-    if (modalMode.value === 'add') {
-      await adminApi.createOperator(formData.value)
+    const payload = buildFormPayload()
+    if (formMode.value === 'add') {
+      await adminApi.createOperator(payload)
+      showToast('Đã thêm hồ sơ nhà xe mới.', 'success')
     } else {
-      await adminApi.updateOperator(formData.value.id, formData.value)
+      await adminApi.updateOperator(form.id, payload)
+      showToast('Đã cập nhật hồ sơ nhà xe.', 'success')
     }
-    showModal.value = false
-    fetchNhaXes(meta.value.current_page)
+    formModalInstance?.hide()
+    await fetchOperators(filters.page)
   } catch (error) {
-    if (error.response?.data?.errors) {
-      formError.value = Object.values(error.response.data.errors).flat().join('\n')
-    } else {
-      formError.value = error.response?.data?.message || 'Có lỗi xảy ra khi lưu.'
-    }
+    console.error('Lỗi lưu nhà xe:', error)
+    const detailedErrors = Object.values(error?.response?.data?.errors || {}).flat().join('\n')
+    const message = detailedErrors || error?.response?.data?.message || 'Không thể lưu dữ liệu nhà xe.'
+    formError.value = message
   } finally {
     submitLoading.value = false
   }
 }
 
-// --- Hàm xử lý Modal Xác nhận (Xoá / Đổi trạng thái) ---
-const openToggleStatus = (item) => {
-  confirmAction.value = 'toggleStatus'
-  confirmTarget.value = item
-  showConfirm.value = true
+const extractListFromAnyResponse = (response) => {
+  const payload = extractResponseData(response)
+  return Array.isArray(payload?.data) ? payload.data : []
 }
 
-const openDelete = (item) => {
-  confirmAction.value = 'delete'
+const hasAtLeastOneApprovedRoute = async (operator) => {
+  const searchKey = operator.ma_nha_xe || operator.ten_nha_xe
+  if (!searchKey) return false
+  const res = await adminApi.getRoutes({ per_page: 100, search: searchKey })
+  const routes = extractListFromAnyResponse(res)
+  const approvedSet = new Set(['hoat_dong', 'da_duyet'])
+  return routes.some((route) => {
+    const sameOperator =
+      (route.ma_nha_xe && operator.ma_nha_xe && route.ma_nha_xe === operator.ma_nha_xe) ||
+      (route.ten_nha_xe && route.ten_nha_xe === operator.ten_nha_xe) ||
+      (!operator.ma_nha_xe && route.ma_nha_xe === searchKey)
+    if (!sameOperator) return false
+    return approvedSet.has(route.tinh_trang) || approvedSet.has(route.trang_thai)
+  })
+}
+
+const parseDateFromItem = (item) => {
+  const raw = item?.ngay_khoi_hanh || item?.ngay_di || item?.ngay_xuat_ben || item?.ngay
+  if (!raw) return null
+  const date = new Date(raw)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const hasFutureIncompleteRecords = async (operator) => {
+  const maNhaXe = operator.ma_nha_xe
+  if (!maNhaXe) return false
+
+  const [tripRes, ticketRes] = await Promise.all([
+    adminApi.getTrips({ per_page: 100, ma_nha_xe: maNhaXe }),
+    adminApi.getTickets({ per_page: 100, ma_nha_xe: maNhaXe })
+  ])
+
+  const trips = extractListFromAnyResponse(tripRes)
+  const tickets = extractListFromAnyResponse(ticketRes)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const isRelatedToOperator = (item) => {
+    const itemMaNhaXe = item?.ma_nha_xe || item?.nha_xe?.ma_nha_xe || item?.chuyen_xe?.ma_nha_xe
+    return itemMaNhaXe === maNhaXe
+  }
+
+  const isFutureAndNotDone = (item, statusField) => {
+    if (!isRelatedToOperator(item)) return false
+    const status = item?.[statusField]
+    const doneStatuses = new Set(['hoan_thanh', 'da_hoan_thanh', 'huy'])
+    if (doneStatuses.has(status)) return false
+    const date = parseDateFromItem(item)
+    if (!date) return true
+    return date >= today
+  }
+
+  const hasTrip = trips.some((trip) => isFutureAndNotDone(trip, 'trang_thai'))
+  const hasTicket = tickets.some((ticket) => isFutureAndNotDone(ticket, 'tinh_trang'))
+  return hasTrip || hasTicket
+}
+
+const openConfirm = (action, item) => {
+  confirmAction.value = action
   confirmTarget.value = item
-  showConfirm.value = true
+  confirmModalInstance?.show()
+  if (action === 'approve') {
+    confirmTitle.value = 'Duyệt tham gia hệ thống'
+    confirmMessage.value = `Duyệt nhà xe "${item.ten_nha_xe}" tham gia hệ thống?`
+    return
+  }
+  if (action === 'toggle') {
+    const isActive = getStatusKey(item.tinh_trang) === 'hoat_dong'
+    confirmTitle.value = isActive ? 'Khóa nhà xe' : 'Kích hoạt nhà xe'
+    confirmMessage.value = isActive
+      ? `Bạn muốn khóa nhà xe "${item.ten_nha_xe}"?`
+      : `Bạn muốn kích hoạt nhà xe "${item.ten_nha_xe}"?`
+    return
+  }
+  confirmTitle.value = 'Xóa nhà xe'
+  confirmMessage.value = `Bạn chắc chắn muốn xóa nhà xe "${item.ten_nha_xe}"?`
 }
 
 const executeConfirm = async () => {
   if (!confirmTarget.value) return
   confirmLoading.value = true
   try {
-    if (confirmAction.value === 'toggleStatus') {
-      await adminApi.toggleOperatorStatus(confirmTarget.value.id)
+    const item = confirmTarget.value
+    if (confirmAction.value === 'approve') {
+      const hasApprovedRoute = await hasAtLeastOneApprovedRoute(item)
+      if (!hasApprovedRoute) {
+        showToast('Không thể duyệt kích hoạt: nhà xe chưa có tuyến đường được duyệt.', 'error')
+        return
+      }
+      await adminApi.toggleOperatorStatus(item.id)
+      showToast('Đã duyệt nhà xe thành công.', 'success')
+    } else if (confirmAction.value === 'toggle') {
+      const targetStatus = getStatusKey(item.tinh_trang) === 'hoat_dong' ? 'khoa' : 'hoat_dong'
+      if (targetStatus === 'hoat_dong') {
+        const hasApprovedRoute = await hasAtLeastOneApprovedRoute(item)
+        if (!hasApprovedRoute) {
+          showToast('Không thể kích hoạt: nhà xe chưa có tuyến đường được duyệt.', 'error')
+          return
+        }
+      }
+      await adminApi.toggleOperatorStatus(item.id)
+      showToast('Cập nhật trạng thái nhà xe thành công.', 'success')
     } else if (confirmAction.value === 'delete') {
-      await adminApi.deleteOperator(confirmTarget.value.id)
+      const blocked = await hasFutureIncompleteRecords(item)
+      if (blocked) {
+        showToast('Không thể xóa: nhà xe còn chuyến xe/vé chưa hoàn thành trong tương lai.', 'error')
+        return
+      }
+      await adminApi.deleteOperator(item.id)
+      showToast('Đã xóa nhà xe.', 'success')
     }
-    showConfirm.value = false
-    fetchNhaXes(meta.value.current_page)
+    confirmModalInstance?.hide()
+    await fetchOperators(filters.page)
   } catch (error) {
-    console.error('Lỗi thao tác:', error)
-    alert(error.response?.data?.message || 'Có lỗi xảy ra!')
+    console.error('Lỗi thao tác nhà xe:', error)
+    showToast(error?.response?.data?.message || 'Thao tác thất bại.', 'error')
   } finally {
     confirmLoading.value = false
   }
 }
 
-// --- Tiện ích hiển thị ---
-const getStatusLabel = (status) => {
-  if (status === 'hoat_dong' || status === 1) return { text: 'Hoạt động', cls: 'badge-green', icon: CheckCircle }
-  if (status === 'cho_duyet') return { text: 'Chờ duyệt', cls: 'badge-yellow', icon: Eye }
-  if (status === 'khoa' || status === 0) return { text: 'Đã khoá', cls: 'badge-red', icon: XCircle }
-  return { text: status ?? 'N/A', cls: 'badge-gray', icon: Info }
-}
+const submitFilter = () => fetchOperators(1)
 
-const filteredStatusOptions = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'hoat_dong', label: 'Hoạt động' },
-  { value: 'cho_duyet', label: 'Chờ duyệt' },
-  { value: 'khoa', label: 'Đã khoá' }
-]
+onMounted(async () => {
+  await nextTick()
+  formModalInstance = new Modal(formModalRef.value, { backdrop: 'static', keyboard: false })
+  confirmModalInstance = new Modal(confirmModalRef.value, { backdrop: 'static', keyboard: false })
+  fetchOperators()
+})
 </script>
 
 <template>
-  <div class="admin-page w-full">
-    
-    <!-- HEADER -->
-    <div class="page-header d-flex justify-content-between align-items-center mb-4">
-      <div class="header-left d-flex align-items-center" style="gap: 16px;">
+  <div class="admin-page">
+    <div v-if="toast.visible" class="custom-toast" :class="toast.type">{{ toast.message }}</div>
+
+    <div class="page-header">
+      <div class="header-left">
         <div class="header-icon-wrap">
           <Building2 class="header-icon" />
         </div>
         <div>
-          <h1 class="page-title mb-0">Quản lý nhà xe</h1>
-          <p class="text-muted mb-0" style="font-size: 14px;">Xem, duyệt và quản lý hồ sơ đối tác vận tải</p>
+          <h1 class="page-title">Quản lý Nhà xe</h1>
+          <p class="sub-title">Quản lý hồ sơ, phê duyệt tham gia, an toàn AI và hợp đồng chiết khấu.</p>
         </div>
       </div>
-      <div class="header-actions" style="display: flex; gap: 0.75rem;">
-        <button class="btn-refresh" :class="{ spinning: loading }" @click="fetchNhaXes()">
-          <RefreshCw class="btn-icon" />
+      <div class="header-actions">
+        <button class="btn btn-refresh" :class="{ spinning: loading }" @click="fetchOperators(filters.page)">
+          <RefreshCw size="18" />
         </button>
-        <button class="btn btn-primary" @click="openAddModal" style="display: flex; align-items: center; gap: 4px;">
-          <Plus class="btn-icon" size="18" /> Thêm nhà xe
+        <button class="btn btn-primary" @click="openAddModal">
+          <Plus size="16" />
+          Thêm nhà xe
         </button>
       </div>
     </div>
 
-    <!-- TÌM KIẾM & LỌC -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <p class="label">Tổng nhà xe</p>
+        <p class="value">{{ dashboardStats.total }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="label">Chờ phê duyệt</p>
+        <p class="value text-warning">{{ dashboardStats.pending }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="label">Đang hoạt động</p>
+        <p class="value text-success">{{ dashboardStats.active }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="label">Cảnh báo AI</p>
+        <p class="value text-danger">{{ dashboardStats.totalSos + dashboardStats.totalDrowsy }}</p>
+        <p class="hint">SOS: {{ dashboardStats.totalSos }} | Ngủ gật: {{ dashboardStats.totalDrowsy }}</p>
+      </div>
+    </div>
+
     <div class="filter-card">
+      <div class="tab-row">
+        <button class="tab-btn" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">Tất cả</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'approval' }" @click="activeTab = 'approval'">Phê duyệt tham gia</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'safety' }" @click="activeTab = 'safety'">Giám sát an toàn AI</button>
+      </div>
+
       <div class="filter-grid">
         <div class="filter-item">
-          <span class="filter-label">Tìm kiếm nhanh</span>
-          <div class="position-relative">
-            <Search class="input-icon" />
-            <input 
-              type="text" 
-              v-model="searchKeyword" 
-              class="custom-input pl-10" 
-              placeholder="VD: tên doanh nghiệp..."
-              @keyup.enter="fetchNhaXes(1)"
-            >
+          <label>Tìm kiếm</label>
+          <div class="input-wrap">
+            <Search class="input-icon" size="16" />
+            <input
+              v-model="filters.keyword"
+              class="custom-input with-icon"
+              placeholder="Tên nhà xe, mã nhà xe, email, số điện thoại"
+              @keyup.enter="submitFilter"
+            />
           </div>
         </div>
-
         <div class="filter-item">
-          <span class="filter-label">Trạng thái</span>
-          <select v-model="selectedStatus" class="custom-select" @change="fetchNhaXes(1)">
-            <option v-for="opt in filteredStatusOptions" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
+          <label>Trạng thái</label>
+          <select v-model="filters.status" class="custom-select">
+            <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
           </select>
         </div>
-
-        <div class="filter-item filter-btn-wrapper self-end">
-          <button class="btn btn-secondary w-100" @click="fetchNhaXes(1)">Tìm & Lọc</button>
+        <div class="filter-item btn-wrap">
+          <button class="btn btn-secondary" @click="submitFilter">Lọc dữ liệu</button>
         </div>
       </div>
     </div>
 
-    <!-- BẢNG DỮ LIỆU -->
     <div class="table-card">
       <div class="table-responsive">
-        <table class="data-table mb-0">
+        <table class="data-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>DOANH NGHIỆP</th>
-              <th>ĐẠI DIỆN</th>
-              <th>CHIẾT KHẤU</th>
-              <th>CẢNH BÁO AI</th>
-              <th>TRẠNG THÁI</th>
-              <th class="text-center">HÀNH ĐỘNG</th>
+              <th>Doanh nghiệp</th>
+              <th>Hồ sơ pháp lý</th>
+              <th>Đại diện</th>
+              <th>Hợp đồng</th>
+              <th>An toàn AI</th>
+              <th>Trạng thái</th>
+              <th class="text-center">Hành động</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="7" class="text-center py-5 text-muted">
-                <RefreshCw class="inline-block animate-spin mr-2" size="20" /> Đang tải dữ liệu...
+              <td colspan="7" class="center muted">
+                <RefreshCw class="spin-inline" size="16" />
+                Đang tải dữ liệu...
               </td>
             </tr>
-            <tr v-else-if="nhaXes.length === 0">
-              <td colspan="7" class="text-center py-5 text-muted">
-                Không tìm thấy thông tin nhà xe nào hợp lệ.
-              </td>
+            <tr v-else-if="displayedOperators.length === 0">
+              <td colspan="7" class="center muted">Không có dữ liệu nhà xe phù hợp bộ lọc.</td>
             </tr>
-            <tr v-else v-for="item in nhaXes" :key="item.id">
-              <td class="font-weight-medium text-dark">#{{ item.id }}</td>
+            <tr v-for="item in displayedOperators" :key="item.id">
               <td>
-                <div class="d-flex align-items-center" style="gap: 12px;">
-                  <div class="avatar-bg">
-                    <Building2 size="18" style="color: #4f46e5;" />
-                  </div>
-                  <div>
-                    <div class="fw-bold text-dark">{{ item.ten_nha_xe }}</div>
-                    <div class="text-xs text-muted truncate-text" :title="item.email">
-                      {{ item.email }}
-                    </div>
-                  </div>
-                </div>
+                <p class="strong">{{ item.ten_nha_xe }}</p>
+                <p class="muted">{{ item.ma_nha_xe || 'Chưa có mã' }}</p>
+                <p class="muted">{{ item.email }}</p>
               </td>
               <td>
-                <div class="text-sm fw-medium text-dark">{{ item.nguoi_dai_dien }}</div>
-                <div class="text-xs text-muted">{{ item.so_dien_thoai }}</div>
+                <p class="line-item">
+                  <Info size="14" />
+                  {{ item.giay_phep_kinh_doanh || 'Chưa cập nhật GPKD' }}
+                </p>
+                <p class="line-item">
+                  <MapPin size="14" />
+                  {{ item.dia_chi_van_phong || item.ho_so?.dia_chi || item.ho_so?.dia_chi_chi_tiet || 'Chưa cập nhật địa chỉ' }}
+                </p>
               </td>
               <td>
-                <div class="discount-badge">
-                  <BadgePercent size="14" class="mr-1" />
-                  {{ item.chiet_khau || 0 }}%
-                </div>
+                <p class="line-item">
+                  <User size="14" />
+                  {{ item.nguoi_dai_dien || 'Chưa cập nhật' }}
+                </p>
+                <p class="line-item">
+                  <Phone size="14" />
+                  {{ item.so_dien_thoai || 'Chưa cập nhật' }}
+                </p>
+                <p class="line-item">
+                  <Mail size="14" />
+                  {{ item.tai_khoan_ngan_hang || 'Chưa cập nhật tài khoản nhận tiền' }}
+                </p>
               </td>
               <td>
-                <div class="d-flex" style="gap: 8px;">
-                  <div class="ai-stat stat-danger" title="Cảnh báo SOS">
-                    <ShieldAlert size="14" />
-                    <span>{{ item.tong_sos || 0 }}</span>
-                  </div>
-                  <div class="ai-stat stat-warning" title="Cảnh báo ngủ gật">
-                    <AlertTriangle size="14" />
-                    <span>{{ item.tong_ngu_gat || 0 }}</span>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span class="status-badge" :class="getStatusLabel(item.tinh_trang).cls">
-                  {{ getStatusLabel(item.tinh_trang).text }}
+                <span class="discount-badge">
+                  <BadgePercent size="14" />
+                  {{ item.ty_le_chiet_khau }}%
                 </span>
               </td>
-              <td class="text-center">
-                <div class="d-flex justify-content-center align-items-center" style="gap: 8px;">
-                  <button class="btn btn-sm btn-outline-secondary d-flex justify-content-center align-items-center px-2" title="Trạng thái" @click="openToggleStatus(item)">
-                    <component :is="item.tinh_trang === 'hoat_dong' ? XCircle : CheckCircle" size="14" />
+              <td>
+                <div class="safety-wrap">
+                  <span class="ai-stat stat-danger"><ShieldAlert size="14" /> SOS: {{ item.tong_sos }}</span>
+                  <span class="ai-stat stat-warning"><AlertTriangle size="14" /> Ngủ gật: {{ item.tong_ngu_gat }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="status-badge" :class="getStatusMeta(item.tinh_trang).cls">
+                  {{ getStatusMeta(item.tinh_trang).text }}
+                </span>
+              </td>
+              <td>
+                <div class="action-group">
+                  <button v-if="canApprove(item)" class="btn btn-sm btn-success" @click="openConfirm('approve', item)">
+                    <CheckCircle size="14" />
+                    Duyệt
                   </button>
-                  <button class="btn btn-sm btn-outline-primary d-flex justify-content-center align-items-center px-2" title="Sửa" @click="openEditModal(item)">
-                    <Edit2 size="14" />
+                  <button class="btn btn-sm btn-outline-primary" @click="openEditModal(item)">
+                    <Save size="14" />
+                    Sửa
                   </button>
-                  <button class="btn btn-sm btn-danger d-flex justify-content-center align-items-center px-2" title="Xóa" @click="openDelete(item)">
+                  <button class="btn btn-sm btn-outline-secondary" @click="openConfirm('toggle', item)">
+                    <Lock v-if="getStatusKey(item.tinh_trang) === 'hoat_dong'" size="14" />
+                    <Unlock v-else size="14" />
+                    {{ getStatusKey(item.tinh_trang) === 'hoat_dong' ? 'Khóa' : 'Kích hoạt' }}
+                  </button>
+                  <button class="btn btn-sm btn-danger" @click="openConfirm('delete', item)">
                     <Trash2 size="14" />
+                    Xóa
                   </button>
                 </div>
               </td>
@@ -304,414 +585,633 @@ const filteredStatusOptions = [
           </tbody>
         </table>
       </div>
-      
-      <!-- Phân trang -->
-      <div v-if="meta.last_page > 1" class="pagination-container mt-4 d-flex justify-content-between align-items-center">
-        <span class="text-muted" style="font-size: 14px;">Trang {{ meta.current_page }} / {{ meta.last_page }}</span>
-        <div class="d-flex" style="gap: 8px;">
-          <button class="btn btn-sm btn-outline-secondary" :disabled="meta.current_page <= 1" @click="fetchNhaXes(meta.current_page - 1)">Trước</button>
-          <button class="btn btn-sm btn-outline-secondary" :disabled="meta.current_page >= meta.last_page" @click="fetchNhaXes(meta.current_page + 1)">Sau</button>
-        </div>
-      </div>
-    </div>
 
-    <!-- MODAL THÊM / SỬA -->
-    <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-      <div class="modal-content modal-lg">
-        <div class="modal-header d-flex justify-content-between align-items-center">
-          <h5 class="modal-title m-0 fw-bold d-flex align-items-center" style="font-size: 1.25rem;">
-            <Building2 class="text-primary mr-2" size="24" style="margin-right: 8px;" />
-            {{ modalMode === 'add' ? 'Thêm Nhà Xe Mới' : 'Cập Nhật Hồ Sơ' }}
-          </h5>
-          <button class="btn-close-custom" @click="showModal = false"><XCircle size="24" /></button>
-        </div>
-        
-        <div class="modal-body p-4">
-          <div v-if="formError" class="alert alert-danger" style="white-space: pre-wrap;">{{ formError }}</div>
-
-          <div class="form-grid">
-            <div class="form-column">
-              <h6 class="column-title"><Info class="mr-2" size="18" style="margin-right: 6px;"/> Thông tin doanh nghiệp</h6>
-              
-              <div class="form-group mb-3">
-                <label class="base-input-label">Tên nhà xe / Tên DN <span class="text-danger">*</span></label>
-                <div class="position-relative">
-                  <input type="text" v-model="formData.ten_nha_xe" class="custom-input" required>
-                </div>
-              </div>
-
-              <div class="form-group mb-3">
-                <label class="base-input-label">Giấy phép kinh doanh <span class="text-danger">*</span></label>
-                <div class="position-relative">
-                  <input type="text" v-model="formData.giay_phep_kinh_doanh" class="custom-input" required>
-                </div>
-              </div>
-
-              <div class="form-group mb-3">
-                <label class="base-input-label">Địa chỉ văn phòng</label>
-                <div class="position-relative">
-                  <input type="text" v-model="formData.dia_chi" class="custom-input">
-                </div>
-              </div>
-              
-              <div class="form-group mb-3">
-                <label class="base-input-label">Tỷ lệ chiết khấu (%) <span class="text-danger">*</span></label>
-                <div class="position-relative">
-                  <input type="number" step="0.1" v-model="formData.chiet_khau" class="custom-input" required>
-                </div>
-                <small class="text-muted mt-1 d-block">Mức phí áp dụng cho mỗi giao dịch qua hệ thống.</small>
-              </div>
-            </div>
-
-            <div class="form-column">
-              <h6 class="column-title"><User class="mr-2" size="18" style="margin-right: 6px;"/> Liên hệ & Thanh toán</h6>
-              
-              <div class="form-group mb-3">
-                <label class="base-input-label">Người đại diện <span class="text-danger">*</span></label>
-                <div class="position-relative">
-                  <input type="text" v-model="formData.nguoi_dai_dien" class="custom-input" required>
-                </div>
-              </div>
-
-              <div class="form-group mb-3">
-                <label class="base-input-label">Số điện thoại <span class="text-danger">*</span></label>
-                <div class="position-relative">
-                  <input type="text" v-model="formData.so_dien_thoai" class="custom-input" required>
-                </div>
-              </div>
-
-              <div class="form-group mb-3">
-                <label class="base-input-label">Email tài khoản <span class="text-danger">*</span></label>
-                <div class="position-relative">
-                  <input type="email" v-model="formData.email" class="custom-input" required>
-                </div>
-              </div>
-
-              <div class="form-group mb-3">
-                <label class="base-input-label">Tài khoản nhận tiền (Stk, Ngân hàng)</label>
-                <textarea v-model="formData.tai_khoan_ngan_hang" class="custom-input h-auto" rows="3" placeholder="VD: 19033... Techcombank HCM"></textarea>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="modal-footer p-4 bg-light border-top-0" style="border-radius: 0 0 20px 20px;">
-          <button class="btn btn-secondary mr-2" @click="showModal = false" :disabled="submitLoading">Hủy</button>
-          <button class="btn btn-primary d-flex align-items-center" @click="handleSave" :disabled="submitLoading">
-            <RefreshCw v-if="submitLoading" class="animate-spin mr-2" size="18" style="margin-right: 8px;" />
-            <Save v-else class="mr-2" size="18" style="margin-right: 8px;" />
-            Lưu Thông Tin
+      <div v-if="meta.last_page > 1" class="pagination">
+        <span>Trang {{ meta.current_page }} / {{ meta.last_page }}</span>
+        <div class="pager-btns">
+          <button class="btn btn-sm btn-outline-secondary" :disabled="meta.current_page <= 1" @click="fetchOperators(meta.current_page - 1)">
+            Trước
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" :disabled="meta.current_page >= meta.last_page" @click="fetchOperators(meta.current_page + 1)">
+            Sau
           </button>
         </div>
       </div>
     </div>
 
-    <!-- MODAL XÁC NHẬN CHUNG -->
-    <div v-if="showConfirm" class="modal-overlay" @click.self="showConfirm = false">
-      <div class="modal-content modal-sm">
-        <div class="modal-body text-center p-4">
-          <div class="confirm-icon mx-auto mb-3 d-flex align-items-center justify-content-center" :class="confirmAction === 'delete' ? 'icon-danger' : 'icon-warning'">
-            <AlertTriangle v-if="confirmAction === 'delete'" size="36" />
-            <Info v-else size="36" />
+    <div ref="formModalRef" class="modal fade" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 class="modal-title">{{ formMode === 'add' ? 'Thêm hồ sơ nhà xe' : 'Cập nhật hồ sơ nhà xe' }}</h3>
+            <button type="button" class="btn-close" aria-label="Close" @click="formModalInstance?.hide()"></button>
           </div>
-          
-          <h5 class="mb-3 fw-bold">Xác nhận</h5>
-          <p class="text-muted mb-4">
-            <template v-if="confirmAction === 'delete'">
-              Bạn chắc chắn muốn xoá nhà xe <strong>{{ confirmTarget?.ten_nha_xe }}</strong>?
-            </template>
-            <template v-else>
-              Bạn muốn {{ confirmTarget?.tinh_trang === 'hoat_dong' ? 'khoá' : 'kích hoạt' }} nhà xe <strong>{{ confirmTarget?.ten_nha_xe }}</strong>?
-            </template>
-          </p>
-          
-          <div class="d-flex justify-content-center" style="gap: 12px;">
-            <button class="btn btn-secondary px-4" @click="showConfirm = false" :disabled="confirmLoading">Hủy</button>
-            <button 
-              class="btn px-4 text-white d-flex align-items-center" 
-              :class="confirmAction === 'delete' ? 'btn-danger' : 'btn-primary'"
-              @click="executeConfirm" 
-              :disabled="confirmLoading"
-            >
-              <RefreshCw v-if="confirmLoading" class="animate-spin mr-2" size="18" style="margin-right: 6px;" />
-              Đồng ý
+          <div class="modal-body">
+            <div v-if="formError" class="alert alert-danger">{{ formError }}</div>
+            <div class="form-grid">
+              <div>
+                <label>Tên doanh nghiệp *</label>
+                <input v-model="form.ten_nha_xe" class="custom-input" />
+              </div>
+              <div>
+                <label>Email đăng nhập *</label>
+                <input v-model="form.email" type="email" class="custom-input" />
+              </div>
+              <div v-if="formMode === 'add'">
+                <label>Mật khẩu *</label>
+                <input v-model="form.password" type="password" class="custom-input" />
+              </div>
+              <div>
+                <label>Số điện thoại</label>
+                <input v-model="form.so_dien_thoai" class="custom-input" />
+              </div>
+              <div>
+                <label>Số đăng ký kinh doanh / giấy phép</label>
+                <input v-model="form.giay_phep_kinh_doanh" class="custom-input" />
+              </div>
+              <div>
+                <label>Người đại diện</label>
+                <input v-model="form.nguoi_dai_dien" class="custom-input" />
+              </div>
+              <div>
+                <label>Địa chỉ văn phòng</label>
+                <input v-model="form.dia_chi_van_phong" class="custom-input" />
+              </div>
+              <div>
+                <label>Tỷ lệ chiết khấu/hoa hồng (%)</label>
+                <input v-model="form.ty_le_chiet_khau" type="number" step="0.1" min="0" class="custom-input" />
+              </div>
+              <div class="full-width">
+                <label>Tài khoản nhận tiền</label>
+                <textarea v-model="form.tai_khoan_ngan_hang" rows="3" class="custom-input"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" :disabled="submitLoading" @click="formModalInstance?.hide()">Hủy</button>
+            <button class="btn btn-primary" :disabled="submitLoading" @click="saveForm">
+              <RefreshCw v-if="submitLoading" size="14" class="spin-inline" />
+              Lưu thông tin
             </button>
           </div>
         </div>
       </div>
     </div>
 
+    <div ref="confirmModalRef" class="modal fade" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+          <div class="modal-body text-center">
+            <div class="confirm-icon">
+              <Eye size="28" />
+            </div>
+            <h4 class="modal-title">{{ confirmTitle }}</h4>
+            <p>{{ confirmMessage }}</p>
+          </div>
+          <div class="modal-footer justify-content-center">
+            <button class="btn btn-secondary" :disabled="confirmLoading" @click="confirmModalInstance?.hide()">Hủy</button>
+            <button class="btn btn-primary" :disabled="confirmLoading" @click="executeConfirm">
+              <RefreshCw v-if="confirmLoading" size="14" class="spin-inline" />
+              Xác nhận
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Xoá max-width để fill width hoàn toàn giống ChuyenXeView */
 .admin-page {
   padding: 1.5rem;
-  width: 100%;
 }
 
-/* Header */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .header-icon-wrap {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-radius: 12px;
+  width: 46px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eef2ff 0%, #dbeafe 100%);
+  border: 1px solid #c7d2fe;
 }
+
 .header-icon {
-  color: #2563eb;
-  width: 24px;
-  height: 24px;
+  color: #4f46e5;
 }
+
 .page-title {
-  font-size: 1.5rem;
+  margin: 0;
+  font-size: 1.45rem;
   font-weight: 700;
   color: #1e293b;
 }
 
-/* Các nút header */
-.btn-refresh {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: white;
+.sub-title {
+  margin: 2px 0 0;
+  font-size: 0.88rem;
   color: #64748b;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  transition: all 0.2s;
-}
-.btn-refresh:hover {
-  background: #f1f5f9;
-  color: #2563eb;
-}
-.spinning .btn-icon {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  100% { transform: rotate(360deg); }
 }
 
-/* Filter Card */
-.filter-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid #e2e8f0;
-  padding: 1rem;
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-.filter-grid {
+.header-actions {
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  gap: 0.65rem;
 }
-.filter-item {
-  flex: 1;
-  min-width: 200px;
+
+.btn-refresh {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #dbe3ef;
+  background: #fff;
+  color: #475569;
 }
-.filter-label {
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.stat-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.label {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.value {
+  margin: 2px 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.text-warning {
+  color: #d97706;
+}
+
+.text-success {
+  color: #16a34a;
+}
+
+.text-danger {
+  color: #dc2626;
+}
+
+.filter-card,
+.table-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.03);
+}
+
+.filter-card {
+  margin-bottom: 1rem;
+}
+
+.tab-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+}
+
+.tab-btn {
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tab-btn.active {
+  background: #e0e7ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.filter-item label {
   display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 0.8rem;
   color: #475569;
   margin-bottom: 0.4rem;
+  font-weight: 600;
 }
+
+.input-wrap {
+  position: relative;
+}
+
 .input-icon {
   position: absolute;
-  left: 14px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
   color: #94a3b8;
-  width: 16px;
-  height: 16px;
-}
-.pl-10 {
-  padding-left: 36px !important;
 }
 
-/* Inputs & Form */
 .custom-input,
 .custom-select {
   width: 100%;
-  padding: 0.625rem 0.875rem;
-  font-size: 0.875rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dbe3ef;
   border-radius: 8px;
-  background-color: #ffffff;
-  color: #1e293b;
-  transition: all 0.2s;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
 }
+
+.with-icon {
+  padding-left: 30px;
+}
+
 .custom-input:focus,
 .custom-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-.base-input-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #334155;
-  margin-bottom: 0.4rem;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
-/* Bảng */
-.table-card {
-  background: white;
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.025);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+.btn-wrap {
+  display: flex;
 }
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
 }
-.data-table th {
-  padding: 12px 16px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #64748b;
-  border-bottom: 1px solid #e2e8f0;
-  background-color: #f8fafc;
-}
+
+.data-table th,
 .data-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
-}
-.data-table tbody tr:hover {
-  background-color: #f8fafc;
+  border-bottom: 1px solid #eef2f7;
+  padding: 0.7rem;
+  vertical-align: top;
 }
 
-.avatar-bg {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: #e0e7ff;
+.data-table th {
+  color: #64748b;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.strong {
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.muted {
+  color: #64748b;
+  margin: 2px 0;
+  font-size: 0.8rem;
+}
+
+.center {
+  text-align: center;
+  padding: 1.4rem;
+}
+
+.line-item {
+  margin: 0 0 4px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 5px;
+  color: #334155;
+  font-size: 0.82rem;
 }
-.truncate-text {
-  max-width: 160px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Badge */
-.status-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  display: inline-block;
-}
-.badge-green { background: #dcfce7; color: #16a34a; }
-.badge-yellow { background: #fef3c7; color: #d97706; }
-.badge-red { background: #fee2e2; color: #dc2626; }
-.badge-gray { background: #f1f5f9; color: #64748b; }
 
 .discount-badge {
   display: inline-flex;
   align-items: center;
-  background: #fdf2f8;
-  color: #db2777;
-  padding: 4px 8px;
-  border-radius: 6px;
+  gap: 5px;
+  padding: 0.28rem 0.58rem;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
   font-weight: 700;
-  font-size: 0.8rem;
+}
+
+.safety-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .ai-stat {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.75rem;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.76rem;
+  font-weight: 700;
 }
-.stat-danger { background: #fee2e2; color: #dc2626; }
-.stat-warning { background: #fef3c7; color: #d97706; }
 
-/* Modals */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(4px);
+.stat-danger {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.stat-warning {
+  color: #b45309;
+  background: #ffedd5;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.badge-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge-yellow {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-gray {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.action-group {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
   justify-content: center;
-  align-items: center;
-  z-index: 1050;
 }
-.modal-content {
-  background: white;
-  border-radius: 16px;
-  width: 100%;
-  max-height: 90vh;
-  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+
+.pagination {
+  margin-top: 0.9rem;
   display: flex;
-  flex-direction: column;
-  animation: slideUp 0.3s ease;
-  border: none;
+  align-items: center;
+  justify-content: space-between;
+  color: #64748b;
+  font-size: 0.85rem;
 }
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+
+.pager-btns {
+  display: flex;
+  gap: 0.42rem;
 }
-.modal-lg { max-width: 800px; }
-.modal-sm { max-width: 400px; }
-.btn-close-custom {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  padding: 0;
-  cursor: pointer;
+
+.modal-content {
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
 }
-.btn-close-custom:hover {
-  color: #ef4444;
+
+.modal-lg {
+  max-width: 840px;
 }
+
+.modal-sm {
+  max-width: 430px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #1e293b;
+}
+
+.modal-body {
+  padding: 1rem;
+}
+
+.modal-footer {
+  padding: 1rem;
+  border-top: 1px solid #eef2f7;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 0.84rem;
+}
+
+.btn-sm {
+  padding: 0.32rem 0.55rem;
+}
+
+.btn-primary {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4f46e5;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #dbe3ef;
+}
+
+.btn-outline-primary {
+  background: #fff;
+  color: #4f46e5;
+  border-color: #c7d2fe;
+}
+
+.btn-outline-secondary {
+  background: #fff;
+  color: #334155;
+  border-color: #dbe3ef;
+}
+
+.btn-success {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.btn-danger {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  gap: 0.75rem;
 }
-@media (max-width: 768px) {
-  .form-grid { grid-template-columns: 1fr; gap: 1rem; }
-}
-.column-title {
+
+.form-grid label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: #475569;
-  font-weight: 700;
-  border-bottom: 2px solid #f1f5f9;
-  padding-bottom: 8px;
-  margin-bottom: 1rem;
 }
 
-/* Icons */
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.alert-error {
+  margin-bottom: 0.7rem;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 0.6rem;
+  white-space: pre-wrap;
+}
+
 .confirm-icon {
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #4338ca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.6rem;
 }
-.icon-danger { background: #fee2e2; color: #dc2626; }
-.icon-warning { background: #fef3c7; color: #d97706; }
 
-/* Buttons Overrides */
-.btn-primary { background-color: #3b82f6; border-color: #3b82f6; box-shadow: 0 4px 6px -1px rgba(59,130,246,0.5); border-radius: 8px; padding: 8px 16px; }
-.btn-primary:hover { background-color: #2563eb; }
-.btn-secondary { background-color: #f1f5f9; border-color: #e2e8f0; color: #475569; }
-.btn-secondary:hover { background-color: #e2e8f0; color: #1e293b; }
-.btn-danger { background-color: #ef4444; border-color: #ef4444; box-shadow: 0 4px 6px -1px rgba(239,68,68,0.3); border-radius: 8px; }
-.btn-danger:hover { background-color: #dc2626; }
+.modal-sm .modal-body {
+  text-align: center;
+}
+
+.modal-sm h4 {
+  margin: 0 0 0.35rem;
+  color: #1e293b;
+}
+
+.modal-sm p {
+  margin: 0;
+  color: #64748b;
+}
+
+.custom-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1500;
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  font-size: 0.85rem;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+}
+
+.custom-toast.success {
+  background: #16a34a;
+}
+
+.custom-toast.error {
+  background: #dc2626;
+}
+
+.spinning,
+.spin-inline {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    justify-content: flex-end;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

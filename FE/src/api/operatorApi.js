@@ -5,6 +5,12 @@ const operatorApi = {
   getProfile: () => axiosClient.get('/v1/nha-xe/profile'),
   changePassword: (data) => axiosClient.post('/v1/nha-xe/doi-mat-khau', data),
 
+  // --- THỐNG KÊ NHÀ XE ---
+  getStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke', { params }),
+  getStatisticsTickets: (params) => axiosClient.get('/v1/nha-xe/thong-ke/ves', { params }),
+  exportStatisticsExcel: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export/excel', { params, responseType: 'blob' }),
+  exportStatisticsPdf: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export/pdf', { params, responseType: 'blob' }),
+
   // --- XE / PHƯƠNG TIỆN ---
   getVehicles: (params) => axiosClient.get('/v1/nha-xe/xe', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}`),
@@ -37,7 +43,7 @@ const operatorApi = {
   cancelTicket: (id) => axiosClient.patch(`/v1/nha-xe/ve/${id}/huy`),
 
   // --- CHUYẾN XE ---
-  getTrips: (params) => axiosClient.get(`/v1/nha-xe/chuyen-xe/`, { params }),
+  getTrips: (params) => axiosClient.get('/v1/nha-xe/chuyen-xe', { params }),
   getTripDetails: (id) => axiosClient.get(`/v1/nha-xe/chuyen-xe/${id}`),
   createTrip: (data) => axiosClient.post('/v1/nha-xe/chuyen-xe', data),
   updateTrip: (id, data) => axiosClient.put(`/v1/nha-xe/chuyen-xe/${id}`, data),
