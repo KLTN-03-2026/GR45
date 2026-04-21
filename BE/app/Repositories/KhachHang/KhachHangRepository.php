@@ -96,14 +96,16 @@ class KhachHangRepository implements KhachHangRepositoryInterface
     }
 
     /**
-     * Xoa khach hang.
+     * Xoa khach hang (Cap nhat trang thai ve 0).
      */
     public function delete(int $id): bool
     {
         $khachHang = $this->model->find($id);
         if (!$khachHang) return false;
 
-        return $khachHang->delete();
+        return $khachHang->update([
+            'tinh_trang' => 'khoa'
+        ]);
     }
 
     /**
