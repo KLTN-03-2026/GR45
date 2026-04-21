@@ -76,31 +76,48 @@ onMounted(() => {
     echoInstance
       .private(channelName)
       .listen(".ve.moi_dat", (eventVeMoi) => {
-        console.log("Nhan event:", eventVeMoi);
-        const msg =
-          eventVeMoi.message ||
-          `Bạn có 1 chuyến xe nhận vé mới (${eventVeMoi.ma_ve})!`;
-        showToast(msg, "success"); // Hiện Toast thông báo có đặt vé thành công
+        console.log("Nhan event moi_dat:", eventVeMoi);
+        const msg = eventVeMoi.message || `Bạn có 1 vé mới (${eventVeMoi.ma_ve})!`;
+        showToast(msg, "success");
+        operatorStore.addNotification({
+          type: 'ticket',
+          title: 'Vé mới được đặt',
+          message: msg,
+          icon: 'info'
+        });
       })
       .listen(".ve.da_thanh_toan", (eventTiendo) => {
-        // Cú pháp bắt event này phụ thuộc vào backend `broadcastAs()` => '.ve.da_thanh_toan'
-        // Object `eventTiendo` chính là mảng `broadcastWith()` trả về
-        const msg =
-          eventTiendo.message || `Vé ${eventTiendo.ma_ve} mới được thanh toán.`;
+        console.log("Nhan event da_thanh_toan:", eventTiendo);
+        const msg = eventTiendo.message || `Vé ${eventTiendo.ma_ve} mới được thanh toán.`;
         showToast(msg, "success");
+        operatorStore.addNotification({
+          type: 'success',
+          title: 'Thanh toán thành công',
+          message: msg,
+          icon: 'success'
+        });
       })
       .listen(".ve.huy_tu_dong", (eventHuy) => {
-        const msg =
-          eventHuy.message ||
-          `Vé ${eventHuy.ma_ve} vừa bị huỷ do hết thời gian thanh toán`;
+        console.log("Nhan event huy_tu_dong:", eventHuy);
+        const msg = eventHuy.message || `Vé ${eventHuy.ma_ve} vừa bị huỷ do hết thời gian thanh toán`;
         showToast(msg, "error");
+        operatorStore.addNotification({
+          type: 'alert',
+          title: 'Vé bị hủy tự động',
+          message: msg,
+          icon: 'alert'
+        });
       })
       .listen(".bao-dong.vi-pham", (event) => {
         console.log("🚨 Nhận cảnh báo vi phạm:", event);
-        const msg =
-          event.message ||
-          `⚠️ Phát hiện tài xế vi phạm trên chuyến #${event.id_chuyen_xe}`;
+        const msg = event.message || `⚠️ Phát hiện tài xế vi phạm trên chuyến #${event.id_chuyen_xe}`;
         showToast(msg, "error");
+        operatorStore.addNotification({
+          type: 'alert',
+          title: 'Cảnh báo vi phạm',
+          message: msg,
+          icon: 'alert'
+        });
       });
   }
 });

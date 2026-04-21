@@ -237,6 +237,8 @@ const isSeatModal = ref(false);
 const seatLoading = ref(false);
 const seatList = ref([]); // flat array từ API
 const selectedTrip = ref(null);
+const pickupStops = ref([]); // Danh sách trạm đón
+const dropoffStops = ref([]); // Danh sách trạm trả
 
 // Ghế được chọn để đặt
 const selectedSeats = ref([]); // mảng ma_ghe
@@ -250,16 +252,34 @@ const openSeatModal = async (trip) => {
   bookFormTrip.id_tram_don = "";
   bookFormTrip.id_tram_tra = "";
   bookFormTrip.sdt_khach_hang = "";
+  bookFormTrip.ten_khach_hang = "";
   bookFormTrip.phuong_thuc_thanh_toan = "tien_mat";
   bookFormTrip.tinh_trang = "da_thanh_toan";
   bookFormTrip.ghi_chu = "";
   try {
-    const res = await operatorApi.getTripSeats(trip.id);
-    // Response: { success: true, data: [...] }
-    const rawData = res.data?.data ?? res.data;
-    seatList.value = Array.isArray(rawData) ? rawData : [];
+    const [seatRes, stopRes] = await Promise.all([
+      operatorApi.getTripSeats(trip.id),
+      operatorApi.getTripStops(trip.id)
+    ]);
+    
+    // Xử lý dữ liệu ghế
+    const rawSeats = seatRes.data?.data ?? seatRes.data;
+    seatList.value = Array.isArray(rawSeats) ? rawSeats : [];
+
+    // Xử lý dữ liệu trạm dừng - bóc tách đúng tầng data từ Laravel
+    const stopsData = stopRes.data || stopRes;
+    pickupStops.value = Array.isArray(stopsData.tram_don) ? stopsData.tram_don : [];
+    dropoffStops.value = Array.isArray(stopsData.tram_tra) ? stopsData.tram_tra : [];
+    
+    // Tự động chọn trạm đầu của danh sách đón và trạm cuối của danh sách trả
+    if (pickupStops.value.length > 0) {
+      bookFormTrip.id_tram_don = pickupStops.value[0].id;
+    }
+    if (dropoffStops.value.length > 0) {
+      bookFormTrip.id_tram_tra = dropoffStops.value[dropoffStops.value.length - 1].id;
+    }
   } catch (e) {
-    showToast("Không thể tải sơ đồ ghế!", "error");
+    showToast("Không thể tải thông tin chuyến xe!", "error");
     isSeatModal.value = false;
   } finally {
     seatLoading.value = false;
@@ -301,6 +321,7 @@ const bookFormTrip = reactive({
   id_tram_don: "",
   id_tram_tra: "",
   sdt_khach_hang: "",
+  ten_khach_hang: "", // Thêm tên khách hàng
   phuong_thuc_thanh_toan: "tien_mat",
   tinh_trang: "da_thanh_toan",
   ghi_chu: "",
@@ -315,7 +336,11 @@ const submitBookFromSeat = async () => {
     return;
   }
   if (!bookFormTrip.id_tram_don || !bookFormTrip.id_tram_tra) {
-    showToast("Vui lòng nhập ID trạm đón và trạm trả!", "error");
+    showToast("Vui lòng chọn trạm đón và trạm trả!", "error");
+    return;
+  }
+  if (bookFormTrip.id_tram_don === bookFormTrip.id_tram_tra) {
+    showToast("Trạm đón và trạm trả không được trùng nhau!", "error");
     return;
   }
   try {
@@ -330,6 +355,8 @@ const submitBookFromSeat = async () => {
     };
     if (bookFormTrip.sdt_khach_hang)
       payload.sdt_khach_hang = bookFormTrip.sdt_khach_hang;
+    if (bookFormTrip.ten_khach_hang)
+      payload.ten_khach_hang = bookFormTrip.ten_khach_hang;
     if (bookFormTrip.ghi_chu) payload.ghi_chu = bookFormTrip.ghi_chu;
 
     await operatorApi.bookTicket(payload);
@@ -1008,35 +1035,47 @@ onMounted(() => {
             <div v-if="isBookPanelOpen" class="book-panel-body">
               <div class="book-form-grid">
                 <div class="form-group">
-                  <label class="form-label">ID Trạm Đón *</label>
-                  <input
-                    type="number"
-                    v-model="bookFormTrip.id_tram_don"
-                    class="custom-input"
-                    min="1"
-                    placeholder="ID trạm đón..."
-                  />
+                  <label class="form-label">Trạm Đón *</label>
+                  <select v-model="bookFormTrip.id_tram_don" class="custom-select">
+                    <option value="" disabled>-- Chọn trạm đón --</option>
+                    <option 
+                      v-for="stop in pickupStops" 
+                      :key="stop.id" 
+                      :value="stop.id"
+                    >
+                      {{ stop.ten_tram }} ({{ stop.dia_chi }})
+                    </option>
+                  </select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">ID Trạm Trả *</label>
-                  <input
-                    type="number"
-                    v-model="bookFormTrip.id_tram_tra"
-                    class="custom-input"
-                    min="1"
-                    placeholder="ID trạm trả..."
-                  />
+                  <label class="form-label">Trạm Trả *</label>
+                  <select v-model="bookFormTrip.id_tram_tra" class="custom-select">
+                    <option value="" disabled>-- Chọn trạm trả --</option>
+                    <option 
+                      v-for="stop in dropoffStops" 
+                      :key="stop.id" 
+                      :value="stop.id"
+                    >
+                      {{ stop.ten_tram }} ({{ stop.dia_chi }})
+                    </option>
+                  </select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label"
-                    >SĐT Khách
-                    <span class="optional">(để trống = vãng lai)</span></label
-                  >
+                  <label class="form-label">SĐT Khách</label>
                   <input
                     type="tel"
                     v-model="bookFormTrip.sdt_khach_hang"
                     class="custom-input"
                     placeholder="0901234567"
+                  />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Tên Khách</label>
+                  <input
+                    type="text"
+                    v-model="bookFormTrip.ten_khach_hang"
+                    class="custom-input"
+                    placeholder="Nguyễn Văn A..."
                   />
                 </div>
                 <div class="form-group">

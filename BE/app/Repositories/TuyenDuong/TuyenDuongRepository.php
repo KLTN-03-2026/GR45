@@ -165,7 +165,7 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
                 'gia_ve_co_ban' => $data['gia_ve_co_ban'],
                 'id_xe' => $data['xe'] ?? null,
                 'ghi_chu' => $data['mo_ta'] ?? null,
-                'tinh_trang' => ($user instanceof \App\Models\Admin) ? 'hoat_dong' : 'khong_hoat_dong',
+                'tinh_trang' => $data['tinh_trang'] ?? (($user instanceof \App\Models\Admin) ? 'hoat_dong' : 'khong_hoat_dong'),
             ]);
 
             if (isset($data['tram_dungs']) && is_array($data['tram_dungs'])) {
@@ -252,7 +252,11 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
                     $updateData['tinh_trang'] = $data['tinh_trang'];
                 }
             } else {
-                $updateData['tinh_trang'] = 'khong_hoat_dong';
+                // Cho phép nhà xe cập nhật trạng thái nếu họ gửi lên, 
+                // nếu không gửi thì giữ nguyên trạng thái cũ hoặc mặc định.
+                if (isset($data['tinh_trang'])) {
+                    $updateData['tinh_trang'] = $data['tinh_trang'];
+                }
             }
 
             $tuyenDuong->update($updateData);

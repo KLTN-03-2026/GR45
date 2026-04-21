@@ -23,6 +23,7 @@ export const useOperatorStore = defineStore('operator', () => {
   const loading = ref(false);
   const error   = ref(null);
   const isTokenVerified = ref(false);
+  const notifications = ref([]);
 
   // ─── Getters ─────────────────────────────────────────────
   const isLoggedIn = computed(() => !!token.value);
@@ -61,15 +62,22 @@ export const useOperatorStore = defineStore('operator', () => {
     }
   }
 
-  // Đăng xuất Nhà Xe
-  function logout() {
-    token.value = null;
-    user.value  = null;
-    isTokenVerified.value = false;
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem('auth.active_role');
+  // Thêm thông báo mới vào danh sách
+  function addNotification(note) {
+    notifications.value.unshift({
+      id: Date.now(),
+      read: false,
+      time: 'Vừa xong',
+      ...note
+    });
+    // Giới hạn 20 thông báo gần nhất
+    if (notifications.value.length > 20) {
+      notifications.value.pop();
+    }
   }
 
-  return { token, user, loading, error, isTokenVerified, isLoggedIn, login, logout };
+  return { 
+    token, user, loading, error, isTokenVerified, isLoggedIn, 
+    notifications, login, addNotification 
+  };
 });
