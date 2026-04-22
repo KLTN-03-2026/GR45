@@ -28,7 +28,7 @@ class KhachHangRepository implements KhachHangRepositoryInterface
             });
         }
 
-        if (isset($filters['tinh_trang'])) {
+        if (!empty($filters['tinh_trang'])) {
             $query->where('tinh_trang', $filters['tinh_trang']);
         }
 
@@ -103,9 +103,7 @@ class KhachHangRepository implements KhachHangRepositoryInterface
         $khachHang = $this->model->find($id);
         if (!$khachHang) return false;
 
-        return $khachHang->update([
-            'tinh_trang' => 'khoa'
-        ]);
+        return $khachHang->delete();
     }
 
     /**
