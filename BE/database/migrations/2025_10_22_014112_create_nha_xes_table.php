@@ -18,6 +18,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('password');
             $table->string('so_dien_thoai')->nullable();
+            $table->decimal('ty_le_chiet_khau', 5, 2)->nullable();
+            $table->string('tai_khoan_nhan_tien')->nullable();
             $table->enum('tinh_trang', ['khoa', 'hoat_dong'])->default('hoat_dong'); // 1=hoạt động, 0=khoá
 
             // Quản lý nội bộ
