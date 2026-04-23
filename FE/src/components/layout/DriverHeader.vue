@@ -1,14 +1,14 @@
 <script setup>
 import { inject, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { 
-  Menu, 
-  Search, 
-  Bell, 
-  UserCircle, 
-  LogOut, 
+import {
+  Menu,
+  Search,
+  Bell,
+  UserCircle,
+  LogOut,
   Settings,
-  ChevronDown 
+  ChevronDown
 } from 'lucide-vue-next'
 
 // Inject the toggler from Layout
@@ -39,7 +39,7 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
 
 <template>
   <header class="driver-header glass-header">
-    
+
     <div class="header-left">
       <button class="hamburger-btn" @click="toggleSidebar">
         <Menu class="icon-menu" />
@@ -50,9 +50,9 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
         <input type="text" placeholder="Tìm kiếm nhanh chuyến xe..." class="search-input" />
       </div>
     </div>
-    
+
     <div class="header-right">
-      
+
       <div class="notify-container" @click="isNotifyMenuOpen = !isNotifyMenuOpen">
         <button class="action-btn notify-btn">
           <Bell class="action-icon" />
@@ -66,12 +66,7 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
               <button class="mark-read-text" @click="isNotifyMenuOpen = false">Đóng</button>
             </div>
             <div class="dropdown-body notify-list">
-              <div 
-                v-for="note in notifications" 
-                :key="note.id" 
-                class="notify-item" 
-                :class="{ 'unread': !note.read }"
-              >
+              <div v-for="note in notifications" :key="note.id" class="notify-item" :class="{ 'unread': !note.read }">
                 <div class="notify-dot" v-if="!note.read"></div>
                 <div class="notify-content">
                   <p class="notify-text-title">{{ note.title }}</p>
@@ -162,9 +157,11 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   border-radius: 8px;
   transition: background 0.2s;
 }
+
 .hamburger-btn:hover {
   background: rgba(0, 0, 0, 0.05);
 }
+
 .icon-menu {
   width: 24px;
   height: 24px;
@@ -179,16 +176,19 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   min-width: 280px;
   transition: box-shadow 0.3s ease;
 }
+
 .search-box:focus-within {
   box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
   background-color: #fff;
 }
+
 .search-icon {
   width: 18px;
   height: 18px;
   color: #64748B;
   margin-right: 12px;
 }
+
 .search-input {
   border: none;
   background: transparent;
@@ -197,6 +197,7 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   color: #0F172A;
   width: 100%;
 }
+
 .search-input::placeholder {
   color: #94A3B8;
 }
@@ -219,18 +220,21 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   cursor: pointer;
   position: relative;
   color: #64748B;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
   transition: all 0.2s ease;
 }
+
 .action-btn:hover {
   color: #059669;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
+
 .action-icon {
   width: 20px;
   height: 20px;
 }
+
 .notify-badge {
   position: absolute;
   top: 8px;
@@ -251,15 +255,18 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
 .notify-container {
   position: relative;
 }
+
 .notify-dropdown {
   width: 320px !important;
   right: -20px !important;
 }
+
 .flex-between {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+
 .mark-read-text {
   font-size: 12px;
   color: #059669;
@@ -268,14 +275,17 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   cursor: pointer;
   font-weight: 600;
 }
+
 .mark-read-text:hover {
   text-decoration: underline;
 }
+
 .notify-list {
   max-height: 350px;
   overflow-y: auto;
   padding: 0 !important;
 }
+
 .notify-item {
   display: flex;
   padding: 16px;
@@ -285,15 +295,19 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   transition: background 0.2s;
   position: relative;
 }
+
 .notify-item:hover {
   background: #F8FAFC;
 }
+
 .notify-item.unread {
   background: #ecfdf5;
 }
+
 .notify-item.unread:hover {
   background: #d1fae5;
 }
+
 .notify-dot {
   width: 8px;
   height: 8px;
@@ -302,32 +316,38 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   margin-top: 6px;
   flex-shrink: 0;
 }
+
 .notify-content {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
+
 .notify-text-title {
   font-size: 13px;
   font-weight: 700;
   color: #0F172A;
   margin: 0;
 }
+
 .notify-text-desc {
   font-size: 12px;
   color: #64748B;
   margin: 0;
   line-height: 1.4;
 }
+
 .notify-time {
   font-size: 11px;
   color: #94A3B8;
 }
+
 .dropdown-footer {
   padding: 12px;
   text-align: center;
   border-top: 1px solid #f1f5f9;
 }
+
 .view-all-btn {
   background: none;
   border: none;
@@ -336,6 +356,7 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   font-weight: 600;
   cursor: pointer;
 }
+
 .view-all-btn:hover {
   text-decoration: underline;
 }
@@ -350,6 +371,7 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   position: relative;
   cursor: pointer;
 }
+
 .profile-trigger {
   display: flex;
   align-items: center;
@@ -358,9 +380,11 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   border-radius: 30px;
   transition: background 0.2s ease;
 }
+
 .profile-trigger:hover {
-  background: rgba(0,0,0,0.02);
+  background: rgba(0, 0, 0, 0.02);
 }
+
 .avatar {
   background: linear-gradient(135deg, #059669 0%, #34d399 100%);
   color: white;
@@ -371,29 +395,35 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   align-items: center;
   justify-content: center;
 }
+
 .avatar-icon {
   width: 24px;
   height: 24px;
 }
+
 .user-info {
   display: flex;
   flex-direction: column;
 }
+
 .user-name {
   font-size: 14px;
   font-weight: 700;
   color: #0F172A;
 }
+
 .user-role {
   font-size: 12px;
   color: #64748B;
 }
+
 .arrow-down {
   width: 16px;
   height: 16px;
   color: #64748B;
   transition: transform 0.3s ease;
 }
+
 .arrow-down.rotate {
   transform: rotate(180deg);
 }
@@ -410,19 +440,23 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   z-index: 100;
   overflow: hidden;
 }
+
 .dropdown-header {
   padding: 16px;
   border-bottom: 1px solid #f1f5f9;
 }
+
 .dropdown-title {
   font-size: 13px;
   font-weight: 700;
   color: #64748B;
   text-transform: uppercase;
 }
+
 .dropdown-body {
   padding: 8px 0;
 }
+
 .dropdown-item {
   width: 100%;
   display: flex;
@@ -437,17 +471,21 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   cursor: pointer;
   transition: background 0.2s;
 }
+
 .dropdown-item:hover {
   background-color: #f8fafc;
   color: #059669;
 }
+
 .text-danger {
   color: #FF5B5B;
 }
+
 .text-danger:hover {
   background-color: #FEF2F2;
   color: #DC2626;
 }
+
 .drop-icon {
   width: 18px;
   height: 18px;
@@ -457,6 +495,7 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
 .fade-scale-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
+
 .fade-scale-enter-from,
 .fade-scale-leave-to {
   opacity: 0;
@@ -467,20 +506,25 @@ const unreadCount = computed(() => notifications.value.filter(n => !n.read).leng
   .driver-header {
     margin: 0;
     border-radius: 0;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   }
+
   .hamburger-btn {
     display: block;
   }
+
   .search-box {
     display: none;
   }
+
   .user-info {
     display: none;
   }
+
   .profile-trigger {
     padding: 0;
   }
+
   .arrow-down {
     display: none;
   }
