@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, watch, computed } from 'vue';
 import { 
   Plus, Search, Filter, Edit, Trash2, 
   Lock, Unlock, UserCheck, Mail, Phone, MapPin, 
-  ShieldCheck, MoreHorizontal, X, Calendar
+  ShieldCheck, MoreHorizontal, X, Calendar, Eye
 } from 'lucide-vue-next';
 import adminApi from '@/api/adminApi';
 import { getStaffStatus } from '@/utils/status';
@@ -23,6 +23,7 @@ const adminStore = useAdminStore();
 const staffs = ref([]);
 const roles = ref([]);
 const loading = ref(false);
+const detailsLoading = ref(false);
 const totalStaffs = ref(0);
 const pagination = reactive({ currentPage: 1, perPage: 5, total: 0, lastPage: 1 });
 
@@ -54,9 +55,11 @@ const stats = computed(() => {
 // Modal State
 const isModalOpen = ref(false);
 const isDeleteModalOpen = ref(false);
+const isDetailsModalOpen = ref(false);
 const isEditing = ref(false);
 const currentStaffId = ref(null);
 const staffToDelete = ref(null);
+const staffDetails = ref(null);
 
 // Form State
 const staffForm = reactive({
@@ -179,6 +182,20 @@ const openCreateModal = () => {
   });
   errors.value = {};
   isModalOpen.value = true;
+};
+
+const openDetailsModal = async (staff) => {
+  detailsLoading.value = true;
+  try {
+    const res = await adminApi.getStaffDetails(staff.id);
+    staffDetails.value = res.data;
+    isDetailsModalOpen.value = true;
+  } catch (err) {
+    showToast('Không thể lấy thông tin chi tiết!', 'error');
+    console.error(err);
+  } finally {
+    detailsLoading.value = false;
+  }
 };
 
 const openEditModal = (staff) => {
@@ -420,6 +437,9 @@ onMounted(() => {
         <!-- Thao tác -->
         <template #cell(actions)="{ item }">
           <div class="action-buttons">
+            <button class="btn-action view" title="Xem chi tiết" @click.stop="openDetailsModal(item)">
+              <Eye :size="18" />
+            </button>
             <button class="btn-action edit" title="Chỉnh sửa" @click.stop="openEditModal(item)">
               <Edit :size="18" />
             </button>
@@ -563,6 +583,58 @@ onMounted(() => {
         <div class="confirm-actions">
           <BaseButton variant="secondary" @click="isDeleteModalOpen = false">Hủy</BaseButton>
           <BaseButton variant="danger" @click="handleDelete" :loading="loading">Xác nhận xóa</BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+
+    <!-- Modal Xem chi tiết -->
+    <BaseModal v-model="isDetailsModalOpen" title="Chi tiết nhân viên" maxWidth="600px">
+      <div v-if="detailsLoading" class="details-loading">
+        <div class="loader"></div>
+        <p>Đang tải thông tin...</p>
+      </div>
+      <div v-else-if="staffDetails" class="details-content">
+        <div class="details-header-info">
+          <div class="details-avatar" :class="staffDetails.is_master ? 'master' : ''">
+            {{ staffDetails.ho_va_ten?.charAt(0).toUpperCase() }}
+          </div>
+          <div class="details-main">
+            <h3>{{ staffDetails.ho_va_ten }}</h3>
+            <div class="details-badges">
+               <span v-if="staffDetails.is_master" class="badge-master">Master Admin</span>
+               <span :class="['status-badge', getStaffStatus(staffDetails.tinh_trang).class]">
+                {{ getStaffStatus(staffDetails.tinh_trang).text }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-grid-view">
+          <div class="detail-item">
+            <label><ShieldCheck :size="16" /> Chức vụ</label>
+            <p>{{ staffDetails.chuc_vu?.ten_chuc_vu || 'Chưa phân chức vụ' }}</p>
+          </div>
+          <div class="detail-item">
+            <label><Mail :size="16" /> Email</label>
+            <p>{{ staffDetails.email }}</p>
+          </div>
+          <div class="detail-item">
+            <label><Phone :size="16" /> Số điện thoại</label>
+            <p>{{ staffDetails.so_dien_thoai || '---' }}</p>
+          </div>
+          <div class="detail-item">
+            <label><Calendar :size="16" /> Ngày sinh</label>
+            <p>{{ formatDateOnly(staffDetails.ngay_sinh) }}</p>
+          </div>
+          <div class="detail-item full-width">
+            <label><MapPin :size="16" /> Địa chỉ</label>
+            <p>{{ staffDetails.dia_chi || 'Chưa cập nhật' }}</p>
+          </div>
+        </div>
+
+        <div class="details-footer">
+          <BaseButton variant="secondary" @click="isDetailsModalOpen = false">Đóng</BaseButton>
+          <BaseButton variant="primary" @click="openEditModal(staffDetails); isDetailsModalOpen = false">Chỉnh sửa</BaseButton>
         </div>
       </div>
     </BaseModal>
@@ -894,16 +966,110 @@ onMounted(() => {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.status-badge.status-approved {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
 .status-badge.status-rejected {
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fecaca;
+}
+
+/* Details Modal Specific Styles */
+.details-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 12px;
+  color: #64748b;
+}
+
+.loader {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f1f5f9;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.details-header-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.details-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+}
+
+.details-avatar.master {
+  background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+  box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.3);
+}
+
+.details-main h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.details-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.details-grid-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 30px;
+}
+
+.detail-item label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.detail-item p {
+  font-size: 15px;
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.detail-item.full-width {
+  grid-column: span 2;
+}
+
+.details-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
 }
 
 .birth-date {
