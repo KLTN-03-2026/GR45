@@ -29,6 +29,12 @@ const handleLogin = async () => {
         <form @submit.prevent="handleLogin" class="login-form">
           <BaseInput v-model="form.email" type="email" label="Email quản trị" placeholder="admin@example.com" />
           <BaseInput v-model="form.password" type="password" label="Mật khẩu" placeholder="••••••••" />
+
+          <div class="forgot-link">
+            <router-link :to="{ name: 'forgot-password', query: { role: 'admin' } }">
+              Quên mật khẩu?
+            </router-link>
+          </div>
           
           <div v-if="adminStore.error" class="error-msg">{{ adminStore.error }}</div>
           
@@ -116,6 +122,24 @@ const handleLogin = async () => {
 }
 
 .login-form { display: flex; flex-direction: column; }
+
+.forgot-link {
+  text-align: right;
+  margin-top: -0.25rem;
+  margin-bottom: 1rem;
+}
+
+.forgot-link a {
+  font-size: 0.9rem;
+  color: #a5b4fc;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.forgot-link a:hover {
+  text-decoration: underline;
+  color: #c7d2fe;
+}
 
 /* CSS cho input trong Dark mode */
 .login-form :deep(.base-input) {

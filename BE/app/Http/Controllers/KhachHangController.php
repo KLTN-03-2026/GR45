@@ -3,13 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Services\KhachHangService;
+use App\Services\PasswordResetService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class KhachHangController extends Controller
 {
-    public function __construct(protected KhachHangService $service) {}
+    public function __construct(
+        protected KhachHangService $service,
+        protected PasswordResetService $passwordResetService,
+    ) {}
 
     // ── AUTH ──────────────────────────────────────────────────────────
 
@@ -44,17 +49,117 @@ class KhachHangController extends Controller
     {
         try {
             $result = $this->service->register($request->all());
+            $needEmailActivation = !empty($request->input('email'));
 
             return response()->json([
                 'success' => true,
-                'message' => 'Dang ky thanh cong.',
-                'data'    => $result,
+                'message' => $needEmailActivation
+                    ? 'Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản.'
+                    : 'Đăng ký thành công.',
+                'data'    => [
+                    ...$result,
+                    'requires_email_activation' => $needEmailActivation,
+                ],
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Du lieu khong hop le.',
                 'errors'  => $e->errors(),
+            ], 422);
+        }
+    }
+
+    public function requestPasswordReset(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'role' => 'required|in:khach_hang,nha_xe,admin',
+            'email' => 'required|email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $this->passwordResetService->requestReset($request->role, $request->email);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.',
+        ]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'role' => 'required|in:khach_hang,nha_xe,admin',
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'mat_khau_moi' => 'required|string|min:6|confirmed',
+        ], [
+            'role.required' => 'Vui lòng chọn vai trò.',
+            'role.in' => 'Vai trò không hợp lệ.',
+            'email.required' => 'Email không được để trống.',
+            'email.email' => 'Email không đúng định dạng.',
+            'token.required' => 'Thiếu token đặt lại mật khẩu.',
+            'mat_khau_moi.required' => 'Vui lòng nhập mật khẩu mới.',
+            'mat_khau_moi.min' => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+            'mat_khau_moi.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $this->passwordResetService->resetPassword(
+                $request->role,
+                $request->email,
+                $request->token,
+                $request->mat_khau_moi
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+            ], 422);
+        }
+    }
+
+    public function kichHoatTaiKhoan(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'token' => 'required|string',
+        ], [
+            'email.required' => 'Email không được để trống.',
+            'email.email' => 'Email không đúng định dạng.',
+            'token.required' => 'Thiếu token kích hoạt.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $this->service->kichHoatTaiKhoan($request->email, $request->token);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kích hoạt tài khoản thành công. Vui lòng đăng nhập.',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
             ], 422);
         }
     }
@@ -219,82 +324,45 @@ class KhachHangController extends Controller
         ]);
     }
 
-    // ── SEARCH CHUYEN XE ──────────────────────────────────────────────
+    // ── PUBLIC SEARCH DATA ────────────────────────────────────────────
 
-    /**
-     * GET /api/v1/tinh-thanh
-     */
     public function getProvinces(): JsonResponse
     {
-        $data = $this->service->getTinhThanhs();
         return response()->json([
             'success' => true,
-            'data'    => $data,
+            'data' => $this->service->getTinhThanhs(),
         ]);
     }
 
-    /**
-     * GET /api/v1/chuyen-xe/search
-     * Query: ?diem_di=...&diem_den=...&ngay_khoi_hanh=...&gia_ve_tu=...&gia_ve_den=...
-     */
     public function searchChuyenXe(Request $request): JsonResponse
     {
-        $data = $this->service->searchChuyenXe($request->all());
         return response()->json([
             'success' => true,
-            'data'    => $data,
+            'data' => $this->service->searchChuyenXe($request->all()),
         ]);
     }
 
-    /**
-     * GET /api/v1/chuyen-xe/{id}/ghe
-     */
     public function getGheChuyenXe(int $id): JsonResponse
     {
-        try {
-            $data = $this->service->getGheChuyenXe($id);
-            return response()->json([
-                'success' => true,
-                'data'    => $data,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 404);
-        }
-    }
-
-    /**
-     * GET /api/v1/chuyen-xe/{id}/tram-dung
-     * Lấy danh sách trạm đón/trả theo tuyến đường của chuyến xe (công khai)
-     */
-    public function getTramDungChuyenXe(int $id): JsonResponse
-    {
-        try {
-            $data = $this->service->getTramDungChuyenXe($id);
-            return response()->json([
-                'success' => true,
-                'data'    => $data,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 404);
-        }
-    }
-
-    /**
-     * GET /api/v1/voucher/public?ma_nha_xe=NX001
-     * Lấy danh sách voucher đang hoạt động (công khai cho khách hàng chọn)
-     */
-    public function getVoucherCongKhai(Request $request): JsonResponse
-    {
-        $data = $this->service->getVoucherCongKhai($request->all());
         return response()->json([
             'success' => true,
-            'data'    => $data,
+            'data' => $this->service->getGheChuyenXe($id),
+        ]);
+    }
+
+    public function getTramDungChuyenXe(int $id): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->service->getTramDungChuyenXe($id),
+        ]);
+    }
+
+    public function getVoucherCongKhai(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->service->getVoucherCongKhai($request->all()),
         ]);
     }
 }

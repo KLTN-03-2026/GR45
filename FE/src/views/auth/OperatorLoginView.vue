@@ -34,7 +34,9 @@ const handleLogin = async () => {
           <BaseInput v-model="form.password" type="password" label="Mật khẩu" placeholder="••••••••" />
           
           <div class="forgot-link">
-            <a href="#">Quên mật khẩu?</a>
+            <router-link :to="{ name: 'forgot-password', query: { role: 'nha_xe' } }">
+              Quên mật khẩu?
+            </router-link>
           </div>
           
           <div v-if="operatorStore.error" class="error-msg">{{ operatorStore.error }}</div>

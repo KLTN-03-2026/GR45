@@ -11,10 +11,4 @@ interface XeRepositoryInterface
     public function update(int $id, array $data);
     public function delete(int $id): bool;
     public function updateStatus(int $id, string $status);
-
-    /** Lấy sơ đồ ghế của xe, nhóm theo tầng */
-    public function getSeats(int $xeId): array;
-
-    /** Cập nhật trạng thái một ghế */
-    public function updateSeatStatus(int $gheId, string $trangThai);
 }

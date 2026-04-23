@@ -50,16 +50,24 @@ const validateForm = () => {
     valid = false;
   }
 
-  if (!form.email.trim()) {
-    errors.email = 'Vui lòng nhập email.';
+  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = 'Email không hợp lệ.';
+    valid = false;
+  }
+
+  if (!form.so_dien_thoai.trim()) {
+    errors.so_dien_thoai = 'Vui lòng nhập số điện thoại.';
+    valid = false;
+  } else if (!/^(0|\+84)[0-9]{9,10}$/.test(form.so_dien_thoai.trim())) {
+    errors.so_dien_thoai = 'Số điện thoại không đúng định dạng.';
     valid = false;
   }
 
   if (!form.password) {
     errors.password = 'Vui lòng nhập mật khẩu.';
     valid = false;
-  } else if (form.password.length < 6) {
-    errors.password = 'Mật khẩu tối thiểu 6 ký tự.';
+  } else if (form.password.length < 8) {
+    errors.password = 'Mật khẩu phải có ít nhất 8 ký tự.';
     valid = false;
   }
 
@@ -68,11 +76,6 @@ const validateForm = () => {
     valid = false;
   } else if (form.password_confirmation !== form.password) {
     errors.password_confirmation = 'Mật khẩu xác nhận không khớp.';
-    valid = false;
-  }
-
-  if (form.so_dien_thoai && form.so_dien_thoai.length > 15) {
-    errors.so_dien_thoai = 'Số điện thoại không vượt quá 15 ký tự.';
     valid = false;
   }
 
@@ -103,23 +106,35 @@ const handleRegister = async () => {
     const payload = {
       ...form,
       ho_va_ten: form.ho_va_ten.trim(),
-      email: form.email.trim(),
-      so_dien_thoai: form.so_dien_thoai?.trim() || null,
+      email: form.email.trim() || null,
+      so_dien_thoai: form.so_dien_thoai.trim(),
       dia_chi: form.dia_chi?.trim() || null,
       ngay_sinh: form.ngay_sinh || null,
     };
 
     const res = await authApi.clientRegister(payload);
     const data = res?.data || res;
-    successMessage.value = data?.message || 'Đăng ký thành công. Bạn có thể đăng nhập ngay.';
+    successMessage.value = data?.message || 'Đăng ký thành công.';
+    const needsEmailActivation = Boolean(
+      data?.data?.requires_email_activation ?? data?.requires_email_activation ?? false,
+    );
 
     setTimeout(() => {
+      if (needsEmailActivation) {
+        router.push({
+          name: 'check-email',
+          query: { email: payload.email },
+        });
+        return;
+      }
       router.push('/auth/login');
     }, 900);
   } catch (err) {
     const apiErrors = err.response?.data?.errors;
     if (apiErrors) {
       mapServerErrors(apiErrors);
+      serverError.value = '';
+      return;
     }
     serverError.value = err.response?.data?.message || 'Không thể đăng ký lúc này. Vui lòng thử lại.';
   } finally {
@@ -147,7 +162,7 @@ const handleRegister = async () => {
         <BaseInput
           v-model="form.email"
           type="email"
-          label="Email *"
+          label="Email"
           placeholder="name@example.com"
           :error="errors.email"
         />
@@ -157,7 +172,7 @@ const handleRegister = async () => {
             v-model="form.password"
             type="password"
             label="Mật khẩu *"
-            placeholder="Tối thiểu 6 ký tự"
+            placeholder="Tối thiểu 8 ký tự"
             :error="errors.password"
           />
           <BaseInput
@@ -173,8 +188,8 @@ const handleRegister = async () => {
           <BaseInput
             v-model="form.so_dien_thoai"
             type="text"
-            label="Số điện thoại"
-            placeholder="09xxxxxxxx"
+            label="Số điện thoại *"
+            placeholder="VD: 0912345678"
             :error="errors.so_dien_thoai"
           />
           <BaseInput

@@ -1,6 +1,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import adminApi from '@/api/adminApi.js'
+import { useAdminStore } from '@/stores/adminStore'
 import BaseToast from '@/components/common/BaseToast.vue'
 
 const PREFS_KEY = 'admin.personal.settings'
@@ -15,6 +17,8 @@ const defaultPrefs = {
 }
 
 const settings = ref(loadPrefs())
+const router = useRouter()
+const adminStore = useAdminStore()
 
 const i18n = {
   vi: {
@@ -72,6 +76,13 @@ const saveStatus = ref('')
 const toastVisible = ref(false)
 const toastMessage = ref('')
 const toastType = ref('success')
+const isChangingPassword = ref(false)
+const passwordErrors = ref({})
+const passwordForm = ref({
+  mat_khau_cu: '',
+  mat_khau_moi: '',
+  mat_khau_moi_confirmation: '',
+})
 let toastTimer = null
 
 const loginHistory = ref([
@@ -183,6 +194,39 @@ const handleSave = () => {
   saveStatus.value = t.value.saved
 }
 
+const resetPasswordForm = () => {
+  passwordForm.value = {
+    mat_khau_cu: '',
+    mat_khau_moi: '',
+    mat_khau_moi_confirmation: '',
+  }
+  passwordErrors.value = {}
+}
+
+const handleChangePassword = async () => {
+  isChangingPassword.value = true
+  passwordErrors.value = {}
+  try {
+    const payload = {
+      mat_khau_cu: passwordForm.value.mat_khau_cu,
+      mat_khau_moi: passwordForm.value.mat_khau_moi,
+      mat_khau_moi_confirmation: passwordForm.value.mat_khau_moi_confirmation,
+    }
+    const res = await adminApi.changePassword(payload)
+    showToast(res?.data?.message || 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.', 'success')
+    resetPasswordForm()
+    setTimeout(() => {
+      adminStore.logout()
+      router.replace({ name: 'admin-login' })
+    }, 700)
+  } catch (error) {
+    passwordErrors.value = error?.response?.data?.errors || {}
+    showToast(error?.response?.data?.message || 'Đổi mật khẩu thất bại.', 'error')
+  } finally {
+    isChangingPassword.value = false
+  }
+}
+
 watch(
   () => settings.value.theme,
   (newTheme) => applyTheme(newTheme),
@@ -263,6 +307,34 @@ onMounted(() => {
 
         <button class="btn-save" @click="handleSave">{{ t.save }}</button>
         <p v-if="saveStatus" class="saved-text">{{ saveStatus }}</p>
+
+        <div class="divider"></div>
+
+        <h3 class="sub-title">Đổi mật khẩu</h3>
+        <div class="field">
+          <label>Mật khẩu hiện tại</label>
+          <input v-model="passwordForm.mat_khau_cu" type="password" placeholder="Nhập mật khẩu hiện tại" />
+          <small v-if="passwordErrors.mat_khau_cu" class="error-text">{{ passwordErrors.mat_khau_cu[0] }}</small>
+        </div>
+
+        <div class="field">
+          <label>Mật khẩu mới</label>
+          <input v-model="passwordForm.mat_khau_moi" type="password" placeholder="Ít nhất 6 ký tự" />
+          <small v-if="passwordErrors.mat_khau_moi" class="error-text">{{ passwordErrors.mat_khau_moi[0] }}</small>
+        </div>
+
+        <div class="field">
+          <label>Xác nhận mật khẩu mới</label>
+          <input
+            v-model="passwordForm.mat_khau_moi_confirmation"
+            type="password"
+            placeholder="Nhập lại mật khẩu mới"
+          />
+        </div>
+
+        <button class="btn-save btn-password" :disabled="isChangingPassword" @click="handleChangePassword">
+          {{ isChangingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu' }}
+        </button>
       </article>
     </div>
 
@@ -381,6 +453,13 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.field input {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+}
+
 .btn-save {
   width: 100%;
   border: none;
@@ -390,6 +469,27 @@ onMounted(() => {
   color: white;
   background: linear-gradient(135deg, #2563eb, #1d4ed8);
   cursor: pointer;
+}
+
+.btn-save:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btn-password {
+  margin-top: 4px;
+}
+
+.divider {
+  margin: 14px 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sub-title {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .saved-text {

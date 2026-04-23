@@ -309,6 +309,26 @@ const router = createRouter({
           name: 'driver-login',
           component: () => import('../views/auth/DriverLoginView.vue'),
         },
+        {
+          path: 'forgot-password',
+          name: 'forgot-password',
+          component: () => import('../views/auth/ForgotPasswordView.vue'),
+        },
+        {
+          path: 'reset-password',
+          name: 'reset-password',
+          component: () => import('../views/auth/ResetPasswordView.vue'),
+        },
+        {
+          path: 'activate-account',
+          name: 'activate-account',
+          component: () => import('../views/auth/ActivateAccountView.vue'),
+        },
+        {
+          path: 'check-email',
+          name: 'check-email',
+          component: () => import('../views/auth/CheckEmailView.vue'),
+        },
       ],
     },
 
