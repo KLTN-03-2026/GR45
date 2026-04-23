@@ -7,9 +7,12 @@ const operatorApi = {
 
   // --- THỐNG KÊ NHÀ XE ---
   getStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke', { params }),
-  getStatisticsTickets: (params) => axiosClient.get('/v1/nha-xe/thong-ke/ves', { params }),
-  exportStatisticsExcel: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export/excel', { params, responseType: 'blob' }),
-  exportStatisticsPdf: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export/pdf', { params, responseType: 'blob' }),
+  getStatisticsByRoute: (params) => axiosClient.get('/v1/nha-xe/thong-ke/theo-tuyen', { params }),
+  getStatisticsTicketStatus: (params) => axiosClient.get('/v1/nha-xe/thong-ke/trang-thai-ve', { params }),
+  getStatisticsTickets: (params) => axiosClient.get('/v1/nha-xe/ve', { params }),
+  exportStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params, responseType: 'blob' }),
+  exportStatisticsExcel: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params: { ...params, loai: 'dashboard' }, responseType: 'blob' }),
+  exportStatisticsPdf: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params: { ...params, loai: 'dashboard' }, responseType: 'blob' }),
 
   // --- XE / PHƯƠNG TIỆN ---
   getVehicles: (params) => axiosClient.get('/v1/nha-xe/xe', { params }),
