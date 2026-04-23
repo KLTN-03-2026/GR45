@@ -35,6 +35,12 @@ return new class extends Migration
                 'bao_hiem_het_han',    // Bao hiem xe sap het han
                 'dang_kiem_het_han',   // Dang kiem sap het han
                 'gplx_het_han',        // Bang lai tai xe sap het han
+                'su_dung_dien_thoai',  // Tai xe su dung dien thoai
+                'hut_thuoc',           // Tai xe hut thuoc
+                'mang_vu_khi',         // Tai xe mang vu khi
+                'vi_pham_khac',        // Tai xe vi pham khac
+                'khong_quan_sat',      // Tai xe khong quan sat
+
             ]);
             $table->enum('muc_do', ['thong_tin', 'canh_bao', 'nguy_hiem', 'khan_cap'])->default('canh_bao');
             $table->enum('trang_thai', ['moi', 'da_xem', 'da_xu_ly', 'bo_qua'])->default('moi');

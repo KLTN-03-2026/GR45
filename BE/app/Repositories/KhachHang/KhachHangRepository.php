@@ -28,7 +28,7 @@ class KhachHangRepository implements KhachHangRepositoryInterface
             });
         }
 
-        if (isset($filters['tinh_trang'])) {
+        if (!empty($filters['tinh_trang'])) {
             $query->where('tinh_trang', $filters['tinh_trang']);
         }
 
@@ -96,7 +96,7 @@ class KhachHangRepository implements KhachHangRepositoryInterface
     }
 
     /**
-     * Xoa khach hang.
+     * Xoa khach hang (Cap nhat trang thai ve 0).
      */
     public function delete(int $id): bool
     {

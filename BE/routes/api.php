@@ -11,6 +11,7 @@ use App\Http\Controllers\NhaXeController;
 use App\Http\Controllers\TuyenDuongController;
 use App\Http\Controllers\ChuyenXeController;
 use App\Http\Controllers\ThanhToanController;
+use App\Http\Controllers\OperatorThongKeController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\VeController;
 use App\Http\Controllers\XeController;
@@ -52,6 +53,8 @@ Route::prefix('v1')->group(function () {
         Route::get('rating/trip/{tripId}', [RatingController::class, 'getRatingByTrip']);
         Route::get('pending-rating', [RatingController::class, 'getPendingRating']);
         Route::get('my-ratings', [RatingController::class, 'getMyRatings']);
+
+    
     });
 
     // Proxy bản đồ - tránh CORS khi gọi API bên ngoài từ browser

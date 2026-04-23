@@ -2,16 +2,16 @@ import axios from 'axios';
 
 // Mapping từ role → token key trong localStorage
 const ROLE_TOKEN_MAP = {
-  admin    : 'auth.admin.token',
-  client   : 'auth.client.token',
-  operator : 'auth.operator.token',
-  driver   : 'auth.driver.token',
+  admin: 'auth.admin.token',
+  client: 'auth.client.token',
+  operator: 'auth.operator.token',
+  driver: 'auth.driver.token',
 };
 
 const axiosClient = axios.create({
-  baseURL :  'http://127.0.0.1:8000/api/',
-  headers : { 'Content-Type': 'application/json' },
-  timeout : 10000,
+  baseURL: 'http://127.0.0.1:8000/api/',
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
 });
 
 // --- REQUEST INTERCEPTOR ---
@@ -19,8 +19,8 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     const activeRole = localStorage.getItem('auth.active_role');
-    const tokenKey   = ROLE_TOKEN_MAP[activeRole];
-    const token      = tokenKey ? localStorage.getItem(tokenKey) : null;
+    const tokenKey = ROLE_TOKEN_MAP[activeRole];
+    const token = tokenKey ? localStorage.getItem(tokenKey) : null;
 
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -43,7 +43,7 @@ axiosClient.interceptors.response.use(
     // Nếu 401 → xóa token của role đang active
     if (error.response?.status === 401) {
       const activeRole = localStorage.getItem('auth.active_role');
-      const tokenKey   = ROLE_TOKEN_MAP[activeRole];
+      const tokenKey = ROLE_TOKEN_MAP[activeRole];
       if (tokenKey) {
         localStorage.removeItem(tokenKey);
         localStorage.removeItem(tokenKey.replace('.token', '.user'));

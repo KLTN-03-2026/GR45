@@ -7,6 +7,7 @@ use App\Models\NhaXe;
 use App\Repositories\NhaXe\NhaXeRepositoryInterface;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
 
@@ -121,6 +122,32 @@ class NhaXeService
         return $this->repo->getById($id);
     }
 
+    protected function buildNhaXePayload(array $data): array
+    {
+        return array_filter([
+            'ten_nha_xe' => $data['ten_nha_xe'] ?? null,
+            'email' => $data['email'] ?? null,
+            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
+            'ty_le_chiet_khau' => isset($data['ty_le_chiet_khau']) ? (float) $data['ty_le_chiet_khau'] : null,
+            'tai_khoan_nhan_tien' => $data['tai_khoan_nhan_tien'] ?? null,
+        ], static fn ($value) => $value !== null);
+    }
+
+    protected function buildHoSoPayload(array $data, ?NhaXe $nhaXe = null): array
+    {
+        return array_filter([
+            'ten_cong_ty' => $data['ten_cong_ty'] ?? $data['ten_nha_xe'] ?? null,
+            'ma_so_thue' => $data['ma_so_thue'] ?? null,
+            'so_dang_ky_kinh_doanh' => $data['so_dang_ky_kinh_doanh'] ?? null,
+            'nguoi_dai_dien' => $data['nguoi_dai_dien'] ?? null,
+            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
+            'email' => $data['email'] ?? null,
+            'id_phuong_xa' => $data['id_phuong_xa'] ?? null,
+            'dia_chi_chi_tiet' => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? null,
+            'trang_thai' => $data['trang_thai'] ?? null,
+        ], static fn ($value) => $value !== null);
+    }
+
     /**
      * Tao nha xe moi (Admin).
      * @throws ValidationException
@@ -132,6 +159,10 @@ class NhaXeService
             'email' => 'required|email|unique:nha_xes,email',
             'password' => 'required|string|min:6',
             'so_dien_thoai' => 'nullable|string|max:15',
+            'giay_phep_kinh_doanh' => 'nullable|string|max:255',
+            'nguoi_dai_dien' => 'nullable|string|max:100',
+            'ty_le_chiet_khau' => 'nullable|numeric|min:0|max:100',
+            'tai_khoan_nhan_tien' => 'nullable|string|max:255',
         ], [
             'ten_nha_xe.required' => 'Tên nhà xe không được để trống.',
             'email.unique' => 'Email đã được sử dụng.',
@@ -146,16 +177,82 @@ class NhaXeService
             $maNhaXe = 'NX' . strtoupper(Str::random(4));
         }
 
-        $nhaXe = $this->repo->create([
+        $nhaXe = $this->repo->create(array_merge([
             'ma_nha_xe' => $maNhaXe,
             'ten_nha_xe' => $data['ten_nha_xe'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
             'tinh_trang' => 'hoat_dong',
+        ], $this->buildNhaXePayload($data)));
+
+        $nhaXe->hoSo()->updateOrCreate(
+            ['ma_nha_xe' => $nhaXe->ma_nha_xe],
+            $this->buildHoSoPayload($data, $nhaXe)
+        );
+
+        return new NhaXeResource($this->repo->getById($nhaXe->id));
+    }
+
+    /**
+     * Cap nhat thong tin nha xe (Admin).
+     * @throws ValidationException
+     */
+    public function update(int $id, array $data): ?NhaXeResource
+    {
+        $nhaXe = $this->repo->getById($id);
+        if (!$nhaXe) {
+            return null;
+        }
+
+        $validator = Validator::make($data, [
+            'ten_nha_xe' => 'sometimes|required|string|max:100',
+            'email' => ['sometimes', 'required', 'email', Rule::unique('nha_xes', 'email')->ignore($id)],
+            'so_dien_thoai' => 'nullable|string|max:15',
+            'ty_le_chiet_khau' => 'nullable|numeric|min:0|max:100',
+            'tai_khoan_nhan_tien' => 'nullable|string|max:255',
+            'ten_cong_ty' => 'nullable|string|max:255',
+            'ma_so_thue' => 'nullable|string|max:255',
+            'so_dang_ky_kinh_doanh' => 'nullable|string|max:255',
+            'nguoi_dai_dien' => 'nullable|string|max:100',
+            'dia_chi_chi_tiet' => 'nullable|string|max:255',
+            'dia_chi' => 'nullable|string|max:255',
+        ], [
+            'ten_nha_xe.required' => 'Tên nhà xe không được để trống.',
+            'email.required' => 'Email không được để trống.',
+            'email.email' => 'Email không đúng định dạng.',
+            'email.unique' => 'Email đã được sử dụng.',
         ]);
 
-        return new NhaXeResource($nhaXe);
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        $mainPayload = $this->buildNhaXePayload($data);
+
+        // Chỉ cập nhật bảng chính khi có field hợp lệ để tránh update rỗng.
+        if (!empty($mainPayload)) {
+            $this->repo->update($id, $mainPayload);
+        }
+
+        $profilePayload = array_filter([
+            'ten_cong_ty' => $data['ten_cong_ty'] ?? $data['ten_nha_xe'] ?? null,
+            'ma_so_thue' => $data['ma_so_thue'] ?? null,
+            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
+            'email' => $data['email'] ?? null,
+            'nguoi_dai_dien' => $data['nguoi_dai_dien'] ?? null,
+            'so_dang_ky_kinh_doanh' => $data['so_dang_ky_kinh_doanh'] ?? null,
+            'dia_chi_chi_tiet' => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? null,
+        ], static fn($value) => $value !== null);
+
+        if (!empty($profilePayload)) {
+            $nhaXe->hoSo()->updateOrCreate(
+                ['ma_nha_xe' => $nhaXe->ma_nha_xe],
+                $profilePayload
+            );
+        }
+
+        return new NhaXeResource($this->repo->getById($id));
     }
 
     public function toggleStatus(int $id): ?NhaXe
