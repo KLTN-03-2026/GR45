@@ -6,6 +6,8 @@ use App\Models\Admin;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Http\Resources\AdminResource;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class AdminRepository implements AdminRepositoryInterface
 {
@@ -181,5 +183,31 @@ class AdminRepository implements AdminRepositoryInterface
         if (!$user instanceof \App\Models\Admin || $user->is_master !== 1) {
             throw new \Exception('Chỉ Quản trị viên cấp cao mới có quyền thực hiện hành động này.');
         }
+    }
+
+    public function doiMatKhau(Admin $admin, array $data): void
+    {
+        $validator = Validator::make($data, [
+            'mat_khau_cu' => 'required|string',
+            'mat_khau_moi' => 'required|string|min:6|confirmed',
+        ], [
+            'mat_khau_cu.required' => 'Vui lòng nhập mật khẩu hiện tại.',
+            'mat_khau_moi.min' => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+            'mat_khau_moi.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
+        ]);
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        if (!Hash::check($data['mat_khau_cu'], $admin->password)) {
+            throw ValidationException::withMessages([
+                'mat_khau_cu' => 'Mật khẩu hiện tại không chính xác.',
+            ]);
+        }
+
+        $admin->password = Hash::make($data['mat_khau_moi']);
+        $admin->save();
+        $admin->tokens()->delete();
     }
 }

@@ -13,6 +13,10 @@ const props = defineProps({
   maxWidth: {
     type: String,
     default: '500px'
+  },
+  bodyOverflow: {
+    type: String,
+    default: 'auto'
   }
 });
 
@@ -59,7 +63,7 @@ watch(() => props.modelValue, (val) => {
               </svg>
             </button>
           </div>
-          <div class="modal-body">
+          <div class="modal-body" :style="{ overflowY: bodyOverflow }">
             <slot></slot>
           </div>
           <div v-if="$slots.footer" class="modal-footer">

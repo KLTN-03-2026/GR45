@@ -16,14 +16,16 @@ const props = defineProps({
 </script>
 
 <template>
-  <div v-if="visible" class="custom-toast" :class="type">
-    <div class="toast-content">
-      <template v-if="showIcon">
-        <span class="toast-icon" v-if="type !== 'success'">!</span>
-      </template>
-      <span>{{ message }}</span>
+  <Teleport to="body">
+    <div v-if="visible" class="custom-toast" :class="type">
+      <div class="toast-content">
+        <template v-if="showIcon">
+          <span class="toast-icon" v-if="type !== 'success'">!</span>
+        </template>
+        <span>{{ message }}</span>
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -35,7 +37,7 @@ const props = defineProps({
   border-radius: 8px;
   color: white;
   font-weight: 500;
-  z-index: 9999;
+  z-index: 20000;
   display: flex;
   align-items: center;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);

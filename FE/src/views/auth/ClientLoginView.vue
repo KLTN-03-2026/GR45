@@ -49,7 +49,7 @@ const handleLogin = async () => {
             <label class="remember-me">
               <input type="checkbox" /> Ghi nhớ
             </label>
-            <a href="#" class="forgot-link">Quên mật khẩu?</a>
+            <router-link :to="{ name: 'forgot-password' }" class="forgot-link">Quên mật khẩu?</router-link>
           </div>
           
           <div v-if="clientStore.error" class="error-msg">{{ clientStore.error }}</div>

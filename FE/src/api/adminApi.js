@@ -3,6 +3,7 @@ import axiosClient from './axiosClient.js';
 const adminApi = {
   // --- PROFILE ---
   getMe: () => axiosClient.get('/v1/admin/me'),
+  changePassword: (data) => axiosClient.post('/v1/admin/doi-mat-khau', data),
 
   // --- QUẢN LÝ NHÂN VIÊN ---
   getStaffs: (params) => axiosClient.get('/v1/admin/nhan-vien', { params }),
@@ -49,6 +50,15 @@ const adminApi = {
   updateVehicle: (id, data) => axiosClient.put(`/v1/admin/xe/${id}`, data),
   deleteVehicle: (id) => axiosClient.delete(`/v1/admin/xe/${id}`),
   updateVehicleStatus: (id, data) => axiosClient.patch(`/v1/admin/xe/${id}/trang-thai`, data),
+  getLoaiXe: () => axiosClient.get('/v1/admin/loai-xe'),
+  getLoaiGhe: () => axiosClient.get('/v1/admin/loai-ghe'),
+  getSeatTypes: () => axiosClient.get('/v1/admin/loai-ghe'),
+  getVehicleSeats: (id) => axiosClient.get(`/v1/admin/xe/${id}/ghe`),
+  createVehicleSeat: (id, data) => axiosClient.post(`/v1/admin/xe/${id}/ghe`, data),
+  updateVehicleSeat: (id, gheId, data) => axiosClient.put(`/v1/admin/xe/${id}/ghe/${gheId}`, data),
+  deleteVehicleSeat: (id, gheId) => axiosClient.delete(`/v1/admin/xe/${id}/ghe/${gheId}`),
+  getVehicleStatusChangeWarning: (id, params) =>
+    axiosClient.get(`/v1/admin/xe/${id}/trang-thai/canh-bao`, { params }),
 
   // --- QUẢN LÝ TUYẾN ĐƯỜNG ---
   getRoutes: (params) => axiosClient.get('/v1/admin/tuyen-duong', { params }),

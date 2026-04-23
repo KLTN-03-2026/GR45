@@ -19,17 +19,22 @@ const operatorApi = {
   getVehicleDetails: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}`),
   createVehicle: (data) => axiosClient.post('/v1/nha-xe/xe', data),
   updateVehicle: (id, data) => axiosClient.put(`/v1/nha-xe/xe/${id}`, data),
+  deleteVehicle: (id) => axiosClient.delete(`/v1/nha-xe/xe/${id}`),
   updateVehicleDocument: (id, formData) => axiosClient.post(`/v1/nha-xe/xe/${id}/ho-so`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
 
   // Sơ đồ ghế xe
   getVehicleSeats: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}/ghe`),
+  createVehicleSeat: (id, data) => axiosClient.post(`/v1/nha-xe/xe/${id}/ghe`, data),
+  updateVehicleSeat: (id, gheId, data) => axiosClient.put(`/v1/nha-xe/xe/${id}/ghe/${gheId}`, data),
+  deleteVehicleSeat: (id, gheId) => axiosClient.delete(`/v1/nha-xe/xe/${id}/ghe/${gheId}`),
   updateSeatStatus: (id, gheId, data) => axiosClient.patch(`/v1/nha-xe/xe/${id}/ghe/${gheId}/trang-thai`, data),
 
   // Danh mục hỗ trợ
   getLoaiXe: () => axiosClient.get('/v1/nha-xe/loai-xe'),
   getLoaiGhe: () => axiosClient.get('/v1/nha-xe/loai-ghe'),
+  getSeatTypes: () => axiosClient.get('/v1/nha-xe/loai-ghe'),
 
   // --- TUYẾN ĐƯỜNG ---
   getRoutes: (params) => axiosClient.get('/v1/nha-xe/tuyen-duong', { params }),
