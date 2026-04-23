@@ -12,7 +12,7 @@ class NhaXeRepository implements NhaXeRepositoryInterface
     public function getAll(array $filters = []): LengthAwarePaginator
     {
         $query = $this->model->query()
-            ->with(['hoSo', 'viTopUp'])
+            ->with(['hoSo', 'viTopUp', 'diaChiNhaXes'])
             ->orderByDesc('created_at');
 
         if (!empty($filters['search'])) {
@@ -34,7 +34,7 @@ class NhaXeRepository implements NhaXeRepositoryInterface
 
     public function getById(int $id): ?NhaXe
     {
-        return $this->model->with(['hoSo', 'viTopUp', 'xes', 'taiXes'])->find($id);
+        return $this->model->with(['hoSo', 'viTopUp', 'diaChiNhaXes', 'xes', 'taiXes'])->find($id);
     }
 
     public function getByMaNhaXe(string $maNhaXe): ?NhaXe

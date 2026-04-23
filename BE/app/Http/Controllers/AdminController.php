@@ -17,6 +17,20 @@ class AdminController extends Controller
         $this->adminService = $adminService;
     }
 
+    public function index(Request $request)
+    {
+        try {
+            $filters = $request->only(['search', 'tinh_trang', 'id_chuc_vu', 'per_page']);
+            $admins = $this->adminService->getAll($filters);
+            return response()->json([
+                'success' => true,
+                'data' => $admins
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
     public function login(LoginAdminRequest $request)
     {
         try {

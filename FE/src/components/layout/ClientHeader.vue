@@ -73,16 +73,24 @@ const scrollToSection = (sectionId) => {
 };
 
 onMounted(() => {
-  window.addEventListener('scroll', handleScroll);
-  document.addEventListener('click', handleOutsideClick);
+  window.addEventListener("scroll", handleScroll);
+  document.addEventListener("click", handleOutsideClick);
   // Bổ sung profile khi đăng nhập nhưng store thiếu id hoặc thiếu tên hiển thị
   const u = clientStore.user || {};
-  const hasDisplayName = !!(u.ho_va_ten || u.ho_ten || u.ten_khach_hang || u.name);
+  const hasDisplayName = !!(
+    u.ho_va_ten ||
+    u.ho_ten ||
+    u.ten_khach_hang ||
+    u.name
+  );
   if (isLoggedIn.value && (!u.id || !hasDisplayName)) {
-    clientApi.getProfile().then((res) => {
-      const p = res?.success ? res.data : res?.data || res?.khach_hang || res;
-      if (p) clientStore.updateUser(p);
-    }).catch(() => {});
+    clientApi
+      .getProfile()
+      .then((res) => {
+        const p = res?.success ? res.data : res?.data || res?.khach_hang || res;
+        if (p) clientStore.updateUser(p);
+      })
+      .catch(() => {});
   }
 });
 
@@ -200,7 +208,7 @@ onBeforeUnmount(() => {
                   <span class="material-symbols-outlined">person</span>
                   Thông tin cá nhân
                 </RouterLink>
-                <!-- <RouterLink
+                <RouterLink
                   @click="isProfileMenuOpen = false"
                   to="/lich-su-dat-ve"
                   class="client-header__dropdown-item"
@@ -295,7 +303,11 @@ onBeforeUnmount(() => {
             <span class="material-symbols-outlined">person</span>
             Thông tin cá nhân
           </RouterLink>
-          <RouterLink to="/lich-su-dat-ve" class="client-header__mobile-link" @click="isMobileMenuOpen = false">
+          <RouterLink
+            to="/lich-su-dat-ve"
+            class="client-header__mobile-link"
+            @click="isMobileMenuOpen = false"
+          >
             <span class="material-symbols-outlined">history</span>
             Lịch sử đặt vé
           </RouterLink>

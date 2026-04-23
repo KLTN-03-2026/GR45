@@ -11,6 +11,7 @@ use App\Http\Controllers\NhaXeController;
 use App\Http\Controllers\TuyenDuongController;
 use App\Http\Controllers\ChuyenXeController;
 use App\Http\Controllers\ThanhToanController;
+use App\Http\Controllers\OperatorThongKeController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\VeController;
 use App\Http\Controllers\XeController;
@@ -51,6 +52,8 @@ Route::prefix('v1')->group(function () {
         Route::get('rating/trip/{tripId}', [RatingController::class, 'getRatingByTrip']);
         Route::get('pending-rating', [RatingController::class, 'getPendingRating']);
         Route::get('my-ratings', [RatingController::class, 'getMyRatings']);
+
+    
     });
 
     // Proxy bản đồ - tránh CORS khi gọi API bên ngoài từ browser
@@ -173,6 +176,12 @@ Route::prefix('v1')->group(function () {
 
             // Tổng hợp đánh giá các chuyến thuộc nhà xe
             Route::get('ratings', [RatingController::class, 'getCompanyRatings']);
+
+            // Thống kê nhà xe
+            Route::get('thong-ke', [OperatorThongKeController::class, 'index']);
+            Route::get('thong-ke/ves', [OperatorThongKeController::class, 've']);
+            Route::get('thong-ke/export/excel', [OperatorThongKeController::class, 'exportExcel']);
+            Route::get('thong-ke/export/pdf', [OperatorThongKeController::class, 'exportPdf']);
         });
     });
 

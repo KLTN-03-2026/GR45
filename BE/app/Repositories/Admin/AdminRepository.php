@@ -87,8 +87,12 @@ class AdminRepository implements AdminRepositoryInterface
             });
         }
 
-        if (isset($filters['tinh_trang'])) {
+        if (!empty($filters['tinh_trang'])) {
             $query->where('tinh_trang', $filters['tinh_trang']);
+        }
+
+        if (!empty($filters['id_chuc_vu'])) {
+            $query->where('id_chuc_vu', $filters['id_chuc_vu']);
         }
 
         return $query->paginate($filters['per_page'] ?? 15);

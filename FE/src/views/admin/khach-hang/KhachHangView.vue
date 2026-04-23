@@ -30,6 +30,7 @@ const loading = ref(false);
 const detailsLoading = ref(false);
 const actionLoading = ref(false); // Dành cho các thao tác nhanh
 const totalClients = ref(0);
+const pagination = reactive({ currentPage: 1, perPage: 5, total: 0, lastPage: 1 });
 
 // Toast
 const toast = reactive({ visible: false, message: "", type: "success" });
@@ -80,26 +81,47 @@ const columns = [
 
 // --- METHODS ---
 
-const fetchClients = async () => {
+const extractListAndPage = (response) => {
+  let listData = [];
+  let pageData = {};
+
+  if (Array.isArray(response?.data?.data?.data)) {
+    listData = response.data.data.data;
+    pageData = response.data.data;
+  } else if (Array.isArray(response?.data?.data)) {
+    listData = response.data.data;
+    pageData = response.data;
+  } else if (Array.isArray(response?.data)) {
+    listData = response.data;
+    pageData = response;
+  } else if (Array.isArray(response)) {
+    listData = response;
+    pageData = {};
+  }
+
+  return { listData, pageData };
+};
+
+const fetchClients = async (page = 1) => {
   loading.value = true;
   try {
     const params = {
       search: filters.search,
       tinh_trang: filters.tinh_trang,
       hang_thanh_vien: filters.hang_thanh_vien,
-      per_page: 50, // Lấy danh sách rộng để phục vụ hiển thị
+      page,
+      per_page: pagination.perPage,
     };
     const res = await adminApi.getClients(params);
 
-    let listData = [];
-    if (res.data?.data && Array.isArray(res.data.data)) {
-      listData = res.data.data;
-    } else if (Array.isArray(res.data)) {
-      listData = res.data;
-    }
+    const { listData, pageData } = extractListAndPage(res);
 
     clients.value = listData;
-    totalClients.value = listData.length;
+    pagination.currentPage = pageData.current_page || page;
+    pagination.perPage = pageData.per_page || pagination.perPage;
+    pagination.total = pageData.total || listData.length;
+    pagination.lastPage = pageData.last_page || 1;
+    totalClients.value = pagination.total;
   } catch (err) {
     console.error("Lỗi lấy danh sách khách hàng:", err);
   } finally {
@@ -111,7 +133,7 @@ const resetFilters = () => {
   filters.search = "";
   filters.tinh_trang = "";
   filters.hang_thanh_vien = "";
-  fetchClients();
+  fetchClients(1);
 };
 
 // Search handling with debounce
@@ -120,12 +142,12 @@ watch(
   () => filters.search,
   () => {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(fetchClients, 500);
+    searchTimeout = setTimeout(() => fetchClients(1), 500);
   },
 );
 
-watch(() => filters.tinh_trang, fetchClients);
-watch(() => filters.hang_thanh_vien, fetchClients);
+watch(() => filters.tinh_trang, () => fetchClients(1));
+watch(() => filters.hang_thanh_vien, () => fetchClients(1));
 
 const openDetailsModal = async (client) => {
   detailsLoading.value = true;
@@ -369,6 +391,42 @@ onMounted(() => {
           </div>
         </template>
       </BaseTable>
+
+      <!-- Pagination Section -->
+      <div class="pagination-container" v-if="pagination.total > 0">
+        <div class="page-info-left">
+          <span>Hiển thị:</span>
+          <select v-model="pagination.perPage" @change="fetchClients(1)" class="per-page-select">
+            <option :value="5">5</option>
+            <option :value="10">10</option>
+            <option :value="15">15</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+          </select>
+          <span>dòng / trang</span>
+          <span class="total-label">(Tổng: {{ pagination.total }} khách hàng)</span>
+        </div>
+
+        <div class="pagination-controls">
+          <BaseButton 
+            size="sm" 
+            variant="outline" 
+            :disabled="pagination.currentPage <= 1"
+            @click="fetchClients(pagination.currentPage - 1)"
+          >
+            ← Trước
+          </BaseButton>
+          <span class="page-number">Trang {{ pagination.currentPage }} / {{ pagination.lastPage }}</span>
+          <BaseButton 
+            size="sm" 
+            variant="outline" 
+            :disabled="pagination.currentPage >= pagination.lastPage"
+            @click="fetchClients(pagination.currentPage + 1)"
+          >
+            Sau →
+          </BaseButton>
+        </div>
+      </div>
     </BaseCard>
 
     <!-- Modal Xem chi tiết -->
@@ -507,6 +565,54 @@ onMounted(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.pagination-container {
+  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0 4px;
+}
+
+.page-info-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.per-page-select {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #1e293b;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.total-label {
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-number {
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 100px;
+  text-align: center;
 }
 
 .page-header {

@@ -172,6 +172,28 @@ const formatRatingDateTime = (iso) => {
   });
 };
 
+const getRankInfo = (rank) => {
+  const map = {
+    'dong': { label: 'Hạng Đồng', class: 'bg-orange-100 text-orange-800 border-orange-200' },
+    'bac': { label: 'Hạng Bạc', class: 'bg-slate-200 text-slate-800 border-slate-300' },
+    'vang': { label: 'Hạng Vàng', class: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+    'kim_cuong': { label: 'Hạng Kim Cương', class: 'bg-blue-100 text-blue-800 border-blue-200' },
+  };
+  return map[rank] || { label: 'Thành viên', class: 'bg-slate-100 text-slate-800 border-slate-200' };
+};
+
+const displayPoints = computed(() => {
+  const p = clientStore.user?.diem_thanh_vien;
+  if (p && typeof p === 'object') return p.diem_kha_dung ?? 0;
+  return p ?? 0;
+});
+
+const displayRank = computed(() => {
+  const p = clientStore.user?.diem_thanh_vien;
+  if (p && typeof p === 'object') return getRankInfo(p.hang_thanh_vien);
+  return getRankInfo(null);
+});
+
 const getStatusInfo = (status) => {
   const map = {
     dang_cho: { label: "Chờ thanh toán", class: "bg-amber-100 text-amber-700 border-amber-200" },
@@ -420,7 +442,7 @@ onUnmounted(() => {
                   <div class="w-full h-full bg-blue-100 rounded-full flex items-center justify-center text-3xl font-black text-blue-700">{{ avatarLetter }}</div>
                 </div>
                 <div class="mb-2">
-                  <span class="px-4 py-1.5 bg-yellow-100 text-yellow-800 font-bold text-xs rounded-full border border-yellow-200">Thành viên</span>
+                  <span :class="displayRank.class" class="px-4 py-1.5 font-bold text-xs rounded-full border">{{ displayRank.label }}</span>
                 </div>
               </div>
               <div>
@@ -453,24 +475,27 @@ onUnmounted(() => {
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div class="space-y-2">
-                    <label class="block text-sm font-semibold text-slate-700">Họ và tên <span class="text-red-500">*</span></label>
-                    <input type="text" v-model="profileForm.ho_va_ten" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors" />
+                    <label class="text-sm font-semibold text-slate-700 flex items-center h-6">Họ và tên <span class="text-red-500 ml-1">*</span></label>
+                    <input type="text" v-model="profileForm.ho_va_ten" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors h-[50px]" />
                   </div>
                   <div class="space-y-2">
-                    <label class="block text-sm font-semibold text-slate-700">Số điện thoại</label>
-                    <input type="tel" v-model="profileForm.so_dien_thoai" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="0901 234 567" />
+                    <label class="text-sm font-semibold text-slate-700 flex items-center h-6">Số điện thoại</label>
+                    <input type="tel" v-model="profileForm.so_dien_thoai" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors h-[50px]" placeholder="0901 234 567" />
                   </div>
                   <div class="space-y-2">
-                    <label class="block text-sm font-semibold text-slate-700 flex justify-between">Email <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded uppercase">Cố định</span></label>
-                    <input type="email" :value="profileForm.email" disabled class="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed" />
+                    <label class="text-sm font-semibold text-slate-700 flex items-center justify-between h-6">
+                      <span>Email</span>
+                      <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded uppercase font-bold">Cố định</span>
+                    </label>
+                    <input type="email" :value="profileForm.email" disabled class="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed h-[50px]" />
                   </div>
                   <div class="space-y-2">
-                    <label class="block text-sm font-semibold text-slate-700">Ngày sinh</label>
-                    <input type="date" v-model="profileForm.ngay_sinh" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors h-[48px]" />
+                    <label class="text-sm font-semibold text-slate-700 flex items-center h-6">Ngày sinh</label>
+                    <input type="date" v-model="profileForm.ngay_sinh" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors h-[50px]" />
                   </div>
                   <div class="space-y-2 md:col-span-2">
-                    <label class="block text-sm font-semibold text-slate-700">Địa chỉ liên hệ</label>
-                    <input type="text" v-model="profileForm.dia_chi" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="Số nhà, đường, thành phố..." />
+                    <label class="text-sm font-semibold text-slate-700 flex items-center h-6">Địa chỉ liên hệ</label>
+                    <input type="text" v-model="profileForm.dia_chi" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 transition-colors h-[50px]" placeholder="Số nhà, đường, thành phố..." />
                   </div>
                 </div>
                 <div class="pt-4 flex justify-end">
@@ -497,16 +522,16 @@ onUnmounted(() => {
                 </div>
                 <div class="space-y-2">
                   <label class="block text-sm font-semibold text-slate-700">Mật khẩu hiện tại</label>
-                  <input type="password" v-model="passwordForm.mat_khau_cu" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono" placeholder="••••••••" />
+                  <input type="password" v-model="passwordForm.mat_khau_cu" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]" placeholder="••••••••" />
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div class="space-y-2">
                     <label class="block text-sm font-semibold text-slate-700">Mật khẩu mới</label>
-                    <input type="password" v-model="passwordForm.mat_khau_moi" required minlength="6" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono" placeholder="••••••••" />
+                    <input type="password" v-model="passwordForm.mat_khau_moi" required minlength="6" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]" placeholder="••••••••" />
                   </div>
                   <div class="space-y-2">
                     <label class="block text-sm font-semibold text-slate-700">Xác nhận mật khẩu</label>
-                    <input type="password" v-model="passwordForm.mat_khau_moi_confirmation" required minlength="6" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono" placeholder="••••••••" />
+                    <input type="password" v-model="passwordForm.mat_khau_moi_confirmation" required minlength="6" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]" placeholder="••••••••" />
                   </div>
                 </div>
                 <div class="pt-4">
@@ -683,7 +708,7 @@ onUnmounted(() => {
               <div class="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
                 <span class="material-symbols-outlined text-5xl text-white">hotel_class</span>
               </div>
-              <h2 class="text-3xl font-bold text-slate-900 mb-2">{{ clientStore.user?.diem_thanh_vien ?? 0 }} điểm</h2>
+              <h2 class="text-3xl font-bold text-slate-900 mb-2">{{ displayPoints }} điểm</h2>
               <p class="text-slate-500 max-w-md mx-auto">Tích điểm khi đặt vé và nhận ưu đãi độc quyền.</p>
               <div class="mt-8 bg-slate-50 rounded-2xl p-6 text-left max-w-lg mx-auto">
                 <h3 class="font-bold text-slate-900 mb-3">Cách tích điểm</h3>
