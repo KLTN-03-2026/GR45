@@ -20,6 +20,7 @@ use App\Http\Controllers\MapProxyController;
 use App\Http\Controllers\LoaiXeController;
 use App\Http\Controllers\LoaiGheController;
 use App\Http\Controllers\RatingController;
+use App\Http\Controllers\BaoCaoController;
 
 Route::prefix('v1')->group(function () {
 
@@ -177,11 +178,11 @@ Route::prefix('v1')->group(function () {
             // Tổng hợp đánh giá các chuyến thuộc nhà xe
             Route::get('ratings', [RatingController::class, 'getCompanyRatings']);
 
-            // Thống kê nhà xe
-            Route::get('thong-ke', [OperatorThongKeController::class, 'index']);
-            Route::get('thong-ke/ves', [OperatorThongKeController::class, 've']);
-            Route::get('thong-ke/export/excel', [OperatorThongKeController::class, 'exportExcel']);
-            Route::get('thong-ke/export/pdf', [OperatorThongKeController::class, 'exportPdf']);
+            // Báo cáo / thống kê nhà xe
+            Route::get('thong-ke', [BaoCaoController::class, 'dashboard']);
+            Route::get('thong-ke/theo-tuyen', [BaoCaoController::class, 'theoTuyenDuong']);
+            Route::get('thong-ke/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe']);
+            Route::get('thong-ke/export', [BaoCaoController::class, 'export']);
         });
     });
 
