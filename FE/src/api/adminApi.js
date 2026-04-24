@@ -40,6 +40,7 @@ const adminApi = {
     return axiosClient.put(`/v1/admin/tai-xe/${id}`, data);
   },
   toggleDriverStatus: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/trang-thai`),
+  approveDriver: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/duyet`),
   deleteDriver: (id) => axiosClient.delete(`/v1/admin/tai-xe/${id}`),
 
   // --- QUẢN LÝ XE ---

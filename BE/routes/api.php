@@ -166,7 +166,7 @@ Route::prefix('v1')->group(function () {
             Route::get('tai-xe', [TaiXeController::class, 'index']);
             Route::get('tai-xe/{id}', [TaiXeController::class, 'show']);
             Route::post('tai-xe', [TaiXeController::class, 'store']);
-            Route::put('tai-xe/{id}', [TaiXeController::class, 'update']);
+            Route::match(['put', 'post'], 'tai-xe/{id}', [TaiXeController::class, 'update']);
             Route::patch('tai-xe/{id}/trang-thai', [TaiXeController::class, 'toggleStatus']);
             Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy']);
 
@@ -228,8 +228,9 @@ Route::prefix('v1')->group(function () {
             Route::get('tai-xe', [TaiXeController::class, 'index'])->middleware('permission:xem-tai-xe');
             Route::get('tai-xe/{id}', [TaiXeController::class, 'show'])->middleware('permission:xem-tai-xe');
             Route::post('tai-xe', [TaiXeController::class, 'store'])->middleware('permission:them-tai-xe');
-            Route::put('tai-xe/{id}', [TaiXeController::class, 'update'])->middleware('permission:sua-tai-xe');
+            Route::match(['put', 'post'], 'tai-xe/{id}', [TaiXeController::class, 'update'])->middleware('permission:sua-tai-xe');
             Route::patch('tai-xe/{id}/trang-thai', [TaiXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-tai-xe');
+            Route::patch('tai-xe/{id}/duyet', [TaiXeController::class, 'approve'])->middleware('permission:cap-nhat-trang-thai-tai-xe');
             Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy'])->middleware('permission:xoa-tai-xe');
 
             // Nhà xe
@@ -307,6 +308,7 @@ Route::prefix('v1')->group(function () {
         Route::get('tai-xe/{id}',                      [TaiXeController::class, 'show']);
         Route::post('tai-xe',                          [TaiXeController::class, 'store']);
         Route::patch('tai-xe/{id}/trang-thai',         [TaiXeController::class, 'toggleStatus']);
+        Route::patch('tai-xe/{id}/duyet',              [TaiXeController::class, 'approve']);
         Route::delete('tai-xe/{id}',                   [TaiXeController::class, 'destroy']);
 
         // Nhà xe
