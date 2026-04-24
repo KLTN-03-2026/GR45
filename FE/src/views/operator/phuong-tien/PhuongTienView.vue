@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import operatorApi from '@/api/operatorApi'
 import BaseTable from '@/components/common/BaseTable.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -7,16 +7,30 @@ import BaseInput from '@/components/common/BaseInput.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseToast from '@/components/common/BaseToast.vue'
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
 const toast = reactive({ visible: false, message: '', type: 'success' })
+let toastTimer = null
+let lastToast = { message: '', type: '', at: 0 }
 const showToast = (message, type = 'success') => {
+  const now = Date.now()
+  if (toast.visible && toast.message === message && toast.type === type) return
+  const globalLastToast = window.__gobusLastToast || { message: '', type: '', at: 0 }
+  if (
+    globalLastToast.message === message &&
+    globalLastToast.type === type &&
+    now - globalLastToast.at < 4000
+  ) return
+  if (lastToast.message === message && lastToast.type === type && now - lastToast.at < 4000) return
+  lastToast = { message, type, at: now }
+  window.__gobusLastToast = { message, type, at: now }
   toast.message = message
   toast.type = type
   toast.visible = true
-  setTimeout(() => { toast.visible = false }, 3500)
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.visible = false
+  }, 3500)
 }
 
-// ─── Danh sách xe ─────────────────────────────────────────────────────────────
 const loading = ref(false)
 const vehicles = ref([])
 const searchQuery = ref('')
@@ -25,432 +39,515 @@ const pagination = reactive({ currentPage: 1, perPage: 15, total: 0, lastPage: 1
 
 const tableColumns = [
   { key: 'id', label: 'ID' },
-  { key: 'bien_so', label: 'Biển số' },
-  { key: 'ten_xe', label: 'Tên xe' },
-  { key: 'loai_xe', label: 'Loại xe' },
-  { key: 'so_ghe', label: 'Số ghế / Tầng' },
-  { key: 'trang_thai', label: 'Trạng thái' },
-  { key: 'actions', label: 'Hành động' },
+  { key: 'bien_so', label: 'Biển Số' },
+  { key: 'ten_xe', label: 'Tên Xe' },
+  { key: 'loai_xe', label: 'Loại Xe' },
+  { key: 'so_ghe_thuc_te', label: 'Số Ghế' },
+  { key: 'trang_thai', label: 'Trạng Thái' },
+  { key: 'actions', label: 'Hành Động' },
 ]
 
-const getStatus = (status) => {
-  if (status === 'hoat_dong') return { text: 'Hoạt động', cls: 'status-active' }
-  if (status === 'bao_tri') return { text: 'Bảo trì', cls: 'status-info' }
-  if (status === 'cho_duyet') return { text: 'Chờ duyệt', cls: 'status-pending' }
-  return { text: 'Không rõ', cls: '' }
-}
-
-const getSeatStatus = (status) => {
-  if (status === 'hoat_dong') return { text: 'Hoạt động', cls: 'seat-ok' }
-  if (status === 'bao_tri_hoac_khoa') return { text: 'Bảo trì', cls: 'seat-broken' }
-  return { text: '', cls: '' }
+const getVehicleStatus = (status) => {
+  if (status === 'hoat_dong') return { text: 'Hoạt động', class: 'status-approved' }
+  if (status === 'bao_tri') return { text: 'Bảo trì', class: 'status-info' }
+  if (status === 'cho_duyet') return { text: 'Chờ duyệt', class: 'status-pending' }
+  return { text: 'Không rõ', class: '' }
 }
 
 const extractListAndPage = (response) => {
-  const d = response?.data
-  if (Array.isArray(d?.data?.data)) return { listData: d.data.data, pageData: d.data }
-  if (Array.isArray(d?.data)) return { listData: d.data, pageData: d }
-  if (Array.isArray(d)) return { listData: d, pageData: {} }
-  return { listData: [], pageData: {} }
+  let listData = []
+  let pageData = {}
+
+  if (Array.isArray(response?.data?.data?.data)) {
+    listData = response.data.data.data
+    pageData = response.data
+  } else if (Array.isArray(response?.data?.data)) {
+    listData = response.data.data
+    pageData = response.data
+  } else if (Array.isArray(response?.data)) {
+    listData = response.data
+    pageData = response
+  } else if (Array.isArray(response)) {
+    listData = response
+    pageData = {}
+  }
+
+  return { listData, pageData }
 }
 
 const fetchVehicles = async (page = 1) => {
   try {
     loading.value = true
-    const res = await operatorApi.getVehicles({
+    const response = await operatorApi.getVehicles({
       page,
       per_page: pagination.perPage,
       search: searchQuery.value || undefined,
       trang_thai: filterStatus.value || undefined,
     })
-    const { listData, pageData } = extractListAndPage(res)
+
+    const { listData, pageData } = extractListAndPage(response)
+
     vehicles.value = listData
     pagination.currentPage = pageData.current_page || page
     pagination.perPage = pageData.per_page || pagination.perPage
     pagination.total = pageData.total || listData.length
     pagination.lastPage = pageData.last_page || 1
-  } catch {
+  } catch (error) {
+    console.error('Lỗi tải danh sách xe:', error)
     showToast('Không thể tải danh sách xe!', 'error')
   } finally {
     loading.value = false
   }
 }
 
-// ─── Danh mục ─────────────────────────────────────────────────────────────────
-const loaiXeList = ref([])
-const loaiGheList = ref([])
+const handleSearch = () => {
+  fetchVehicles(1)
+}
 
-const fetchMeta = async () => {
+const resetFilter = () => {
+  searchQuery.value = ''
+  filterStatus.value = ''
+  fetchVehicles(1)
+}
+
+const isFormModal = ref(false)
+const isEditMode = ref(false)
+const currentVehicleId = ref(null)
+const formLoading = ref(false)
+const loaiXeList = ref([])
+const loaiXeLoading = ref(false)
+const driverList = ref([])
+const driverLoading = ref(false)
+
+const ensureLoaiXe = async (force = false) => {
+  if (!force && loaiXeList.value.length) return
   try {
-    const [lx, lg] = await Promise.all([
-      operatorApi.getLoaiXe(),
-      operatorApi.getLoaiGhe(),
-    ])
-    loaiXeList.value = lx?.data?.data ?? lx?.data ?? []
-    loaiGheList.value = lg?.data?.data ?? lg?.data ?? []
-  } catch {
-    showToast('Không thể tải danh mục. Vui lòng tải lại trang.', 'error')
+    loaiXeLoading.value = true
+    const res = await operatorApi.getLoaiXe()
+    loaiXeList.value = Array.isArray(res?.data) ? res.data : []
+  } catch (error) {
+    console.error('Lỗi tải loại xe:', error)
+    showToast(error.response?.data?.message || 'Không tải được danh sách loại xe.', 'error')
+  } finally {
+    loaiXeLoading.value = false
   }
 }
 
-// ─── Modal Tạo xe (2 bước) ───────────────────────────────────────────────────
-const createModal = ref(false)
-const createStep = ref(1) // 1 = thông tin, 2 = sơ đồ ghế
-const createLoading = ref(false)
+const ensureDrivers = async (force = false) => {
+  if (!force && driverList.value.length) return
+  try {
+    driverLoading.value = true
+    const res = await operatorApi.getDrivers({ per_page: 200, tinh_trang: 'hoat_dong' })
+    const raw = res?.data
+    if (Array.isArray(raw?.data)) {
+      driverList.value = raw.data
+    } else if (Array.isArray(raw)) {
+      driverList.value = raw
+    } else {
+      driverList.value = []
+    }
+  } catch (error) {
+    console.error('Lỗi tải tài xế:', error)
+    showToast(error.response?.data?.message || 'Không tải được danh sách tài xế.', 'error')
+  } finally {
+    driverLoading.value = false
+  }
+}
 
-const selectedLoaiXe = computed(() =>
-  loaiXeList.value.find(lx => lx.id === Number(createForm.id_loai_xe)) || null
-)
-
-const createForm = reactive({
+const initialFormData = () => ({
   bien_so: '',
   ten_xe: '',
   id_loai_xe: '',
+  id_tai_xe_chinh: '',
+  bien_nhan_dang: '',
   so_ghe_thuc_te: '',
-  so_tang: 1,
-  tien_nghi: '',
-  bien_nhan_dang: '',
-  id_tai_xe_chinh: '',
 })
 
-// Khi chọn loại xe → auto-fill so_tang và so_ghe_thuc_te
-watch(() => createForm.id_loai_xe, (val) => {
-  const lx = loaiXeList.value.find(x => x.id === Number(val))
-  if (lx) {
-    createForm.so_tang = lx.so_tang ?? 1
-    createForm.so_ghe_thuc_te = lx.so_ghe_mac_dinh ?? ''
-    createForm.tien_nghi = lx.tien_nghi ?? ''
-    // Reset và generate ghế
-    generateGhes()
-  }
-})
+const formData = reactive(initialFormData())
+const formErrors = ref({})
+const seatErrors = ref({})
 
-watch(() => createForm.so_tang, () => generateGhes())
-watch(() => createForm.so_ghe_thuc_te, () => generateGhes())
-
-// ─── Sơ đồ ghế tạm thời ──────────────────────────────────────────────────────
-const ghes = ref([]) // [{ ma_ghe, tang, id_loai_ghe }]
-
-const defaultLoaiGheId = computed(() => loaiGheList.value[0]?.id ?? '')
-
-/**
- * Sinh danh sách ghế tự động theo số tầng & số ghế.
- * Nếu 1 tầng: A01→A{n}
- * Nếu 2 tầng: chia đều, tầng 1 = A01…, tầng 2 = B01…
- */
-const generateGhes = () => {
-  const total = parseInt(createForm.so_ghe_thuc_te) || 0
-  const tang = parseInt(createForm.so_tang) || 1
-
-  if (total === 0) { ghes.value = []; return }
-
-  const result = []
-  const perFloor = Math.ceil(total / tang)
-
-  for (let t = 1; t <= tang; t++) {
-    const prefix = String.fromCharCode(64 + t) // A, B
-    const count = t < tang ? perFloor : total - perFloor * (tang - 1)
-    for (let i = 1; i <= count; i++) {
-      result.push({
-        ma_ghe: `${prefix}${String(i).padStart(2, '0')}`,
-        tang: t,
-        id_loai_ghe: defaultLoaiGheId.value || '',
-      })
-    }
-  }
-  ghes.value = result
+const seatFieldError = (key) => {
+  const raw = seatErrors.value?.[key]
+  if (raw == null || raw === '') return ''
+  if (Array.isArray(raw)) return raw[0] != null ? String(raw[0]) : ''
+  return String(raw)
 }
 
-const ghesByFloor = computed(() => {
-  const map = {}
-  for (const g of ghes.value) {
-    if (!map[g.tang]) map[g.tang] = []
-    map[g.tang].push(g)
-  }
-  return map
-})
-
-const addGhe = (tang) => {
-  const floor = ghes.value.filter(g => g.tang === tang)
-  const prefix = String.fromCharCode(64 + tang)
-  const idx = floor.length + 1
-  ghes.value.push({
-    ma_ghe: `${prefix}${String(idx).padStart(2, '0')}`,
-    tang,
-    id_loai_ghe: defaultLoaiGheId.value || '',
-  })
+const clearSeatError = (key) => {
+  if (!seatErrors.value[key]) return
+  const next = { ...seatErrors.value }
+  delete next[key]
+  seatErrors.value = next
 }
 
-const removeGhe = (index) => {
-  ghes.value.splice(index, 1)
-}
-
-const openCreateModal = () => {
-  createStep.value = 1
-  Object.assign(createForm, {
-    bien_so: '', ten_xe: '', id_loai_xe: '', so_ghe_thuc_te: '',
-    so_tang: 1, tien_nghi: '', bien_nhan_dang: '', id_tai_xe_chinh: '',
-  })
-  ghes.value = []
-  createModal.value = true
-}
-
-const goToStep2 = () => {
-  if (!createForm.bien_so.trim()) { showToast('Vui lòng nhập biển số xe.', 'error'); return }
-  if (!createForm.ten_xe.trim()) { showToast('Vui lòng nhập tên xe.', 'error'); return }
-  if (!createForm.id_loai_xe) { showToast('Vui lòng chọn loại xe.', 'error'); return }
-  if (!createForm.so_ghe_thuc_te || Number(createForm.so_ghe_thuc_te) < 1) {
-    showToast('Vui lòng nhập số ghế hợp lệ (ít nhất 1).', 'error'); return
-  }
-  if (ghes.value.length === 0) generateGhes()
-  createStep.value = 2
-}
-
-const submitCreate = async () => {
-  if (createLoading.value) return
-  createLoading.value = true
-
-  try {
-    // Validate bước 2
-    if (ghes.value.length === 0) {
-      showToast('Sơ đồ ghế không được để trống.', 'error');
-      createLoading.value = false;
-      return
-    }
-    const maGhes = ghes.value.map(g => g.ma_ghe.trim().toUpperCase())
-    if (new Set(maGhes).size !== maGhes.length) {
-      showToast('Có mã ghế bị trùng. Vui lòng kiểm tra lại.', 'error');
-      createLoading.value = false;
-      return
-    }
-    if (ghes.value.some(g => !g.id_loai_ghe)) {
-      showToast('Vui lòng chọn loại ghế cho tất cả ghế.', 'error');
-      createLoading.value = false;
-      return
-    }
-    if (ghes.value.length !== Number(createForm.so_ghe_thuc_te)) {
-      showToast(`Số ghế trong sơ đồ (${ghes.value.length}) không khớp với số ghế thực tế (${createForm.so_ghe_thuc_te}).`, 'error');
-      createLoading.value = false;
-      return
-    }
-
-    const payload = {
-      bien_so: createForm.bien_so.trim(),
-      ten_xe: createForm.ten_xe.trim(),
-      id_loai_xe: Number(createForm.id_loai_xe),
-      so_ghe_thuc_te: Number(createForm.so_ghe_thuc_te),
-      so_tang: Number(createForm.so_tang),
-      tien_nghi: createForm.tien_nghi || undefined,
-      bien_nhan_dang: createForm.bien_nhan_dang || undefined,
-      id_tai_xe_chinh: createForm.id_tai_xe_chinh ? Number(createForm.id_tai_xe_chinh) : undefined,
-      ghes: ghes.value.map(g => ({
-        ma_ghe: g.ma_ghe.trim().toUpperCase(),
-        tang: Number(g.tang),
-        id_loai_ghe: Number(g.id_loai_ghe),
-      })),
-    }
-    await operatorApi.createVehicle(payload)
-    showToast('Thêm xe thành công! Đang chờ Admin duyệt.', 'success')
-    createModal.value = false
-    fetchVehicles(1)
-  } catch (err) {
-    const errors = err.response?.data?.errors
-    const msg = errors
-      ? Object.values(errors).flat()[0]
-      : (err.response?.data?.message || 'Thêm xe thất bại!')
-    showToast(msg, 'error')
-  } finally {
-    createLoading.value = false
+const onSeatCodeInput = (value) => {
+  if (String(value ?? '').length > 0) {
+    clearSeatError('ma_ghe')
   }
 }
 
-// ─── Modal Sửa xe ─────────────────────────────────────────────────────────────
-const editModal = ref(false)
-const editLoading = ref(false)
-const currentEditId = ref(null)
-const editTab = ref('basic') // 'basic', 'images', 'docs'
+const openCreateModal = async () => {
+  await ensureLoaiXe()
+  await ensureDrivers()
+  isEditMode.value = false
+  currentVehicleId.value = null
+  Object.assign(formData, initialFormData())
+  formErrors.value = {}
+  isFormModal.value = true
+}
 
-const editForm = reactive({
-  bien_so: '',
-  ten_xe: '',
-  bien_nhan_dang: '',
-  tien_nghi: '',
-  id_tai_xe_chinh: '',
-  // Hồ sơ xe
-  so_dang_kiem: '',
-  ngay_dang_kiem: '',
-  ngay_het_han_dang_kiem: '',
-  so_bao_hiem: '',
-  ngay_hieu_luc_bao_hiem: '',
-  ngay_het_han_bao_hiem: '',
-  ghi_chu: '',
-})
-
-// File được chọn để upload
-const editFiles = reactive({
-  hinh_xe_truoc: null,
-  hinh_xe_sau: null,
-  hinh_bien_so: null,
-  hinh_dang_kiem: null,
-  hinh_bao_hiem: null,
-})
-
-// Preview URL (ảnh đã có hoặc ảnh vừa chọn)
-const editPreviews = reactive({
-  hinh_xe_truoc: '',
-  hinh_xe_sau: '',
-  hinh_bien_so: '',
-  hinh_dang_kiem: '',
-  hinh_bao_hiem: '',
-})
-
-const openEditModal = (vehicle) => {
-  currentEditId.value = vehicle.id
-  editTab.value = 'basic'
-
-  Object.assign(editForm, {
+const openEditModal = async (vehicle) => {
+  await ensureLoaiXe()
+  await ensureDrivers()
+  isEditMode.value = true
+  currentVehicleId.value = vehicle.id
+  Object.assign(formData, {
     bien_so: vehicle.bien_so || '',
     ten_xe: vehicle.ten_xe || '',
-    bien_nhan_dang: vehicle.bien_nhan_dang || '',
-    tien_nghi: vehicle.thong_tin_cai_dat?.tien_nghi || '',
+    id_loai_xe: vehicle.id_loai_xe || vehicle.loai_xe?.id || '',
     id_tai_xe_chinh: vehicle.id_tai_xe_chinh || '',
-
-    so_dang_kiem: vehicle.ho_so_xe?.so_dang_kiem || '',
-    ngay_dang_kiem: vehicle.ho_so_xe?.ngay_dang_kiem || '',
-    ngay_het_han_dang_kiem: vehicle.ho_so_xe?.ngay_het_han_dang_kiem || '',
-    so_bao_hiem: vehicle.ho_so_xe?.so_bao_hiem || '',
-    ngay_hieu_luc_bao_hiem: vehicle.ho_so_xe?.ngay_hieu_luc_bao_hiem || '',
-    ngay_het_han_bao_hiem: vehicle.ho_so_xe?.ngay_het_han_bao_hiem || '',
-    ghi_chu: vehicle.ho_so_xe?.ghi_chu || '',
+    bien_nhan_dang: vehicle.bien_nhan_dang || '',
+    so_ghe_thuc_te: vehicle.so_ghe_thuc_te || '',
   })
-
-  // Reset files
-  Object.keys(editFiles).forEach(key => editFiles[key] = null)
-
-  // Gán preview từ dữ liệu hiên có
-  Object.assign(editPreviews, {
-    hinh_xe_truoc: vehicle.ho_so_xe?.hinh_xe_truoc || '',
-    hinh_xe_sau: vehicle.ho_so_xe?.hinh_xe_sau || '',
-    hinh_bien_so: vehicle.ho_so_xe?.hinh_bien_so || '',
-    hinh_dang_kiem: vehicle.ho_so_xe?.hinh_dang_kiem || '',
-    hinh_bao_hiem: vehicle.ho_so_xe?.hinh_bao_hiem || '',
-  })
-  
-  editModal.value = true
+  formErrors.value = {}
+  isFormModal.value = true
 }
 
-const handleFileChange = (e, field) => {
-  const file = e.target.files[0]
-  if (!file) {
-    editFiles[field] = null
-    return
+const buildPayload = () => {
+  const selectedLoaiXe = loaiXeList.value.find((lx) => Number(lx.id) === Number(formData.id_loai_xe))
+  const payload = {
+    bien_so: String(formData.bien_so || '').trim(),
+    ten_xe: String(formData.ten_xe || '').trim(),
+    id_loai_xe: Number(formData.id_loai_xe),
+    so_ghe_thuc_te: Number(selectedLoaiXe?.so_ghe_mac_dinh || 0),
   }
-  editFiles[field] = file
-  // Preview
-  const reader = new FileReader()
-  reader.onload = (ev) => {
-    editPreviews[field] = ev.target.result
+
+  if (formData.id_tai_xe_chinh !== '' && formData.id_tai_xe_chinh !== null) {
+    payload.id_tai_xe_chinh = Number(formData.id_tai_xe_chinh)
   }
-  reader.readAsDataURL(file)
+
+  if (String(formData.bien_nhan_dang || '').trim()) {
+    payload.bien_nhan_dang = String(formData.bien_nhan_dang).trim()
+  }
+
+  return payload
 }
 
-const submitEdit = async () => {
-  if (editLoading.value) return
-  if (!editForm.bien_so.trim()) { 
-    showToast('Biển số không được để trống.', 'error'); 
-    editTab.value = 'basic';
-    return;
-  }
-  
+const submitForm = async () => {
+  if (formLoading.value) return
   try {
-    editLoading.value = true
+    formLoading.value = true
+    formErrors.value = {}
+    const payload = buildPayload()
 
-    // 1. Cập nhật thông tin cơ bản
-    const basicPayload = {
-      bien_so: editForm.bien_so.trim(),
-      ten_xe: editForm.ten_xe.trim() || undefined,
-      bien_nhan_dang: editForm.bien_nhan_dang || undefined,
-      tien_nghi: editForm.tien_nghi || undefined,
-      id_tai_xe_chinh: editForm.id_tai_xe_chinh ? Number(editForm.id_tai_xe_chinh) : undefined,
-    }
-    await operatorApi.updateVehicle(currentEditId.value, basicPayload)
-
-    // 2. Cập nhật Hồ sơ xe + Hình ảnh
-    const formData = new FormData()
-    const textFields = ['so_dang_kiem', 'ngay_dang_kiem', 'ngay_het_han_dang_kiem', 'so_bao_hiem', 'ngay_hieu_luc_bao_hiem', 'ngay_het_han_bao_hiem', 'ghi_chu']
-    textFields.forEach(f => {
-      if (editForm[f]) formData.append(f, editForm[f])
-    })
-    const imageFields = ['hinh_xe_truoc', 'hinh_xe_sau', 'hinh_bien_so', 'hinh_dang_kiem', 'hinh_bao_hiem']
-    let hasHoSoUpdate = textFields.some(f => editForm[f]) || imageFields.some(f => editFiles[f])
-    
-    let docRes = null
-    if (hasHoSoUpdate) {
-      imageFields.forEach(f => {
-        if (editFiles[f]) formData.append(f, editFiles[f])
-      })
-      docRes = await operatorApi.updateVehicleDocument(currentEditId.value, formData)
+    if (isEditMode.value) {
+      await operatorApi.updateVehicle(currentVehicleId.value, payload)
+      showToast('Cập nhật xe thành công! Đang chờ Admin duyệt lại.', 'success')
+    } else {
+      await operatorApi.createVehicle(payload)
+      showToast('Thêm xe mới thành công! Đang chờ Admin duyệt.', 'success')
     }
 
-    const docMsg = docRes?.message ? ' ' + docRes.message : ''
-    showToast('Cập nhật xe thành công!' + docMsg, 'success')
-    editModal.value = false
-    fetchVehicles(pagination.currentPage)
-  } catch (err) {
-    const errors = err.response?.data?.errors
-    const msg = errors
-      ? Object.values(errors).flat()[0]
-      : (err.response?.data?.message || 'Cập nhật thất bại!')
-    showToast(msg, 'error')
+    isFormModal.value = false
+    fetchVehicles(isEditMode.value ? pagination.currentPage : 1)
+  } catch (error) {
+    console.error('Lỗi lưu xe:', error)
+    const backendErrors = error.response?.data?.errors
+    if (backendErrors) {
+      formErrors.value = backendErrors
+    }
+    const message = backendErrors
+      ? Object.values(backendErrors).flat()[0]
+      : (error.response?.data?.message || 'Lưu xe thất bại!')
+    showToast(message, 'error')
   } finally {
-    editLoading.value = false
+    formLoading.value = false
   }
 }
 
-// ─── Modal sơ đồ ghế ──────────────────────────────────────────────────────────
-const seatModal = reactive({ show: false, loading: false, data: null, updatingId: null })
 
-const openSeatModal = async (vehicle) => {
-  seatModal.show = true
-  seatModal.loading = true
-  seatModal.data = null
+const detailModal = reactive({ show: false, loading: false, data: null })
+
+const seatModal = reactive({
+  show: false,
+  vehicleId: null,
+  driverId: null,
+  vehicleName: '',
+  loading: false,
+  saving: false,
+  seats: [],
+  editingId: null,
+  form: { id_loai_ghe: '', ma_ghe: '', tang: 1, trang_thai: 'hoat_dong' },
+})
+const seatDeleteModal = reactive({ show: false, seat: null, loading: false })
+const seatTypeList = ref([])
+const seatTypeLoading = ref(false)
+
+const resetSeatForm = () => {
+  seatModal.editingId = null
+  seatModal.form = { id_loai_ghe: '', ma_ghe: '', tang: 1, trang_thai: 'hoat_dong' }
+  seatDeleteModal.show = false
+  seatDeleteModal.seat = null
+  seatErrors.value = {}
+}
+
+const ensureSeatTypes = async (force = false) => {
+  if (!force && seatTypeList.value.length) return
+  seatTypeLoading.value = true
   try {
-    const res = await operatorApi.getVehicleSeats(vehicle.id)
-    seatModal.data = res?.data?.data ?? res?.data ?? null
-  } catch {
-    showToast('Không thể tải sơ đồ ghế!', 'error')
-    seatModal.show = false
+    const res = await operatorApi.getSeatTypes()
+    const raw = res?.data
+    if (Array.isArray(raw?.data)) {
+      seatTypeList.value = raw.data
+    } else if (Array.isArray(raw)) {
+      seatTypeList.value = raw
+    } else {
+      seatTypeList.value = []
+    }
+  } catch (error) {
+    showToast(error.response?.data?.message || 'Không tải được loại ghế.', 'error')
+  } finally {
+    seatTypeLoading.value = false
+  }
+}
+
+const loadSeats = async () => {
+  seatModal.loading = true
+  try {
+    const res = await operatorApi.getVehicleSeats(seatModal.vehicleId)
+    seatModal.seats = res?.data || []
+  } catch (error) {
+    showToast(error.response?.data?.message || 'Không tải được danh sách ghế!', 'error')
   } finally {
     seatModal.loading = false
   }
 }
 
-const toggleSeatStatus = async (vehicleId, ghe) => {
-  const newStatus = ghe.trang_thai === 'hoat_dong' ? 'bao_tri_hoac_khoa' : 'hoat_dong'
-  seatModal.updatingId = ghe.id
-  try {
-    await operatorApi.updateSeatStatus(vehicleId, ghe.id, { trang_thai: newStatus })
-    ghe.trang_thai = newStatus
-    const label = newStatus === 'bao_tri_hoac_khoa' ? 'Bảo trì' : 'Hoạt động'
-    showToast(`Ghế ${ghe.ma_ghe} → ${label}`, 'success')
-  } catch (err) {
-    showToast(err.response?.data?.message || 'Cập nhật thất bại!', 'error')
-  } finally {
-    seatModal.updatingId = null
+const openSeatModal = async (vehicle) => {
+  seatModal.vehicleId = vehicle.id
+  seatModal.driverId = vehicle.id_tai_xe_chinh || null
+  seatModal.vehicleName = vehicle.ten_xe || vehicle.bien_so
+  applySeatDirectionFromDriver(seatModal.driverId)
+  seatModal.show = true
+  resetSeatForm()
+  await ensureSeatTypes()
+  await loadSeats()
+}
+
+
+const getSeatMapByFloor = () => {
+  const visibleSeats = seatModal.seats.filter((seat) => seat.trang_thai !== 'an_ghe')
+
+  const grouped = visibleSeats.reduce((acc, seat) => {
+    const floor = Number(seat.tang || 1)
+    if (!acc[floor]) acc[floor] = []
+    acc[floor].push(seat)
+    return acc
+  }, {})
+
+  return Object.entries(grouped)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([floor, seats]) => ({
+      floor: Number(floor),
+      seats,
+    }))
+}
+
+const seatStats = computed(() => {
+  const visibleSeats = seatModal.seats.filter((seat) => seat.trang_thai !== 'an_ghe')
+  const total = visibleSeats.length
+  const active = visibleSeats.filter((seat) => seat.trang_thai === 'hoat_dong').length
+  const locked = visibleSeats.filter((seat) => seat.trang_thai === 'bao_tri_hoac_khoa').length
+  const booked = visibleSeats.filter((seat) => seat.dang_co_ve).length
+  return { total, active, locked, booked }
+})
+
+const editingSeatBooked = computed(() => {
+  if (!seatModal.editingId) return false
+  const s = seatModal.seats.find((x) => x.id === seatModal.editingId)
+  return !!s?.dang_co_ve
+})
+
+const SEAT_ROWS_LS_KEY = 'gobus_seat_map_rows_per_floor'
+const seatRowsPerFloor = ref(2)
+const seatDirection = ref('driver_left')
+const SEAT_DIRECTION_LS_PREFIX = 'gobus_seat_direction_driver_'
+
+const getSeatDirectionStorageKey = (driverId) => `${SEAT_DIRECTION_LS_PREFIX}${driverId || 'none'}`
+
+const applySeatDirectionFromDriver = (driverId) => {
+  const stored = localStorage.getItem(getSeatDirectionStorageKey(driverId))
+  seatDirection.value = stored === 'driver_right' ? 'driver_right' : 'driver_left'
+}
+
+const handleSeatDirectionChange = () => {
+  if (seatModal.seats.some((s) => s.dang_co_ve)) {
+    applySeatDirectionFromDriver(seatModal.driverId)
+    showToast('Đã có vé, không thể đổi vị trí tài xế.', 'error')
+    return
+  }
+  localStorage.setItem(getSeatDirectionStorageKey(seatModal.driverId), seatDirection.value)
+}
+
+const splitSeatsIntoRows = (seats, numRows) => {
+  const list = Array.isArray(seats) ? [...seats] : []
+  if (!list.length) return []
+  const rows = Math.min(8, Math.max(1, Number(numRows) || 1))
+  const perRow = Math.ceil(list.length / rows)
+  const out = []
+  for (let i = 0; i < list.length; i += perRow) {
+    out.push(list.slice(i, i + perRow))
+  }
+  return out
+}
+
+/** Thứ tự mã ghế cố định; trái/phải chỉ đổi nhãn (TX) qua isDriverSeat */
+const getDisplayedRow = (row) => {
+  if (!Array.isArray(row)) return []
+  return [...row]
+}
+
+const isDriverSeat = (seat, floorNumber, row, rowIndex) => {
+  if (!seat || floorNumber !== 1 || rowIndex !== 0 || !Array.isArray(row) || !row.length) return false
+  const driverSeat = seatDirection.value === 'driver_right' ? row[row.length - 1] : row[0]
+  return Number(driverSeat?.id) === Number(seat.id)
+}
+
+const seatTooltipText = (seat, floorNumber, row, rowIndex) => {
+  const roleText = isDriverSeat(seat, floorNumber, row, rowIndex) ? ' · Ghế tài xế' : ''
+  const statusText = seat.trang_thai !== 'hoat_dong'
+    ? 'Khóa/Bảo trì'
+    : seat.dang_co_ve
+      ? 'Đã đặt (có vé)'
+      : 'Hoạt động'
+  return `Click để chọn/sửa · Double-click để sửa nhanh — ${seat.ma_ghe}${roleText} (${statusText})`
+}
+
+
+watch(seatRowsPerFloor, (v) => {
+  const n = Math.min(8, Math.max(1, Number(v) || 2))
+  if (n !== Number(v)) seatRowsPerFloor.value = n
+  localStorage.setItem(SEAT_ROWS_LS_KEY, String(n))
+})
+
+const editSeat = (seat) => {
+  if (seat?.dang_co_ve) {
+    showToast('Ghế đã có vé đặt, không thể sửa hoặc xóa.', 'error')
+    return
+  }
+  seatModal.editingId = seat.id
+  seatModal.form = {
+    id_loai_ghe: seat.id_loai_ghe || '',
+    ma_ghe: seat.ma_ghe || '',
+    tang: seat.tang || 1,
+    trang_thai: seat.trang_thai || 'hoat_dong',
   }
 }
 
-// ─── Chi tiết xe ──────────────────────────────────────────────────────────────
-const detailModal = reactive({ show: false, loading: false, data: null })
+const handleSeatTileClick = (seat) => {
+  if (seatModal.saving) return
+  editSeat(seat)
+}
+
+const submitSeat = async () => {
+  if (seatModal.editingId && editingSeatBooked.value) {
+    showToast('Ghế đã có vé đặt, không thể cập nhật.', 'error')
+    return
+  }
+  seatErrors.value = {}
+  const maGhe = String(seatModal.form.ma_ghe || '').trim()
+  if (!maGhe) {
+    seatErrors.value = { ma_ghe: ['Vui lòng nhập mã ghế.'] }
+    showToast('Vui lòng nhập mã ghế.', 'error')
+    return
+  }
+  if (!seatModal.form.id_loai_ghe) {
+    seatErrors.value = { id_loai_ghe: ['Vui lòng chọn loại ghế.'] }
+    showToast('Vui lòng chọn loại ghế.', 'error')
+    return
+  }
+  try {
+    seatModal.saving = true
+    const payload = {
+      id_loai_ghe: Number(seatModal.form.id_loai_ghe),
+      ma_ghe: String(seatModal.form.ma_ghe || '').trim(),
+      tang: Number(seatModal.form.tang),
+      trang_thai: String(seatModal.form.trang_thai || 'hoat_dong'),
+    }
+    if (seatModal.editingId) {
+      await operatorApi.updateVehicleSeat(seatModal.vehicleId, seatModal.editingId, payload)
+      showToast('Cập nhật ghế thành công!', 'success')
+    } else {
+      await operatorApi.createVehicleSeat(seatModal.vehicleId, payload)
+      showToast('Thêm ghế thành công!', 'success')
+    }
+    resetSeatForm()
+    await loadSeats()
+  } catch (error) {
+    const backendErrors = error.response?.data?.errors
+    if (backendErrors) {
+      seatErrors.value = backendErrors
+    }
+    const message = backendErrors
+      ? Object.values(backendErrors).flat()[0]
+      : (error.response?.data?.message || 'Lưu ghế thất bại!')
+    showToast(message, 'error')
+  } finally {
+    seatModal.saving = false
+  }
+}
+
+
+const openDeleteSeatModal = () => {
+  if (!seatModal.editingId) return
+  const seat = seatModal.seats.find((item) => item.id === seatModal.editingId) || null
+  if (!seat) {
+    showToast('Không tìm thấy ghế để xóa.', 'error')
+    return
+  }
+  if (seat.dang_co_ve) {
+    showToast('Ghế đã có vé đặt, không thể xóa.', 'error')
+    return
+  }
+  seatDeleteModal.seat = seat
+  seatDeleteModal.show = true
+}
+
+const deleteSeat = async (seat) => {
+  if (!seat?.id) return
+  try {
+    await operatorApi.deleteVehicleSeat(seatModal.vehicleId, seat.id)
+    if (seatModal.editingId === seat.id) resetSeatForm()
+    seatDeleteModal.show = false
+    seatDeleteModal.seat = null
+    showToast('Xóa ghế thành công!', 'success')
+    await loadSeats()
+  } catch (error) {
+    showToast(error.response?.data?.message || 'Không thể xóa ghế!', 'error')
+  }
+}
+
+const confirmDeleteSeat = async () => {
+  if (seatDeleteModal.loading || !seatDeleteModal.seat) return
+  try {
+    seatDeleteModal.loading = true
+    await deleteSeat(seatDeleteModal.seat)
+  } finally {
+    seatDeleteModal.loading = false
+  }
+}
 
 const openDetailModal = async (vehicle) => {
   detailModal.show = true
   detailModal.loading = true
   detailModal.data = null
+
   try {
-    const res = await operatorApi.getVehicleDetails(vehicle.id)
-    detailModal.data = res?.data?.data ?? res?.data ?? null
-  } catch {
+    const response = await operatorApi.getVehicleDetails(vehicle.id)
+    detailModal.data = response?.data || response
+  } catch (error) {
+    console.error('Lỗi tải chi tiết xe:', error)
     showToast('Không thể tải chi tiết xe!', 'error')
     detailModal.show = false
   } finally {
@@ -458,713 +555,973 @@ const openDetailModal = async (vehicle) => {
   }
 }
 
-onMounted(async () => {
-  await fetchMeta()
+const deleteModal = reactive({ show: false, id: null, bienSo: '', loading: false })
+
+const openDeleteModal = (vehicle) => {
+  deleteModal.show = true
+  deleteModal.id = vehicle.id
+  deleteModal.bienSo = vehicle.bien_so
+}
+
+const confirmDelete = async () => {
+  if (deleteModal.loading) return
+  try {
+    deleteModal.loading = true
+    await operatorApi.deleteVehicle(deleteModal.id)
+    showToast('Xóa xe thành công!', 'success')
+    deleteModal.show = false
+    await fetchVehicles(pagination.currentPage)
+  } catch (error) {
+    console.error('Lỗi xóa xe:', error)
+    showToast(error.response?.data?.message || 'Không thể xóa xe!', 'error')
+  } finally {
+    deleteModal.loading = false
+  }
+}
+
+onMounted(() => {
+  const raw = localStorage.getItem(SEAT_ROWS_LS_KEY)
+  if (raw != null) {
+    const n = parseInt(raw, 10)
+    if (!Number.isNaN(n)) seatRowsPerFloor.value = Math.min(8, Math.max(1, n))
+  }
   fetchVehicles()
 })
 </script>
 
 <template>
-  <div class="pt-page">
+  <div class="operator-page">
     <BaseToast :visible="toast.visible" :message="toast.message" :type="toast.type" />
 
-    <!-- Header -->
-    <div class="pt-header">
+    <div class="page-header">
       <div>
-        <h1 class="pt-title">Quản Lý Phương Tiện</h1>
-        <p class="pt-sub">Thêm xe với sơ đồ ghế. Mọi thay đổi sẽ về trạng thái <strong>Chờ Admin duyệt</strong>.</p>
+        <h1 class="page-title">Quản Lý Phương Tiện</h1>
+        <p class="page-sub">Quản lý xe thuộc nhà xe của bạn. Mọi thay đổi sẽ chuyển về trạng thái chờ Admin duyệt.</p>
       </div>
       <BaseButton variant="primary" @click="openCreateModal">+ Thêm Xe Mới</BaseButton>
     </div>
 
-    <!-- Filter -->
-    <div class="pt-filter">
-      <div class="filter-inner">
-        <div class="search-wrap">
-          <BaseInput v-model="searchQuery" placeholder="Tìm biển số, tên xe..." @keyup.enter="fetchVehicles(1)" />
-          <BaseButton variant="secondary" @click="fetchVehicles(1)">Tìm</BaseButton>
+    <div class="filter-card">
+      <div class="filter-row">
+        <div class="search-box">
+          <BaseInput v-model="searchQuery" placeholder="Tìm biển số, tên xe..." @keyup.enter="handleSearch" />
+          <BaseButton variant="secondary" @click="handleSearch">Tìm</BaseButton>
         </div>
+
         <div class="filter-group">
-          <label class="flabel">Trạng thái</label>
-          <select v-model="filterStatus" class="fselect" @change="fetchVehicles(1)">
+          <label class="filter-label">Trạng thái</label>
+          <select v-model="filterStatus" class="custom-select" @change="handleSearch">
             <option value="">Tất cả</option>
             <option value="hoat_dong">Hoạt động</option>
             <option value="bao_tri">Bảo trì</option>
             <option value="cho_duyet">Chờ duyệt</option>
           </select>
         </div>
-        <BaseButton variant="outline" @click="() => { searchQuery = ''; filterStatus = ''; fetchVehicles(1) }">Đặt lại</BaseButton>
+
+        <BaseButton variant="outline" @click="resetFilter">Đặt lại</BaseButton>
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="pt-table-card">
+    <div class="table-card">
       <BaseTable :columns="tableColumns" :data="vehicles" :loading="loading">
         <template #cell(bien_so)="{ value }">
-          <span class="chip-code">{{ value }}</span>
+          <span class="code-chip">{{ value }}</span>
         </template>
 
         <template #cell(ten_xe)="{ item }">
-          <div class="name-col">
+          <div class="name-block">
             <strong>{{ item.ten_xe }}</strong>
             <span v-if="item.bien_nhan_dang" class="name-sub">{{ item.bien_nhan_dang }}</span>
           </div>
         </template>
 
         <template #cell(loai_xe)="{ item }">
-          <span>{{ item.loai_xe?.ten_loai_xe || '—' }}</span>
+          <span>{{ item.loai_xe?.ten_loai_xe || `ID: ${item.id_loai_xe || '—'}` }}</span>
         </template>
 
-        <template #cell(so_ghe)="{ item }">
-          <div class="ghe-col">
-            <span class="ghe-badge">{{ item.so_ghe_thuc_te || 0 }} ghế</span>
-            <span class="tang-badge">{{ item.thong_tin_cai_dat?.so_tang ?? 1 }} tầng</span>
-          </div>
+        <template #cell(so_ghe_thuc_te)="{ value }">
+          <span class="seat-badge">{{ value || 0 }} ghế</span>
         </template>
 
         <template #cell(trang_thai)="{ value }">
-          <span :class="['status-badge', getStatus(value).cls]">{{ getStatus(value).text }}</span>
+          <span :class="['status-badge', getVehicleStatus(value).class]">
+            {{ getVehicleStatus(value).text }}
+          </span>
         </template>
 
         <template #cell(actions)="{ item }">
-          <div class="action-row">
-            <BaseButton size="sm" variant="outline" @click="openDetailModal(item)">Chi tiết</BaseButton>
-            <BaseButton size="sm" variant="secondary" @click="openSeatModal(item)">🪑 Sơ đồ ghế</BaseButton>
+          <div class="action-buttons">
             <BaseButton size="sm" variant="primary" @click="openEditModal(item)">Sửa</BaseButton>
+            <BaseButton size="sm" variant="secondary" @click="openSeatModal(item)">Ghế</BaseButton>
+            <BaseButton size="sm" variant="danger" @click="openDeleteModal(item)">Xóa</BaseButton>
           </div>
         </template>
       </BaseTable>
 
-      <!-- Phân trang -->
-      <div class="pagination">
-        <div class="page-left">
+      <div class="pagination-container">
+        <div class="page-info-left">
           <span>Hiển thị:</span>
-          <select v-model="pagination.perPage" class="fselect per-sel" @change="fetchVehicles(1)">
+          <select v-model="pagination.perPage" @change="fetchVehicles(1)" class="custom-select per-page-select">
             <option :value="10">10</option>
             <option :value="15">15</option>
             <option :value="20">20</option>
+            <option :value="30">30</option>
           </select>
-          <span>dòng/trang</span>
-          <span v-if="pagination.total > 0" class="total-txt">(Tổng: {{ pagination.total }} xe)</span>
+          <span>dòng / trang</span>
+          <span v-if="pagination.total > 0" class="total-label">(Tổng: {{ pagination.total }} xe)</span>
         </div>
-        <div class="page-ctrl">
-          <BaseButton size="sm" variant="outline" :disabled="pagination.currentPage <= 1" @click="fetchVehicles(pagination.currentPage - 1)">← Trước</BaseButton>
-          <span class="page-num">Trang {{ pagination.currentPage }} / {{ pagination.lastPage }}</span>
-          <BaseButton size="sm" variant="outline" :disabled="pagination.currentPage >= pagination.lastPage" @click="fetchVehicles(pagination.currentPage + 1)">Sau →</BaseButton>
+
+        <div class="pagination-controls">
+          <BaseButton size="sm" variant="outline" :disabled="pagination.currentPage <= 1"
+            @click="fetchVehicles(pagination.currentPage - 1)">← Trước</BaseButton>
+
+          <span class="page-number">Trang {{ pagination.currentPage }} / {{ pagination.lastPage }}</span>
+
+          <BaseButton size="sm" variant="outline" :disabled="pagination.currentPage >= pagination.lastPage"
+            @click="fetchVehicles(pagination.currentPage + 1)">Sau →</BaseButton>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════
-         MODAL: TẠO XE MỚI (2 bước)
-    ═══════════════════════════════════════════════════════ -->
-    <BaseModal v-model="createModal" title="Thêm Xe Mới" maxWidth="820px">
-      <!-- Step indicator -->
-      <div class="step-bar">
-        <div :class="['step', createStep === 1 ? 'step-active' : 'step-done']">
-          <span class="step-dot">{{ createStep > 1 ? '✓' : '1' }}</span>
-          <span>Thông tin xe</span>
-        </div>
-        <div class="step-line" />
-        <div :class="['step', createStep === 2 ? 'step-active' : '']">
-          <span class="step-dot">2</span>
-          <span>Sơ đồ ghế</span>
-        </div>
+    <BaseModal v-model="isFormModal" :title="isEditMode ? 'Cập Nhật Xe' : 'Thêm Xe Mới'" maxWidth="760px">
+      <div class="info-banner">
+        <span class="info-icon">ℹ️</span>
+        <span v-if="isEditMode">Sau khi cập nhật xe, hệ thống sẽ chuyển xe về trạng thái <strong>Chờ
+            duyệt</strong>.</span>
+        <span v-else>Xe mới được tạo sẽ ở trạng thái <strong>Chờ duyệt</strong> cho tới khi Admin phê duyệt.</span>
       </div>
 
-      <!-- Bước 1 -->
-      <div v-if="createStep === 1" class="form-grid-2">
-        <div class="form-group">
-          <label class="flabel">Biển số xe *</label>
-          <input v-model="createForm.bien_so" class="finput" placeholder="VD: 51G-12345" required />
-        </div>
-        <div class="form-group">
-          <label class="flabel">Tên xe *</label>
-          <input v-model="createForm.ten_xe" class="finput" placeholder="VD: Xe giường nằm VIP" required />
-        </div>
+      <form id="gobus-operator-vehicle-form" @submit.prevent="submitForm" class="vehicle-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <BaseInput v-model="formData.bien_so" label="Biển số *" placeholder="VD: 51G-12345" required />
+            <p v-if="formErrors.bien_so?.[0]" class="field-error">{{ formErrors.bien_so[0] }}</p>
+          </div>
+          <div class="form-group">
+            <BaseInput v-model="formData.ten_xe" label="Tên xe *" placeholder="VD: Xe giường nằm VIP" required />
+            <p v-if="formErrors.ten_xe?.[0]" class="field-error">{{ formErrors.ten_xe[0] }}</p>
+          </div>
 
-        <div class="form-group full-w">
-          <label class="flabel">Loại xe *</label>
-          <select v-model="createForm.id_loai_xe" class="finput">
-            <option value="">-- Chọn loại xe --</option>
-            <option v-for="lx in loaiXeList" :key="lx.id" :value="lx.id">
-              {{ lx.ten_loai_xe }} ({{ lx.so_tang }} tầng, {{ lx.so_ghe_mac_dinh }} ghế)
+          <div class="form-group">
+            <label class="base-input-label">Loại xe *</label>
+            <select v-model="formData.id_loai_xe" class="custom-input custom-select" required :disabled="loaiXeLoading">
+              <option disabled value="">-- Chọn loại xe --</option>
+              <option v-for="lx in loaiXeList" :key="lx.id" :value="lx.id">
+                {{ lx.ten_loai_xe }} (mặc định {{ lx.so_ghe_mac_dinh }} ghế{{ lx.so_tang > 1 ? ', ' + lx.so_tang + ' tầng' : '' }})
+              </option>
+            </select>
+            <p v-if="formErrors.id_loai_xe?.[0]" class="field-error">{{ formErrors.id_loai_xe[0] }}</p>
+          </div>
+
+          <div class="form-group">
+            <label class="base-input-label">Tài xế chính</label>
+            <select v-model="formData.id_tai_xe_chinh" class="custom-input custom-select" :disabled="driverLoading">
+              <option value="">-- Chưa chọn --</option>
+              <option v-for="d in driverList" :key="d.id" :value="d.id">
+                {{ d.ho_so?.ho_va_ten || d.email }} (ID: {{ d.id }})
+              </option>
+            </select>
+            <p v-if="formErrors.id_tai_xe_chinh?.[0]" class="field-error">{{ formErrors.id_tai_xe_chinh[0] }}</p>
+          </div>
+
+          <div class="form-group full-width">
+            <label class="base-input-label">Biển nhận dạng</label>
+            <textarea v-model="formData.bien_nhan_dang" class="custom-input custom-textarea"
+              placeholder="VD: Màu xanh, logo lớn phía hông xe"></textarea>
+            <p v-if="formErrors.bien_nhan_dang?.[0]" class="field-error">{{ formErrors.bien_nhan_dang[0] }}</p>
+          </div>
+        </div>
+      </form>
+
+      <template #footer>
+        <BaseButton variant="secondary" @click="isFormModal = false">Hủy</BaseButton>
+        <BaseButton type="submit" form="gobus-operator-vehicle-form" variant="primary" :loading="formLoading">
+          {{ isEditMode ? 'Lưu thay đổi' : 'Thêm xe' }}
+        </BaseButton>
+      </template>
+    </BaseModal>
+
+    <BaseModal v-model="detailModal.show" title="Chi tiết xe" maxWidth="650px">
+      <div v-if="detailModal.loading" class="detail-loading">Đang tải...</div>
+      <div v-else-if="detailModal.data" class="detail-grid">
+        <div class="detail-item"><span class="detail-label">Biển số</span><span class="detail-value">{{
+          detailModal.data.bien_so }}</span></div>
+        <div class="detail-item"><span class="detail-label">Tên xe</span><span class="detail-value">{{
+          detailModal.data.ten_xe }}</span></div>
+        <div class="detail-item"><span class="detail-label">ID Loại xe</span><span class="detail-value">{{
+          detailModal.data.id_loai_xe || '—' }}</span></div>
+        <div class="detail-item"><span class="detail-label">ID Tài xế chính</span><span class="detail-value">{{
+          detailModal.data.id_tai_xe_chinh || '—' }}</span></div>
+        <div class="detail-item"><span class="detail-label">Số ghế</span><span class="detail-value">{{
+          detailModal.data.so_ghe_thuc_te || 0 }}</span></div>
+        <div class="detail-item full-width"><span class="detail-label">Biển nhận dạng</span><span
+            class="detail-value">{{
+              detailModal.data.bien_nhan_dang || '—' }}</span></div>
+        <div class="detail-item full-width"><span class="detail-label">Trạng thái</span><span class="detail-value"><span
+              :class="['status-badge', getVehicleStatus(detailModal.data.trang_thai).class]">{{
+                getVehicleStatus(detailModal.data.trang_thai).text }}</span></span></div>
+      </div>
+      <template #footer>
+        <BaseButton variant="secondary" @click="detailModal.show = false">Đóng</BaseButton>
+      </template>
+    </BaseModal>
+
+    <BaseModal v-model="deleteModal.show" title="Xác nhận xóa xe" maxWidth="520px">
+      <div class="delete-body">
+        <p>Bạn có chắc muốn xóa xe <strong>{{ deleteModal.bienSo }}</strong>? Hành động này không thể hoàn tác.</p>
+        <p class="delete-hint">Nếu xe đang được gán cho chuyến hoặc còn dữ liệu liên quan, hệ thống có thể từ chối xóa.
+        </p>
+      </div>
+      <template #footer>
+        <BaseButton variant="secondary" @click="deleteModal.show = false">Hủy</BaseButton>
+        <BaseButton variant="danger" :loading="deleteModal.loading" @click="confirmDelete">Xóa xe</BaseButton>
+      </template>
+    </BaseModal>
+
+    <BaseModal v-model="seatModal.show" title="Quản lý ghế xe" maxWidth="860px" bodyOverflow="visible">
+      <p class="seat-title">Xe: <strong>{{ seatModal.vehicleName }}</strong></p>
+      <div class="seat-stats">
+        <div class="stat-item">
+          <span class="stat-num">{{ seatStats.total }}</span>
+          <span class="stat-lbl">Tổng ghế</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num">{{ seatStats.active }}</span>
+          <span class="stat-lbl">Hoạt động</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num">{{ seatStats.booked }}</span>
+          <span class="stat-lbl">Đã đặt</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num">{{ seatStats.locked }}</span>
+          <span class="stat-lbl">Khóa / bảo trì</span>
+        </div>
+      </div>
+      <form class="seat-form" @submit.prevent="submitSeat">
+        <BaseInput v-model="seatModal.form.ma_ghe" label="Mã ghế *" placeholder="VD: A01"
+          :error="seatFieldError('ma_ghe')" @update:modelValue="onSeatCodeInput" />
+        <div class="seat-select-field">
+          <label class="base-input-label">Loại ghế *</label>
+          <select v-model="seatModal.form.id_loai_ghe" class="custom-select"
+            :class="{ 'has-error': !!seatFieldError('id_loai_ghe') }" :disabled="seatTypeLoading"
+            @change="clearSeatError('id_loai_ghe')">
+            <option disabled value="">-- Chọn loại ghế --</option>
+            <option v-for="lg in seatTypeList" :key="lg.id" :value="lg.id">
+              {{ lg.ten_loai_ghe }} (ID: {{ lg.id }})
             </option>
           </select>
-          <span v-if="selectedLoaiXe" class="hint">
-            Đã auto-fill: {{ selectedLoaiXe.so_tang }} tầng, {{ selectedLoaiXe.so_ghe_mac_dinh }} ghế mặc định
-          </span>
+          <span v-if="seatFieldError('id_loai_ghe')" class="field-error">{{ seatFieldError('id_loai_ghe') }}</span>
         </div>
-
-        <div class="form-group">
-          <label class="flabel">Số tầng *</label>
-          <select v-model="createForm.so_tang" class="finput">
-            <option :value="1">1 tầng</option>
-            <option :value="2">2 tầng</option>
+        <div class="seat-select-field">
+          <label class="base-input-label">Tầng</label>
+          <select v-model="seatModal.form.tang" class="custom-select" :class="{ 'has-error': !!seatFieldError('tang') }"
+            @change="clearSeatError('tang')">
+            <option :value="1">Tầng 1</option>
+            <option :value="2">Tầng 2</option>
           </select>
+          <span v-if="seatFieldError('tang')" class="field-error">{{ seatFieldError('tang') }}</span>
         </div>
-        <div class="form-group">
-          <label class="flabel">Số ghế thực tế *</label>
-          <input v-model="createForm.so_ghe_thuc_te" class="finput" type="number" min="1" max="100" placeholder="VD: 40" required />
+        <div class="seat-select-field">
+          <label class="base-input-label">Trạng thái ghế</label>
+          <select v-model="seatModal.form.trang_thai" class="custom-select"
+            :class="{ 'has-error': !!seatFieldError('trang_thai') }" @change="clearSeatError('trang_thai')">
+            <option value="hoat_dong">Hoạt động</option>
+            <option value="bao_tri_hoac_khoa">Khóa/Bảo trì</option>
+          </select>
+          <span v-if="seatFieldError('trang_thai')" class="field-error">{{ seatFieldError('trang_thai') }}</span>
         </div>
-
-        <div class="form-group full-w">
-          <label class="flabel">Tiện nghi trên xe</label>
-          <input v-model="createForm.tien_nghi" class="finput" placeholder="VD: Wifi, máy lạnh, TV, cổng sạc USB" />
-        </div>
-        <div class="form-group full-w">
-          <label class="flabel">Biển nhận dạng xe</label>
-          <textarea v-model="createForm.bien_nhan_dang" class="finput ftextarea" placeholder="VD: Màu xanh lá, logo lớn ở hai bên hông xe" />
-        </div>
-        <div class="form-group">
-          <label class="flabel">ID Tài xế chính</label>
-          <input v-model="createForm.id_tai_xe_chinh" class="finput" type="number" min="1" placeholder="Tùy chọn" />
-        </div>
-      </div>
-
-      <!-- Bước 2 -->
-      <div v-else class="step2-wrap">
-        <div class="seat-info-bar">
-          <span>🚌 <strong>{{ createForm.ten_xe }}</strong></span>
-          <span class="seat-count-badge">{{ ghes.length }} / {{ createForm.so_ghe_thuc_te }} ghế</span>
-          <span :class="ghes.length === Number(createForm.so_ghe_thuc_te) ? 'count-ok' : 'count-err'">
-            {{ ghes.length === Number(createForm.so_ghe_thuc_te) ? '✓ Đúng số ghế' : '⚠ Chưa khớp số ghế' }}
-          </span>
-        </div>
-
-        <div v-for="t in Number(createForm.so_tang)" :key="t" class="floor-block">
-          <div class="floor-header">
-            <span class="floor-label">Tầng {{ t }}</span>
-            <span class="floor-count">{{ (ghesByFloor[t] || []).length }} ghế</span>
-            <button class="btn-add-seat" @click="addGhe(t)">+ Thêm ghế</button>
-          </div>
-
-          <div class="seat-grid">
-            <div
-              v-for="(ghe, idx) in ghes.filter(g => g.tang === t)"
-              :key="idx"
-              class="seat-card"
-            >
-              <div class="seat-preview" :class="ghe.id_loai_ghe == loaiGheList[0]?.id ? 'seat-norm' : 'seat-vip'">
-                {{ ghe.ma_ghe }}
-              </div>
-              <div class="seat-fields">
-                <input
-                  v-model="ghe.ma_ghe"
-                  class="seat-input"
-                  placeholder="Mã ghế"
-                  @input="ghe.ma_ghe = ghe.ma_ghe.toUpperCase()"
-                />
-                <select v-model="ghe.id_loai_ghe" class="seat-input">
-                  <option value="">-- Loại ghế --</option>
-                  <option v-for="lg in loaiGheList" :key="lg.id" :value="lg.id">
-                    {{ lg.ten_loai_ghe }} (x{{ lg.he_so_gia }})
-                  </option>
-                </select>
-              </div>
-              <button
-                class="seat-remove"
-                @click="removeGhe(ghes.findIndex(g => g === ghe))"
-                title="Xóa ghế"
-              >✕</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="seat-tip">
-          💡 Mã ghế phải duy nhất (VD: A01, B12). Sau khi tạo xe, sơ đồ ghế <strong>không thể thay đổi</strong>.
-        </div>
-      </div>
-
-      <template #footer>
-        <template v-if="createStep === 1">
-          <BaseButton variant="secondary" @click="createModal = false">Hủy</BaseButton>
-          <BaseButton variant="primary" @click="goToStep2">Tiếp theo → Cấu hình ghế</BaseButton>
-        </template>
-        <template v-else>
-          <BaseButton variant="secondary" @click="createStep = 1">← Quay lại</BaseButton>
-          <BaseButton variant="primary" :loading="createLoading" @click="submitCreate">
-            🚌 Tạo xe & sơ đồ ghế
+        <div class="seat-form-actions">
+          <BaseButton type="submit" variant="primary" :loading="seatModal.saving" :disabled="editingSeatBooked">
+            Lưu
           </BaseButton>
-        </template>
+          <BaseButton v-if="seatModal.editingId" type="button" variant="danger" :disabled="editingSeatBooked"
+            @click="openDeleteSeatModal">Xóa</BaseButton>
+          <BaseButton v-if="seatModal.editingId" type="button" variant="outline" @click="resetSeatForm">Hủy sửa
+          </BaseButton>
+        </div>
+      </form>
+
+      <div v-if="seatModal.loading" class="detail-loading">Đang tải danh sách ghế...</div>
+      <template v-else>
+        <div v-if="seatModal.seats.length" class="seat-map-wrap">
+          <div class="seat-legend-row">
+            <div class="seat-legend">
+              <span class="legend-item"><span class="seat-dot dot-active"></span> Hoạt động</span>
+              <span class="legend-item"><span class="seat-dot dot-booked"></span> Đã đặt</span>
+              <span class="legend-item"><span class="seat-dot dot-locked"></span> Khóa / bảo trì</span>
+              <span class="legend-item"><span class="seat-dot dot-editing"></span> Ghế đang chỉnh sửa</span>
+              <span class="legend-item"><span class="seat-dot dot-driver"></span> Ghế tài xế</span>
+            </div>
+            <div class="seat-layout-toolbar">
+              <span class="seat-layout-label">Số hàng ghế / tầng</span>
+              <select v-model.number="seatRowsPerFloor" class="custom-select seat-rows-select">
+                <option v-for="n in 8" :key="n" :value="n">{{ n }} hàng</option>
+              </select>
+              <span class="seat-layout-label">Vị trí ghế tài xế</span>
+              <select v-model="seatDirection" class="custom-select seat-dir-select" @change="handleSeatDirectionChange">
+                <option value="driver_left">Tài xế bên trái</option>
+                <option value="driver_right">Tài xế bên phải</option>
+              </select>
+            </div>
+          </div>
+          <div v-for="floor in getSeatMapByFloor()" :key="floor.floor" class="seat-floor-block">
+            <h4 class="seat-floor-title">Tầng {{ floor.floor }}</h4>
+            <div v-for="(row, ri) in splitSeatsIntoRows(floor.seats, seatRowsPerFloor)" :key="ri" class="seat-row"
+              :style="{ '--seat-cols': Math.max(row.length, 1) }">
+              <button v-for="seat in getDisplayedRow(row)" :key="seat.id" type="button" class="seat-tile" :class="{
+                blocked: seat.trang_thai !== 'hoat_dong',
+                booked: seat.trang_thai === 'hoat_dong' && seat.dang_co_ve,
+                editing: seatModal.editingId === seat.id,
+                driver:
+                  isDriverSeat(seat, floor.floor, row, ri) &&
+                  seat.trang_thai === 'hoat_dong' &&
+                  !seat.dang_co_ve,
+              }"
+                @click="handleSeatTileClick(seat)" @dblclick.stop="editSeat(seat)">
+                {{ seat.ma_ghe }}<span v-if="isDriverSeat(seat, floor.floor, row, ri)"> (TX)</span>
+                <span class="seat-tooltip">{{ seatTooltipText(seat, floor.floor, row, ri) }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </template>
     </BaseModal>
-
-    <!-- ═══════════════════════════════════════════════════════
-         MODAL: SỬA XE (chỉ ngoại hình)
-    ═══════════════════════════════════════════════════════ -->
-    <BaseModal v-model="editModal" title="Cập Nhật Thông Tin & Hồ Sơ Xe" maxWidth="750px">
-      <!-- Tabs header -->
-      <div class="edit-tabs">
-        <button :class="['etab', editTab === 'basic' ? 'etab-active' : '']" @click="editTab = 'basic'">1. Thông tin chung</button>
-        <button :class="['etab', editTab === 'images' ? 'etab-active' : '']" @click="editTab = 'images'">2. Hình ảnh xe</button>
-        <button :class="['etab', editTab === 'docs' ? 'etab-active' : '']" @click="editTab = 'docs'">3. Giấy tờ</button>
-      </div>
-
-      <!-- Tab 1: Thông tin cơ bản -->
-      <div v-show="editTab === 'basic'" class="tab-pane">
-        <div class="info-banner mb-3">
-          ℹ️ Sơ đồ ghế <strong>không thể thay đổi</strong> sau khi xe được tạo. Bạn chỉ có thể cập nhật thông tin và hồ sơ xe.
-        </div>
-        <div class="form-grid-2">
-          <div class="form-group">
-            <label class="flabel">Biển số xe *</label>
-            <input v-model="editForm.bien_so" class="finput" required />
-          </div>
-          <div class="form-group">
-            <label class="flabel">Tên xe</label>
-            <input v-model="editForm.ten_xe" class="finput" />
-          </div>
-          <div class="form-group full-w">
-            <label class="flabel">Tiện nghi trên xe</label>
-            <input v-model="editForm.tien_nghi" class="finput" placeholder="VD: Wifi, máy lạnh, cổng sạc" />
-          </div>
-          <div class="form-group full-w">
-            <label class="flabel">Biển nhận dạng xe</label>
-            <textarea v-model="editForm.bien_nhan_dang" class="finput ftextarea" placeholder="VD: Màu xanh lá, logo lớn ở hai bên hông xe" />
-          </div>
-          <div class="form-group">
-            <label class="flabel">ID Tài xế chính</label>
-            <input v-model="editForm.id_tai_xe_chinh" class="finput" type="number" min="1" placeholder="Tùy chọn" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 2: Hình ảnh xe -->
-      <div v-show="editTab === 'images'" class="tab-pane">
-        <div class="form-grid-2">
-          <!-- Ảnh trước -->
-          <div class="form-group">
-            <label class="flabel">Ảnh xe phía trước</label>
-            <div class="upload-box" @click="$refs.hxTruoc.click()">
-              <img v-if="editPreviews.hinh_xe_truoc" :src="editPreviews.hinh_xe_truoc" class="up-img" />
-              <div v-else class="up-placeholder">+ Chọn ảnh</div>
-            </div>
-            <input type="file" ref="hxTruoc" class="hidden-input" accept="image/png, image/jpeg, image/webp" @change="(e) => handleFileChange(e, 'hinh_xe_truoc')" />
-          </div>
-          
-          <!-- Ảnh sau -->
-          <div class="form-group">
-            <label class="flabel">Ảnh xe phía sau</label>
-            <div class="upload-box" @click="$refs.hxSau.click()">
-              <img v-if="editPreviews.hinh_xe_sau" :src="editPreviews.hinh_xe_sau" class="up-img" />
-              <div v-else class="up-placeholder">+ Chọn ảnh</div>
-            </div>
-            <input type="file" ref="hxSau" class="hidden-input" accept="image/png, image/jpeg, image/webp" @change="(e) => handleFileChange(e, 'hinh_xe_sau')" />
-          </div>
-
-          <!-- Ảnh biển số -->
-          <div class="form-group">
-            <label class="flabel">Ảnh chụp rõ biển số</label>
-            <div class="upload-box" @click="$refs.hBien.click()">
-              <img v-if="editPreviews.hinh_bien_so" :src="editPreviews.hinh_bien_so" class="up-img" />
-              <div v-else class="up-placeholder">+ Chọn ảnh</div>
-            </div>
-            <input type="file" ref="hBien" class="hidden-input" accept="image/png, image/jpeg, image/webp" @change="(e) => handleFileChange(e, 'hinh_bien_so')" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Tab 3: Giấy tờ -->
-      <div v-show="editTab === 'docs'" class="tab-pane">
-        <div class="form-grid-2">
-          <div class="form-group full-w">
-            <label class="flabel">Ghi chú hồ sơ</label>
-            <input v-model="editForm.ghi_chu" class="finput" placeholder="Ghi chú thêm về tình trạng giấy tờ" />
-          </div>
-
-          <!-- Đăng kiểm -->
-          <div class="doc-panel">
-            <h4 class="dp-title">Đăng kiểm</h4>
-            <div class="form-group">
-              <label class="flabel">Số đăng kiểm</label>
-              <input v-model="editForm.so_dang_kiem" class="finput" />
-            </div>
-            <div class="form-group">
-              <label class="flabel">Ngày đăng kiểm</label>
-              <input type="date" v-model="editForm.ngay_dang_kiem" class="finput" />
-            </div>
-            <div class="form-group">
-              <label class="flabel">Ngày hết hạn</label>
-              <input type="date" v-model="editForm.ngay_het_han_dang_kiem" class="finput" />
-            </div>
-            <div class="form-group mt-2">
-              <label class="flabel">Ảnh giấy đăng kiểm</label>
-              <div class="upload-box u-small" @click="$refs.hDK.click()">
-                <img v-if="editPreviews.hinh_dang_kiem" :src="editPreviews.hinh_dang_kiem" class="up-img" />
-                <div v-else class="up-placeholder">Tải ảnh...</div>
-              </div>
-              <input type="file" ref="hDK" class="hidden-input" accept="image/png, image/jpeg, image/webp" @change="(e) => handleFileChange(e, 'hinh_dang_kiem')" />
-            </div>
-          </div>
-
-          <!-- Bảo hiểm -->
-          <div class="doc-panel">
-            <h4 class="dp-title">Bảo hiểm</h4>
-            <div class="form-group">
-              <label class="flabel">Số bảo hiểm</label>
-              <input v-model="editForm.so_bao_hiem" class="finput" />
-            </div>
-            <div class="form-group">
-              <label class="flabel">Ngày hiệu lực</label>
-              <input type="date" v-model="editForm.ngay_hieu_luc_bao_hiem" class="finput" />
-            </div>
-            <div class="form-group">
-              <label class="flabel">Ngày hết hạn</label>
-              <input type="date" v-model="editForm.ngay_het_han_bao_hiem" class="finput" />
-            </div>
-            <div class="form-group mt-2">
-              <label class="flabel">Ảnh giấy bảo hiểm</label>
-              <div class="upload-box u-small" @click="$refs.hBH.click()">
-                <img v-if="editPreviews.hinh_bao_hiem" :src="editPreviews.hinh_bao_hiem" class="up-img" />
-                <div v-else class="up-placeholder">Tải ảnh...</div>
-              </div>
-              <input type="file" ref="hBH" class="hidden-input" accept="image/png, image/jpeg, image/webp" @change="(e) => handleFileChange(e, 'hinh_bao_hiem')" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <BaseButton variant="secondary" @click="editModal = false">Hủy</BaseButton>
-        <BaseButton variant="primary" :loading="editLoading" @click="submitEdit">Thay đổi & Upload ảnh</BaseButton>
-      </template>
-    </BaseModal>
-
-    <!-- ═══════════════════════════════════════════════════════
-         MODAL: SƠ ĐỒ GHẾ
-    ═══════════════════════════════════════════════════════ -->
-    <BaseModal v-model="seatModal.show" title="Sơ Đồ Ghế Xe" maxWidth="860px">
-      <div v-if="seatModal.loading" class="seat-loading">⏳ Đang tải sơ đồ ghế...</div>
-
-      <div v-else-if="seatModal.data">
-        <!-- Thông tin xe -->
-        <div class="seat-xe-info">
-          <span class="chip-code">{{ seatModal.data.bien_so }}</span>
-          <span>{{ seatModal.data.ten_xe }}</span>
-          <span class="ghe-badge">{{ seatModal.data.tong_ghe }} ghế</span>
-          <span class="tang-badge">{{ seatModal.data.so_tang }} tầng</span>
-        </div>
-
-        <!-- Chú thích -->
-        <div class="seat-legend">
-          <span class="legend-item"><span class="lbox seat-ok-box"></span> Hoạt động</span>
-          <span class="legend-item"><span class="lbox seat-broken-box"></span> Bảo trì / Khóa</span>
-          <span class="legend-item"><span class="lbox seat-vip-box"></span> VIP / Hệ số giá cao</span>
-        </div>
-
-        <!-- Sơ đồ từng tầng -->
-        <div v-for="(seats, floorKey) in seatModal.data.so_do_ghe" :key="floorKey" class="view-floor">
-          <div class="floor-header">
-            <span class="floor-label">{{ floorKey.replace('tang_', 'Tầng ') }}</span>
-            <span class="floor-count">{{ seats.length }} ghế</span>
-          </div>
-
-          <div class="seat-map-grid">
-            <div
-              v-for="ghe in seats"
-              :key="ghe.id"
-              :class="[
-                'seat-map-item',
-                ghe.trang_thai === 'hoat_dong' ? 'smok' : 'smbrk',
-                ghe.loai_ghe?.he_so_gia > 1 ? 'smvip' : '',
-                seatModal.updatingId === ghe.id ? 'sm-updating' : '',
-              ]"
-              :title="ghe.ma_ghe + ' — ' + (ghe.loai_ghe?.ten_loai_ghe || '') + ' — ' + getSeatStatus(ghe.trang_thai).text"
-              @click="toggleSeatStatus(seatModal.data.xe_id, ghe)"
-            >
-              <span class="sm-code">{{ ghe.ma_ghe }}</span>
-              <span class="sm-type">{{ ghe.loai_ghe?.ten_loai_ghe || '' }}</span>
-              <span v-if="seatModal.updatingId === ghe.id" class="sm-spin">⏳</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="seat-tip">💡 Click vào ghế để chuyển trạng thái Hoạt động ↔ Bảo trì</div>
-      </div>
-
-      <template #footer>
-        <BaseButton variant="secondary" @click="seatModal.show = false">Đóng</BaseButton>
-      </template>
-    </BaseModal>
-
-    <!-- ═══════════════════════════════════════════════════════
-         MODAL: CHI TIẾT XE
-    ═══════════════════════════════════════════════════════ -->
-    <BaseModal v-model="detailModal.show" title="Chi Tiết Xe" maxWidth="640px">
-      <div v-if="detailModal.loading" class="seat-loading">Đang tải...</div>
-      <div v-else-if="detailModal.data" class="detail-grid">
-        <div class="detail-item">
-          <span class="dlabel">Biển số</span>
-          <span class="dvalue"><span class="chip-code">{{ detailModal.data.bien_so }}</span></span>
-        </div>
-        <div class="detail-item">
-          <span class="dlabel">Tên xe</span>
-          <span class="dvalue">{{ detailModal.data.ten_xe }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="dlabel">Loại xe</span>
-          <span class="dvalue">{{ detailModal.data.loai_xe?.ten_loai_xe || '—' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="dlabel">Số ghế / Tầng</span>
-          <span class="dvalue">{{ detailModal.data.so_ghe_thuc_te }} ghế / {{ detailModal.data.thong_tin_cai_dat?.so_tang ?? 1 }} tầng</span>
-        </div>
-        <div class="detail-item">
-          <span class="dlabel">Tiện nghi</span>
-          <span class="dvalue">{{ detailModal.data.thong_tin_cai_dat?.tien_nghi || '—' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="dlabel">Tài xế chính</span>
-          <span class="dvalue">{{ detailModal.data.tai_xe_chinh?.ho_ten || '—' }}</span>
-        </div>
-        <div class="detail-item full-w">
-          <span class="dlabel">Biển nhận dạng</span>
-          <span class="dvalue">{{ detailModal.data.bien_nhan_dang || '—' }}</span>
-        </div>
-        <div class="detail-item full-w">
-          <span class="dlabel">Trạng thái</span>
-          <span class="dvalue">
-            <span :class="['status-badge', getStatus(detailModal.data.trang_thai).cls]">
-              {{ getStatus(detailModal.data.trang_thai).text }}
-            </span>
-          </span>
-        </div>
-        <div v-if="detailModal.data.ho_so_xe" class="detail-item full-w">
-          <span class="dlabel">Trạng thái hồ sơ</span>
-          <span class="dvalue">{{ detailModal.data.ho_so_xe.tinh_trang }}</span>
-        </div>
+    <BaseModal v-model="seatDeleteModal.show" title="Xác nhận xóa ghế" maxWidth="420px">
+      <div class="delete-body">
+        <p>Bạn có chắc muốn xóa ghế <strong>{{ seatDeleteModal.seat?.ma_ghe }}</strong> không?</p>
       </div>
       <template #footer>
-        <BaseButton variant="secondary" @click="() => { detailModal.show = false; openSeatModal(detailModal.data) }">🪑 Xem sơ đồ ghế</BaseButton>
-        <BaseButton variant="outline" @click="detailModal.show = false">Đóng</BaseButton>
+        <BaseButton variant="secondary" :disabled="seatDeleteModal.loading" @click="seatDeleteModal.show = false">Hủy
+        </BaseButton>
+        <BaseButton variant="danger" :loading="seatDeleteModal.loading" @click="confirmDeleteSeat">Xóa</BaseButton>
       </template>
     </BaseModal>
   </div>
 </template>
 
 <style scoped>
-.pt-page { padding: 0; font-family: 'Inter', system-ui, sans-serif; }
+.operator-page {
+  padding: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+}
 
-/* ── Header ── */
-.pt-header {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
-.pt-title { font-size: 22px; font-weight: 800; color: #0d4f35; margin: 0 0 4px; }
-.pt-sub { margin: 0; color: #64748b; font-size: 13px; }
 
-/* ── Filter ── */
-.pt-filter {
-  background: rgba(255,255,255,.88); backdrop-filter: blur(10px);
-  border: 1px solid #dcfce7; border-radius: 14px;
-  box-shadow: 0 8px 20px rgba(13,79,53,.06);
-  padding: 14px 16px; margin-bottom: 18px;
+.page-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0d4f35;
+  margin: 0 0 4px 0;
 }
-.filter-inner { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
-.search-wrap { display: flex; gap: 10px; align-items: flex-end; flex: 1; min-width: 260px; }
-.search-wrap > :first-child { flex: 1; margin-bottom: 0; }
-.filter-group { display: flex; flex-direction: column; gap: 4px; }
-.flabel { font-size: 13px; font-weight: 600; color: #334155; }
-.fselect, .finput {
-  border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 9px 12px;
-  font-size: 14px; color: #1f2937; background: #fff;
-  transition: border-color .2s, box-shadow .2s; width: 100%; box-sizing: border-box;
-}
-.fselect:focus, .finput:focus {
-  outline: none; border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.14);
-}
-.ftextarea { resize: vertical; min-height: 70px; }
 
-/* ── Table ── */
-.pt-table-card {
-  background: #fff; border: 1px solid #dcfce7; border-radius: 16px;
-  padding: 16px; box-shadow: 0 8px 24px rgba(13,79,53,.06);
+.page-sub {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
 }
-.chip-code {
-  display: inline-block; background: #f0fdf4; color: #15803d;
-  border: 1px solid #bbf7d0; padding: 3px 10px;
-  border-radius: 10px; font-size: 12px; font-weight: 700;
-}
-.name-col { display: flex; flex-direction: column; gap: 2px; }
-.name-sub { font-size: 12px; color: #64748b; }
-.ghe-col { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.ghe-badge { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; padding: 2px 8px; border-radius: 8px; font-size: 12px; font-weight: 700; }
-.tang-badge { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 8px; font-size: 12px; }
-.status-badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 12px; }
-.status-active { background: #dcfce7; color: #166534; }
-.status-info { background: #dbeafe; color: #1d4ed8; }
-.status-pending { background: #fef3c7; color: #b45309; }
-.action-row { display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* ── Pagination ── */
-.pagination {
-  margin-top: 16px; display: flex; justify-content: space-between;
-  align-items: center; gap: 12px; flex-wrap: wrap;
+.filter-card {
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(10px);
+  border: 1px solid #dcfce7;
+  box-shadow: 0 8px 20px rgba(13, 79, 53, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
 }
-.page-left { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; }
-.per-sel { width: 72px !important; }
-.total-txt { color: #94a3b8; }
-.page-ctrl { display: flex; align-items: center; gap: 10px; }
-.page-num { color: #334155; font-size: 14px; font-weight: 600; }
 
-/* ── Step bar ── */
-.step-bar {
-  display: flex; align-items: center; gap: 0; margin-bottom: 20px;
-  padding: 12px 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;
+.filter-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  flex-wrap: wrap;
 }
-.step { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #94a3b8; }
-.step-active { color: #15803d; }
-.step-done { color: #0f766e; }
-.step-dot {
-  width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800;
+
+.search-box {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex: 1;
+  min-width: 280px;
 }
-.step-active .step-dot { background: #16a34a; color: #fff; }
-.step-done .step-dot { background: #0d9488; color: #fff; }
-.step-line { flex: 1; height: 2px; background: #e2e8f0; margin: 0 12px; }
 
-/* ── Form grid ── */
-.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.form-group { display: flex; flex-direction: column; gap: 5px; }
-.full-w { grid-column: 1 / -1; }
-.hint { font-size: 12px; color: #16a34a; font-style: italic; margin-top: 2px; }
+.search-box> :first-child {
+  flex: 1;
+  margin-bottom: 0;
+}
 
-/* ── Info banner ── */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.filter-label,
+.base-input-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.table-card {
+  background: #fff;
+  border: 1px solid #dcfce7;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(13, 79, 53, 0.06);
+}
+
+.code-chip {
+  display: inline-block;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name-sub {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.seat-badge {
+  font-weight: 700;
+  color: #334155;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.status-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.delete-body p {
+  margin: 0 0 10px;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.delete-hint {
+  font-size: 12px !important;
+  color: #64748b !important;
+  margin-bottom: 0 !important;
+}
+
+.pagination-container {
+  margin-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-info-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.total-label {
+  color: #94a3b8;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-number {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.per-page-select {
+  width: 72px !important;
+}
+
 .info-banner {
-  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
-  padding: 10px 14px; font-size: 13px; color: #92400e; margin-bottom: 16px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #92400e;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-/* ── Step 2: Seat builder ── */
-.step2-wrap { display: flex; flex-direction: column; gap: 16px; }
-.seat-info-bar {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  padding: 10px 14px; background: #f0fdf4; border-radius: 10px;
-  font-size: 13px; color: #166534; border: 1px solid #bbf7d0;
-}
-.seat-count-badge { background: #166534; color: #fff; border-radius: 999px; padding: 2px 10px; font-weight: 800; font-size: 12px; }
-.count-ok { color: #15803d; font-weight: 700; }
-.count-err { color: #b45309; font-weight: 700; }
-.floor-block { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-.floor-header {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
-}
-.floor-label { font-weight: 800; color: #0f172a; font-size: 14px; }
-.floor-count { color: #64748b; font-size: 12px; }
-.btn-add-seat {
-  margin-left: auto; background: #f0fdf4; color: #15803d;
-  border: 1.5px solid #bbf7d0; border-radius: 7px; padding: 4px 12px;
-  font-size: 12px; font-weight: 700; cursor: pointer; transition: all .2s;
-}
-.btn-add-seat:hover { background: #dcfce7; }
-.seat-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px; padding: 14px;
-}
-.seat-card {
-  display: flex; flex-direction: column; gap: 6px;
-  border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px;
-  position: relative; background: #fff; transition: box-shadow .2s;
-}
-.seat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
-.seat-preview {
-  height: 36px; border-radius: 8px; display: flex; align-items: center;
-  justify-content: center; font-weight: 800; font-size: 13px;
-}
-.seat-norm { background: #f0fdf4; color: #166534; border: 1.5px solid #bbf7d0; }
-.seat-vip { background: #fef3c7; color: #92400e; border: 1.5px solid #fde68a; }
-.seat-input {
-  border: 1px solid #cbd5e1; border-radius: 7px; padding: 5px 8px;
-  font-size: 12px; color: #1f2937; background: #fff; width: 100%; box-sizing: border-box;
-}
-.seat-input:focus { outline: none; border-color: #16a34a; }
-.seat-remove {
-  position: absolute; top: 6px; right: 6px; width: 20px; height: 20px;
-  border-radius: 50%; border: none; background: #fee2e2; color: #dc2626;
-  font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all .15s;
-}
-.seat-remove:hover { background: #dc2626; color: #fff; }
-.seat-tip {
-  font-size: 12px; color: #64748b; background: #f8fafc;
-  border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px;
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 
-/* ── Seat map viewer ── */
-.seat-loading { text-align: center; padding: 32px; color: #64748b; font-size: 15px; }
-.seat-xe-info {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  font-size: 14px; font-weight: 600; color: #0f172a; margin-bottom: 12px;
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.custom-input,
+.custom-select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #1f2937;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.custom-input:focus,
+.custom-select:focus {
+  outline: none;
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.custom-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.field-error {
+  display: block;
+  color: #dc2626;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+.seat-form {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.8fr 1fr auto;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.seat-form :deep(.base-input-wrapper) {
+  margin-bottom: 0;
+}
+
+.seat-select-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.seat-form-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-top: 0;
+  padding-top: 1.35rem;
+}
+
+.custom-select.has-error {
+  border-color: #ef4444 !important;
+}
+
+.custom-select.has-error:focus {
+  outline: none;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.detail-loading {
+  text-align: center;
+  padding: 28px;
+  color: #64748b;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.seat-title {
+  margin: 0 0 10px;
+  color: #334155;
+}
+
+.seat-map-wrap {
+  margin: 12px 0 14px;
+  padding: 10px;
+}
+
+.seat-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 8px 6px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-num {
+  font-size: 20px;
+  font-weight: 800;
+  color: #334155;
+  line-height: 1;
+}
+
+.stat-lbl {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.seat-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
 .seat-legend {
-  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
-  font-size: 12px; color: #64748b; margin-bottom: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  font-size: 12px;
+  color: #334155;
+  flex: 1;
+  min-width: 0;
 }
-.legend-item { display: flex; align-items: center; gap: 5px; }
-.lbox { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
-.seat-ok-box { background: #dcfce7; border: 1px solid #86efac; }
-.seat-broken-box { background: #fee2e2; border: 1px solid #fca5a5; }
-.seat-vip-box { background: #fef3c7; border: 1px solid #fde68a; }
-.view-floor { margin-bottom: 16px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-.seat-map-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 8px; padding: 14px;
-}
-.seat-map-item {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  border-radius: 10px; padding: 8px 4px; cursor: pointer;
-  border: 2px solid transparent; transition: all .18s; user-select: none;
-}
-.seat-map-item:hover { transform: scale(1.07); z-index: 2; }
-.smok { background: #f0fdf4; border-color: #86efac; }
-.smbrk { background: #fee2e2; border-color: #fca5a5; }
-.smvip { border-style: dashed; border-color: #fbbf24; }
-.smok.smvip { background: #fef9c3; }
-.sm-updating { opacity: .5; pointer-events: none; }
-.sm-code { font-size: 13px; font-weight: 800; color: #0f172a; }
-.sm-type { font-size: 9px; color: #64748b; text-align: center; }
-.sm-spin { font-size: 12px; }
 
-/* ── Detail grid ── */
-.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.detail-item { display: flex; flex-direction: column; gap: 4px; }
-.full-w { grid-column: 1 / -1; }
-.dlabel { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: #64748b; font-weight: 700; }
-.dvalue { font-size: 14px; color: #0f172a; font-weight: 600; }
-
-/* ── Edit Modal Tabs & Upload ── */
-.edit-tabs { display: flex; gap: 4px; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px; padding: 0 4px; }
-.etab { 
-  background: none; border: none; padding: 10px 16px; font-size: 14px; font-weight: 600; 
-  color: #64748b; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px;
-  transition: all 0.2s;
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
-.etab:hover { color: #15803d; }
-.etab-active { color: #15803d; border-bottom-color: #16a34a; }
-.mb-3 { margin-bottom: 12px; }
-.mt-2 { margin-top: 8px; }
-.doc-panel { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: #fafafa; }
-.dp-title { margin: 0; font-size: 14px; font-weight: 700; color: #334155; border-bottom: 1px dashed #cbd5e1; padding-bottom: 8px; }
 
-.hidden-input { display: none; }
-.upload-box { 
-  width: 100%; height: 140px; border: 2px dashed #cbd5e1; border-radius: 12px; 
-  display: flex; align-items: center; justify-content: center; cursor: pointer; 
-  background: #f8fafc; overflow: hidden; transition: all 0.2s; position: relative;
+.seat-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  display: inline-block;
 }
-.upload-box:hover { border-color: #16a34a; background: #f0fdf4; }
-.up-small { height: 100px; }
-.up-placeholder { font-size: 13px; font-weight: 600; color: #94a3b8; }
-.up-img { width: 100%; height: 100%; object-fit: cover; }
 
-/* ── Responsive ── */
+.dot-active {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+}
+
+.dot-booked {
+  background: #ffedd5;
+  border: 1px solid #ea580c;
+}
+
+.dot-locked {
+  background: #e2e8f0;
+  border: 1px solid #475569;
+}
+
+.dot-editing {
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+}
+
+.dot-driver {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.seat-layout-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-bottom: 0;
+}
+
+.seat-layout-toolbar .seat-layout-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.seat-layout-toolbar .custom-select {
+  width: auto;
+  height: 30px;
+  min-height: 30px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+
+.seat-rows-select {
+  width: auto;
+  min-width: 100px;
+  max-width: 160px;
+}
+
+.seat-dir-select {
+  width: auto;
+  min-width: 128px;
+  max-width: 190px;
+}
+
+.seat-floor-block {
+  margin-bottom: 14px;
+}
+
+.seat-floor-title {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.seat-row {
+  display: grid;
+  grid-template-columns: repeat(var(--seat-cols), minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.seat-floor-block .seat-row:last-child {
+  margin-bottom: 0;
+}
+
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 6px;
+}
+
+.seat-tile {
+  position: relative;
+  overflow: visible;
+  width: 100%;
+  border: 1px solid #86efac;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 9px;
+  padding: 8px 4px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.seat-tile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);
+}
+
+.seat-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+  z-index: 12050;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.32);
+}
+
+.seat-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: #0f172a transparent transparent transparent;
+}
+
+.seat-tile:hover .seat-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.seat-tile.blocked {
+  border-color: #64748b;
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.seat-tile.blocked:hover {
+  box-shadow: 0 4px 10px rgba(71, 85, 105, 0.25);
+}
+
+.seat-tile.booked {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
+  cursor: not-allowed;
+}
+
+.seat-tile.booked:hover {
+  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.2);
+  transform: none;
+}
+
+.seat-tile.editing {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.seat-tile.driver {
+  border-color: #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+.seat-tile.dragging {
+  opacity: 0.55;
+  transform: scale(0.98);
+}
+
+.seat-driver-tile {
+  border-color: #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+  cursor: default;
+}
+
 @media (max-width: 768px) {
-  .filter-inner { flex-direction: column; align-items: stretch; }
-  .form-grid-2, .detail-grid { grid-template-columns: 1fr; }
-  .seat-map-grid { grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); }
-  .step-bar { flex-direction: column; gap: 8px; }
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-grid,
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pagination-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .seat-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .seat-form-actions {
+    flex-wrap: wrap;
+    padding-top: 0;
+  }
+
+  .seat-stats {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

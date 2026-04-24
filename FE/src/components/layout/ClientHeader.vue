@@ -45,7 +45,7 @@ const goLogin = () => {
 
 const goRegister = () => {
   isMobileMenuOpen.value = false;
-  router.push("/auth/login");
+  router.push("/auth/register");
 };
 
 const handleLogout = () => {

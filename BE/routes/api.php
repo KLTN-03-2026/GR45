@@ -27,6 +27,9 @@ Route::prefix('v1')->group(function () {
     // API dành cho khách hàng - có thể đăng ký, đăng nhập, xem và quản lý thông tin cá nhân, đặt vé, hủy vé, xem thông tin chuyến xe đã đặt, tracking chuyến xe đã đặt, không can thiệp được vào thông tin của khách hàng khác
     Route::post('dang-nhap',  [KhachHangController::class, 'login']);
     Route::post('dang-ky',    [KhachHangController::class, 'register']);
+    Route::post('kich-hoat-tai-khoan', [KhachHangController::class, 'kichHoatTaiKhoan']);
+    Route::post('quen-mat-khau', [KhachHangController::class, 'requestPasswordReset']);
+    Route::post('dat-lai-mat-khau', [KhachHangController::class, 'resetPassword']);
     Route::middleware('auth.khach-hang')->group(function () {
         Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
         Route::post('dang-xuat',    [KhachHangController::class, 'logout']);
@@ -49,8 +52,8 @@ Route::prefix('v1')->group(function () {
 
         // Đánh giá chuyến xe
         Route::post('rating', [RatingController::class, 'submitRating']);
-        Route::get('rating/{ticketCode}', [RatingController::class, 'getRating']);
         Route::get('rating/trip/{tripId}', [RatingController::class, 'getRatingByTrip']);
+        Route::get('rating/{ticketCode}', [RatingController::class, 'getRating']);
         Route::get('pending-rating', [RatingController::class, 'getPendingRating']);
         Route::get('my-ratings', [RatingController::class, 'getMyRatings']);
 
@@ -151,11 +154,15 @@ Route::prefix('v1')->group(function () {
             Route::get('xe/{id}', [XeController::class, 'show']);
             Route::post('xe', [XeController::class, 'store']);
             Route::put('xe/{id}', [XeController::class, 'update']);
+            Route::delete('xe/{id}', [XeController::class, 'destroy']);
             Route::post('xe/{id}/ho-so', [XeController::class, 'updateHoSo']);
             Route::patch('xe/{id}/trang-thai', [XeController::class, 'toggleStatus']);
 
             // Sơ đồ ghế xe (Nhà xe)
             Route::get('xe/{id}/ghe', [XeController::class, 'getSeats']);
+            Route::post('xe/{id}/ghe', [XeController::class, 'storeSeat']);
+            Route::put('xe/{id}/ghe/{seatId}', [XeController::class, 'updateSeat']);
+            Route::delete('xe/{id}/ghe/{seatId}', [XeController::class, 'deleteSeat']);
             Route::patch('xe/{id}/ghe/{gheId}/trang-thai', [XeController::class, 'updateSeatStatus']);
 
             // Danh mục hỗ trợ cấu hình xe
@@ -209,6 +216,7 @@ Route::prefix('v1')->group(function () {
             Route::post('logout', [AdminController::class, 'logout']);
             Route::post('refresh', [AdminController::class, 'refresh']);
             Route::get('me', [AdminController::class, 'me']);
+            Route::post('doi-mat-khau', [AdminController::class, 'doiMatKhau']);
 
             // Nhân viên
             Route::get('nhan-vien', [AdminController::class, 'index'])->middleware('permission:xem-nhan-vien');
@@ -280,7 +288,12 @@ Route::prefix('v1')->group(function () {
             Route::patch('xe/{id}/trang-thai', [XeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-xe');
 
             // Sơ đồ ghế xe (Admin)
+            Route::get('loai-xe', [LoaiXeController::class, 'index'])->middleware('permission:xem-xe');
+            Route::get('loai-ghe', [LoaiGheController::class, 'index'])->middleware('permission:xem-xe');
             Route::get('xe/{id}/ghe', [XeController::class, 'getSeats'])->middleware('permission:xem-xe');
+            Route::post('xe/{id}/ghe', [XeController::class, 'storeSeat'])->middleware('permission:sua-xe');
+            Route::put('xe/{id}/ghe/{seatId}', [XeController::class, 'updateSeat'])->middleware('permission:sua-xe');
+            Route::delete('xe/{id}/ghe/{seatId}', [XeController::class, 'deleteSeat'])->middleware('permission:sua-xe');
             Route::patch('xe/{id}/ghe/{gheId}/trang-thai', [XeController::class, 'updateSeatStatus'])->middleware('permission:sua-xe');
 
             // Quản lý Voucher (Admin)

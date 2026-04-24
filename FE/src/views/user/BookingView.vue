@@ -70,10 +70,75 @@ const vietQrUrl = computed(() => {
 const formatPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + 'đ';
 
 // Lọc vé theo tầng
-const seatsFloor1 = computed(() => seatMapRaw.value.filter(s => s.tang === 1));
-const seatsFloor2 = computed(() => seatMapRaw.value.filter(s => s.tang === 2));
+const seatsFloor1 = computed(() =>
+  seatMapRaw.value.filter(s => Number(s.tang) === 1 && s.trang_thai !== 'an_ghe')
+);
+const seatsFloor2 = computed(() =>
+  seatMapRaw.value.filter(s => Number(s.tang) === 2 && s.trang_thai !== 'an_ghe')
+);
 
-const currentFloor = ref(1);
+const SEAT_ROWS_LS_KEY = 'gobus_seat_map_rows_per_floor';
+const seatRowsPerFloor = ref(2);
+const seatDirection = ref('driver_left');
+const SEAT_DIRECTION_LS_PREFIX = 'gobus_seat_direction_driver_';
+const getSeatDirectionStorageKey = (driverId) => `${SEAT_DIRECTION_LS_PREFIX}${driverId || 'none'}`;
+
+const applySeatDirectionFromDriver = () => {
+  const driverId = tripData.value?.xe?.id_tai_xe_chinh || null;
+  const stored = localStorage.getItem(getSeatDirectionStorageKey(driverId));
+  seatDirection.value = stored === 'driver_right' ? 'driver_right' : 'driver_left';
+};
+
+const seatsByFloor = computed(() => {
+  const grouped = seatMapRaw.value.reduce((acc, seat) => {
+    const floor = Number(seat.tang || 1);
+    if (!acc[floor]) acc[floor] = [];
+    acc[floor].push(seat);
+    return acc;
+  }, {});
+
+  return Object.entries(grouped)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([floor, seats]) => ({
+      floor: Number(floor),
+      seats: [...seats].sort((x, y) => String(x.ma_ghe || '').localeCompare(String(y.ma_ghe || '')))
+    }));
+});
+
+const splitSeatsIntoRows = (seats, numRows) => {
+  const list = Array.isArray(seats) ? [...seats] : [];
+  if (!list.length) return [];
+  const rows = Math.min(8, Math.max(1, Number(numRows) || 1));
+  const perRow = Math.ceil(list.length / rows);
+  const out = [];
+  for (let i = 0; i < list.length; i += perRow) {
+    out.push(list.slice(i, i + perRow));
+  }
+  return out;
+};
+
+const isDriverSeat = (seat, floorNumber, row, rowIndex) => {
+  if (!seat || floorNumber !== 1 || rowIndex !== 0 || !Array.isArray(row) || !row.length) return false;
+  const driverSeat = seatDirection.value === 'driver_right' ? row[row.length - 1] : row[0];
+  return Number(driverSeat?.id_ghe) === Number(seat.id_ghe);
+};
+
+const driverSeatIdSet = computed(() => {
+  const ids = new Set();
+  seatsByFloor.value.forEach((floor) => {
+    const rows = splitSeatsIntoRows(floor.seats, seatRowsPerFloor.value);
+    rows.forEach((row, rowIndex) => {
+      if (rowIndex !== 0 || floor.floor !== 1 || !row.length) return;
+      const driverSeat = seatDirection.value === 'driver_right' ? row[row.length - 1] : row[0];
+      if (driverSeat?.id_ghe != null) {
+        ids.add(Number(driverSeat.id_ghe));
+      }
+    });
+  });
+  return ids;
+});
+
+const isDriverSeatById = (seatId) => driverSeatIdSet.value.has(Number(seatId));
 
 // --- METHODS ---
 const fetchInitialData = async () => {
@@ -86,7 +151,15 @@ const fetchInitialData = async () => {
     const res = await clientApi.getTripSeats(tripId);
     if (res.success) {
       tripData.value = res.data.chuyen_xe;
-      seatMapRaw.value = res.data.so_do_ghe;
+      const rawSeats = res.data.so_do_ghe;
+      if (Array.isArray(rawSeats)) {
+        seatMapRaw.value = rawSeats;
+      } else if (rawSeats && typeof rawSeats === 'object') {
+        seatMapRaw.value = Object.values(rawSeats).flat();
+      } else {
+        seatMapRaw.value = [];
+      }
+      applySeatDirectionFromDriver();
       
       // Load stops
       const stopsRes = await clientApi.getTripStops(tripId);
@@ -114,6 +187,7 @@ const fetchInitialData = async () => {
 
 const toggleSeat = (seat) => {
   if (seat.trang_thai !== 'trong') return; // Không cho chọn ghế đã đặt/khóa
+  if (isDriverSeatById(seat.id_ghe)) return; // Ghế tài xế: disable chọn
   
   const index = selectedSeats.value.findIndex(s => s.id_ghe === seat.id_ghe);
   if (index >= 0) {
@@ -202,6 +276,13 @@ const submitBooking = async () => {
 };
 
 onMounted(() => {
+  const rawSeatRows = localStorage.getItem(SEAT_ROWS_LS_KEY);
+  if (rawSeatRows != null) {
+    const n = parseInt(rawSeatRows, 10);
+    if (!Number.isNaN(n)) {
+      seatRowsPerFloor.value = Math.min(8, Math.max(1, n));
+    }
+  }
   fetchInitialData();
 });
 </script>
@@ -256,47 +337,47 @@ onMounted(() => {
               Sơ đồ ghế
             </h2>
             
-            <div class="flex justify-center gap-4 mb-8">
-              <button class="px-6 py-2 rounded-full font-medium transition-all"
-                :class="currentFloor === 1 ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                @click="currentFloor = 1">Tầng 1</button>
-              <button class="px-6 py-2 rounded-full font-medium transition-all"
-                :class="currentFloor === 2 ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
-                @click="currentFloor = 2">Tầng 2</button>
-            </div>
+            <div class="seat-map-wrap">
+              <div class="seat-legend-row">
+                <div class="seat-legend">
+                  <span class="legend-item"><span class="seat-dot dot-active"></span> Hoạt động</span>
+                  <span class="legend-item"><span class="seat-dot dot-booked"></span> Đã đặt</span>
+                  <span class="legend-item"><span class="seat-dot dot-locked"></span> Khóa / bảo trì</span>
+                  <span class="legend-item"><span class="seat-dot dot-driver"></span> Ghế tài xế</span>
+                </div>
+              </div>
 
-            <!-- Chú thích -->
-            <div class="flex justify-center gap-6 mb-8 text-sm text-slate-600 flex-wrap">
-              <div class="flex items-center gap-2"><div class="w-5 h-5 bg-white border-2 border-slate-200 rounded"></div> Ghế trống</div>
-              <div class="flex items-center gap-2"><div class="w-5 h-5 bg-slate-200 border-2 border-slate-300 rounded opacity-60"></div> Đã đặt</div>
-              <div class="flex items-center gap-2"><div class="w-5 h-5 bg-blue-100 border-2 border-blue-500 rounded"></div> Đang chọn</div>
-            </div>
-
-            <div class="seat-map-container bg-slate-50 p-6 rounded-2xl border border-slate-100 w-fit mx-auto">
-              <!-- Đầu xe -->
-              <div class="w-full text-center text-xs font-bold text-slate-400 mb-6 uppercase tracking-widest border-b-2 border-dashed border-slate-200 pb-2">Đầu xe</div>
-              
-              <div class="grid grid-cols-5 gap-x-2 sm:gap-x-4 gap-y-4">
-                <template v-for="(seat, index) in (currentFloor === 1 ? seatsFloor1 : seatsFloor2)" :key="seat.id_ghe">
-                  <!-- Tạo khoảng trống cho lối đi (cột 3) -->
-                  <div v-if="index % 4 === 2" class="w-4 sm:w-8"></div>
-                  
-                  <button class="seat-btn relative w-10 sm:w-12 h-14 sm:h-16 rounded-lg border-2 transition-all flex flex-col items-center justify-center group"
-                    :disabled="seat.trang_thai !== 'trong'"
-                    :class="[
-                      seat.trang_thai !== 'trong' ? 'bg-slate-200 border-slate-300 cursor-not-allowed opacity-60' :
-                      isSeatSelected(seat.id_ghe) ? 'bg-blue-100 border-blue-500 shadow-inner' :
-                      'bg-white border-slate-200 hover:border-blue-400 hover:shadow'
-                    ]"
+              <div
+                v-for="floor in seatsByFloor"
+                :key="floor.floor"
+                class="seat-floor-block"
+              >
+                <h4 class="seat-floor-title">Tầng {{ floor.floor }}</h4>
+                <div
+                  v-for="(row, ri) in splitSeatsIntoRows(floor.seats, seatRowsPerFloor)"
+                  :key="ri"
+                  class="seat-row"
+                  :style="{ '--seat-cols': Math.max(row.length, 1) }"
+                >
+                  <button
+                    v-for="seat in row"
+                    :key="seat.id_ghe"
+                    type="button"
+                    class="seat-tile"
+                    :disabled="seat.trang_thai !== 'trong' || isDriverSeatById(seat.id_ghe)"
+                    :class="{
+                      blocked: seat.trang_thai === 'bao_tri_hoac_khoa',
+                      booked: seat.trang_thai === 'da_dat',
+                      editing: isSeatSelected(seat.id_ghe),
+                      driver:
+                        isDriverSeat(seat, floor.floor, row, ri) &&
+                        seat.trang_thai === 'trong',
+                    }"
                     @click="toggleSeat(seat)"
                   >
-                    <span class="text-xs sm:text-sm font-bold"
-                      :class="isSeatSelected(seat.id_ghe) ? 'text-blue-700' : 'text-slate-600'">
-                      {{ seat.ma_ghe }}
-                    </span>
-                    <span v-if="isSeatSelected(seat.id_ghe)" class="material-symbols-outlined text-blue-500 text-[16px] mt-1 absolute bottom-1">check_circle</span>
+                    {{ seat.ma_ghe }}
                   </button>
-                </template>
+                </div>
               </div>
             </div>
 
@@ -644,4 +725,141 @@ onMounted(() => {
 .custom-scroll::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+.seat-map-wrap {
+  margin: 12px 0 14px;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.seat-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.seat-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  font-size: 12px;
+  color: #334155;
+  flex: 1;
+  min-width: 0;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.seat-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.dot-active {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+}
+
+.dot-booked {
+  background: #ffedd5;
+  border: 1px solid #ea580c;
+}
+
+.dot-locked {
+  background: #e2e8f0;
+  border: 1px solid #475569;
+}
+
+.dot-driver {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.seat-floor-block {
+  margin-bottom: 14px;
+}
+
+.seat-floor-title {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.seat-row {
+  display: grid;
+  grid-template-columns: repeat(var(--seat-cols), minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.seat-floor-block .seat-row:last-child {
+  margin-bottom: 0;
+}
+
+.seat-tile {
+  width: 100%;
+  border: 1px solid #86efac;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 9px;
+  padding: 8px 4px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.seat-tile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);
+}
+
+.seat-tile.blocked {
+  border-color: #64748b;
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.seat-tile.blocked:hover {
+  box-shadow: 0 4px 10px rgba(71, 85, 105, 0.25);
+}
+
+.seat-tile.booked {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
+  cursor: not-allowed;
+}
+
+.seat-tile.booked:hover {
+  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.2);
+  transform: none;
+}
+
+.seat-tile.editing {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.seat-tile.driver {
+  border-color: #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
 </style>

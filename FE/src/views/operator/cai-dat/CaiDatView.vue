@@ -1,26 +1,249 @@
 <script setup>
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import operatorApi from '@/api/operatorApi.js'
+import { useOperatorStore } from '@/stores/operatorStore'
+import BaseToast from '@/components/common/BaseToast.vue'
+
+const profile = ref({
+  ten_nha_xe: 'Nhà xe',
+  email: '---',
+  so_dien_thoai: '---',
+})
+const router = useRouter()
+const operatorStore = useOperatorStore()
+const isLoading = ref(false)
+const isChangingPassword = ref(false)
+const passwordErrors = ref({})
+const passwordForm = ref({
+  mat_khau_cu: '',
+  mat_khau_moi: '',
+  mat_khau_moi_confirmation: '',
+})
+
+const toastVisible = ref(false)
+const toastMessage = ref('')
+const toastType = ref('success')
+let toastTimer = null
+
+const showToast = (message, type = 'success') => {
+  toastMessage.value = message
+  toastType.value = type
+  toastVisible.value = true
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastVisible.value = false
+  }, 3000)
+}
+
+const resetPasswordForm = () => {
+  passwordForm.value = {
+    mat_khau_cu: '',
+    mat_khau_moi: '',
+    mat_khau_moi_confirmation: '',
+  }
+  passwordErrors.value = {}
+}
+
+const fetchProfile = async () => {
+  isLoading.value = true
+  try {
+    const res = await operatorApi.getProfile()
+    const payload = res?.data?.data || {}
+    profile.value = {
+      ten_nha_xe: payload.ten_nha_xe || payload.ten || payload.name || 'Nhà xe',
+      email: payload.email || '---',
+      so_dien_thoai: payload.so_dien_thoai || payload.phone || '---',
+    }
+  } catch (error) {
+    showToast(error?.response?.data?.message || 'Không tải được thông tin nhà xe.', 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const handleChangePassword = async () => {
+  isChangingPassword.value = true
+  passwordErrors.value = {}
+  try {
+    const payload = {
+      mat_khau_cu: passwordForm.value.mat_khau_cu,
+      mat_khau_moi: passwordForm.value.mat_khau_moi,
+      mat_khau_moi_confirmation: passwordForm.value.mat_khau_moi_confirmation,
+    }
+    const res = await operatorApi.changePassword(payload)
+    showToast(res?.data?.message || 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.', 'success')
+    resetPasswordForm()
+    setTimeout(() => {
+      operatorStore.logout()
+      router.replace({ name: 'operator-login' })
+    }, 700)
+  } catch (error) {
+    passwordErrors.value = error?.response?.data?.errors || {}
+    showToast(error?.response?.data?.message || 'Đổi mật khẩu thất bại.', 'error')
+  } finally {
+    isChangingPassword.value = false
+  }
+}
+
+onMounted(fetchProfile)
 </script>
 
 <template>
-  <div class="operator-page">
-    <h1 class="page-title">Cài Đặt Hệ Thống</h1>
-    <div class="page-content">
-      <p>Nội dung đang phát triển...</p>
-    </div>
-  </div>
+  <section class="operator-page">
+    <BaseToast :visible="toastVisible" :message="toastMessage" :type="toastType" />
+    <h1 class="page-title">Cài đặt tài khoản nhà xe</h1>
+
+    <article class="card">
+      <h2>Thông tin tài khoản</h2>
+      <p v-if="isLoading" class="muted">Đang tải thông tin...</p>
+      <div v-else class="profile-grid">
+        <div class="profile-item">
+          <span>Tên nhà xe</span>
+          <strong>{{ profile.ten_nha_xe }}</strong>
+        </div>
+        <div class="profile-item">
+          <span>Email</span>
+          <strong>{{ profile.email }}</strong>
+        </div>
+        <div class="profile-item">
+          <span>Số điện thoại</span>
+          <strong>{{ profile.so_dien_thoai }}</strong>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <h2>Đổi mật khẩu</h2>
+      <div class="field">
+        <label>Mật khẩu hiện tại</label>
+        <input v-model="passwordForm.mat_khau_cu" type="password" placeholder="Nhập mật khẩu hiện tại" />
+        <small v-if="passwordErrors.mat_khau_cu" class="error-text">{{ passwordErrors.mat_khau_cu[0] }}</small>
+      </div>
+
+      <div class="field">
+        <label>Mật khẩu mới</label>
+        <input v-model="passwordForm.mat_khau_moi" type="password" placeholder="Ít nhất 6 ký tự" />
+        <small v-if="passwordErrors.mat_khau_moi" class="error-text">{{ passwordErrors.mat_khau_moi[0] }}</small>
+      </div>
+
+      <div class="field">
+        <label>Xác nhận mật khẩu mới</label>
+        <input
+          v-model="passwordForm.mat_khau_moi_confirmation"
+          type="password"
+          placeholder="Nhập lại mật khẩu mới"
+        />
+      </div>
+
+      <button class="btn-save" :disabled="isChangingPassword" @click="handleChangePassword">
+        {{ isChangingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu' }}
+      </button>
+    </article>
+  </section>
 </template>
 
 <style scoped>
+.operator-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .page-title {
+  margin: 0;
   font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 24px;
+  font-weight: 800;
   color: #0d4f35;
 }
-.page-content {
+
+.card {
   background: white;
-  padding: 24px;
+  padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.04);
+}
+
+.card h2 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-item span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.profile-item strong {
+  font-size: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.field input {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.btn-save {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #0d4f35, #15803d);
+  cursor: pointer;
+}
+
+.btn-save:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.error-text {
+  font-size: 12px;
+  color: #dc2626;
+}
+
+@media (max-width: 1024px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
