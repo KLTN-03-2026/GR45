@@ -426,7 +426,9 @@ const openSeatModal = async (vehicle) => {
 
 
 const getSeatMapByFloor = () => {
-  const grouped = seatModal.seats.reduce((acc, seat) => {
+  const visibleSeats = seatModal.seats.filter((seat) => seat.trang_thai !== 'an_ghe')
+
+  const grouped = visibleSeats.reduce((acc, seat) => {
     const floor = Number(seat.tang || 1)
     if (!acc[floor]) acc[floor] = []
     acc[floor].push(seat)
@@ -442,10 +444,11 @@ const getSeatMapByFloor = () => {
 }
 
 const seatStats = computed(() => {
-  const total = seatModal.seats.length
-  const active = seatModal.seats.filter((seat) => seat.trang_thai === 'hoat_dong').length
-  const locked = seatModal.seats.filter((seat) => seat.trang_thai === 'bao_tri_hoac_khoa').length
-  const booked = seatModal.seats.filter((seat) => seat.dang_co_ve).length
+  const visibleSeats = seatModal.seats.filter((seat) => seat.trang_thai !== 'an_ghe')
+  const total = visibleSeats.length
+  const active = visibleSeats.filter((seat) => seat.trang_thai === 'hoat_dong').length
+  const locked = visibleSeats.filter((seat) => seat.trang_thai === 'bao_tri_hoac_khoa').length
+  const booked = visibleSeats.filter((seat) => seat.dang_co_ve).length
   return { total, active, locked, booked }
 })
 
@@ -499,6 +502,16 @@ const isDriverSeat = (seat, floorNumber, row, rowIndex) => {
   if (!seat || floorNumber !== 1 || rowIndex !== 0 || !Array.isArray(row) || !row.length) return false
   const driverSeat = seatDirection.value === 'driver_right' ? row[row.length - 1] : row[0]
   return Number(driverSeat?.id) === Number(seat.id)
+}
+
+const seatTooltipText = (seat, floorNumber, row, rowIndex) => {
+  const roleText = isDriverSeat(seat, floorNumber, row, rowIndex) ? ' · Ghế tài xế' : ''
+  const statusText = seat.trang_thai !== 'hoat_dong'
+    ? 'Khóa/Bảo trì'
+    : seat.dang_co_ve
+      ? 'Đã đặt (có vé)'
+      : 'Hoạt động'
+  return `Click để chọn/sửa · Double-click để sửa nhanh — ${seat.ma_ghe}${roleText} (${statusText})`
 }
 
 
@@ -835,7 +848,7 @@ onMounted(() => {
       </template>
     </BaseModal>
 
-    <BaseModal v-model="seatModal.show" title="Quản lý ghế xe" maxWidth="860px">
+    <BaseModal v-model="seatModal.show" title="Quản lý ghế xe" maxWidth="860px" bodyOverflow="visible">
       <p class="seat-title">Xe: <strong>{{ seatModal.vehicleName }}</strong></p>
       <div class="seat-stats">
         <div class="stat-item">
@@ -937,9 +950,9 @@ onMounted(() => {
                   seat.trang_thai === 'hoat_dong' &&
                   !seat.dang_co_ve,
               }"
-                :title="`Click để chọn/sửa · Double-click để sửa nhanh — ${seat.ma_ghe}${isDriverSeat(seat, floor.floor, row, ri) ? ' · Ghế tài xế' : ''} (${seat.trang_thai !== 'hoat_dong' ? 'Khóa/Bảo trì' : seat.dang_co_ve ? 'Đã đặt (có vé)' : 'Hoạt động'})`"
                 @click="handleSeatTileClick(seat)" @dblclick.stop="editSeat(seat)">
                 {{ seat.ma_ghe }}<span v-if="isDriverSeat(seat, floor.floor, row, ri)"> (TX)</span>
+                <span class="seat-tooltip">{{ seatTooltipText(seat, floor.floor, row, ri) }}</span>
               </button>
             </div>
           </div>
@@ -1455,6 +1468,8 @@ onMounted(() => {
 }
 
 .seat-tile {
+  position: relative;
+  overflow: visible;
   width: 100%;
   border: 1px solid #86efac;
   background: #dcfce7;
@@ -1469,6 +1484,46 @@ onMounted(() => {
 .seat-tile:hover {
   transform: scale(1.05);
   box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);
+}
+
+.seat-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+  z-index: 12050;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.32);
+}
+
+.seat-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 6px;
+  border-style: solid;
+  border-color: #0f172a transparent transparent transparent;
+}
+
+.seat-tile:hover .seat-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
 }
 
 .seat-tile.blocked {

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\Admin\AdminRepositoryInterface;
+use Illuminate\Support\Facades\Log;
 
 class AdminService
 {
@@ -18,9 +19,9 @@ class AdminService
         return $this->adminRepo->login($credentials);
     }
 
-    public function logout(): void
+    public function logout()
     {
-        $this->adminRepo->logout();
+        return $this->adminRepo->logout();
     }
 
     public function refresh()
@@ -61,5 +62,10 @@ class AdminService
     public function toggleStatus(int $id)
     {
         return $this->adminRepo->toggleStatus($id);
+    }
+
+    public function doiMatKhau(\App\Models\Admin $admin, array $data): void
+    {
+        $this->adminRepo->doiMatKhau($admin, $data);
     }
 }

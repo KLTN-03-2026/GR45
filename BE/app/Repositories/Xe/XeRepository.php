@@ -29,6 +29,8 @@ class XeRepository implements XeRepositoryInterface
 
         if (!empty($filters['trang_thai'])) {
             $query->where('trang_thai', $filters['trang_thai']);
+        } elseif (empty($filters['include_hidden'])) {
+            $query->where('trang_thai', '!=', 'ngung_su_dung');
         }
 
         if (!empty($filters['ma_nha_xe'])) {
@@ -58,6 +60,8 @@ class XeRepository implements XeRepositoryInterface
 
         if (!empty($filters['trang_thai'])) {
             $query->where('trang_thai', $filters['trang_thai']);
+        } elseif (empty($filters['include_hidden'])) {
+            $query->where('trang_thai', '!=', 'ngung_su_dung');
         }
 
         return $query->orderByDesc('created_at')->paginate($filters['per_page'] ?? 15);

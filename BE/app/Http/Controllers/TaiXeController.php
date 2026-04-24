@@ -3,16 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\TaiXeResource;
+use App\Models\ChiTietVe;
+use App\Models\ChuyenXe;
+use App\Models\Ve;
 use App\Services\TaiXeService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use App\Http\Requests\TaiXe\DeleteTaiXeRequest;
 
 class TaiXeController extends Controller
 {
-    public function __construct(protected TaiXeService $service)
-    {
-    }
+    public function __construct(protected TaiXeService $service) {}
 
     // ── AUTH ──────────────────────────────────────────────────────────
 
@@ -39,7 +42,7 @@ class TaiXeController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => $this->service->getProfile($request->user('sanctum')),
+            'data'    => $this->service->getProfile($request->user('sanctum')),
         ]);
     }
 
@@ -54,6 +57,96 @@ class TaiXeController extends Controller
         }
     }
 
+    /** GET /api/v1/tai-xe/stats */
+    public function stats(Request $request): JsonResponse
+    {
+        $taiXe = $request->user('sanctum');
+        if (!$taiXe) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $today = Carbon::today();
+        $completedTripsToday = ChuyenXe::where('id_tai_xe', $taiXe->id)
+            ->whereDate('ngay_khoi_hanh', $today)
+            ->where('trang_thai', 'hoan_thanh')
+            ->get();
+
+        $todayEarnings = 0;
+        $totalKm = 0;
+
+        foreach ($completedTripsToday as $trip) {
+            $todayEarnings += Ve::where('id_chuyen_xe', $trip->id)
+                ->where('tinh_trang', 'da_thanh_toan')
+                ->sum('tong_tien');
+
+            $totalKm += (float) ($trip->tuyenDuong?->quang_duong ?? 0);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'todayEarnings' => (float) $todayEarnings,
+                'completedTrips' => $completedTripsToday->count(),
+                'totalKm' => $totalKm,
+                'rating' => 4.8,
+            ],
+        ]);
+    }
+
+    /** GET /api/v1/tai-xe/upcoming-trips */
+    public function upcomingTrips(Request $request): JsonResponse
+    {
+        $taiXe = $request->user('sanctum');
+        if (!$taiXe) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $now = Carbon::now();
+        $trips = ChuyenXe::with(['tuyenDuong', 'xe'])
+            ->where('id_tai_xe', $taiXe->id)
+            ->where(function ($query) use ($now) {
+                $query->whereDate('ngay_khoi_hanh', '>', $now->toDateString())
+                    ->orWhere(function ($q) use ($now) {
+                        $q->whereDate('ngay_khoi_hanh', $now->toDateString())
+                            ->whereTime('gio_khoi_hanh', '>=', $now->toTimeString());
+                    });
+            })
+            ->whereIn('trang_thai', ['hoat_dong', 'dang_di_chuyen'])
+            ->orderBy('ngay_khoi_hanh')
+            ->orderBy('gio_khoi_hanh')
+            ->limit(10)
+            ->get();
+
+        $data = $trips->map(function ($trip) {
+            $tripDate = Carbon::parse($trip->ngay_khoi_hanh);
+            if ($tripDate->isToday()) {
+                $ngay = 'Hôm nay';
+            } elseif ($tripDate->isTomorrow()) {
+                $ngay = 'Ngày mai';
+            } else {
+                $ngay = $tripDate->format('d/m');
+            }
+
+            $soKhach = ChiTietVe::whereHas('ve', function ($query) use ($trip) {
+                $query->where('id_chuyen_xe', $trip->id)
+                    ->whereIn('tinh_trang', ['dang_cho', 'da_thanh_toan']);
+            })->count();
+
+            return [
+                'id' => $trip->id,
+                'gio_khoi_hanh' => Carbon::parse($trip->gio_khoi_hanh)->format('H:i'),
+                'ngay' => $ngay,
+                'tuyen_duong' => $trip->tuyenDuong
+                    ? $trip->tuyenDuong->diem_bat_dau . ' - ' . $trip->tuyenDuong->diem_ket_thuc
+                    : 'N/A',
+                'bien_so' => $trip->xe->bien_so ?? 'N/A',
+                'so_khach' => $soKhach,
+            ];
+        });
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
     // ── ADMIN & NHA XE CRUD ────────────────────────────────────────────────────
 
     public function index(Request $request): JsonResponse
@@ -65,9 +158,11 @@ class TaiXeController extends Controller
             $filters['ma_nha_xe'] = $user->ma_nha_xe;
         }
 
+        $drivers = $this->service->getAll($filters);
+
         return response()->json([
             'success' => true,
-            'data' => $this->service->getAll($filters),
+            'data'    => TaiXeResource::collection($drivers)->response()->getData(true),
         ]);
     }
 
@@ -136,13 +231,28 @@ class TaiXeController extends Controller
     public function toggleStatus(int $id): JsonResponse
     {
         $taiXe = $this->service->toggleStatus($id);
-        if (!$taiXe)
-            return response()->json(['success' => false, 'message' => 'Không tìm thấy tài xế.'], 404);
+        if (!$taiXe) return response()->json(['success' => false, 'message' => 'Không tìm thấy tài xế.'], 404);
         $msg = $taiXe->tinh_trang === 'hoat_dong' ? 'Đã mở khóa tài khoản.' : 'Đã khóa tài khoản.';
         return response()->json(['success' => true, 'message' => $msg, 'data' => new TaiXeResource($taiXe)]);
     }
 
-    public function destroy(int $id, Request $request): JsonResponse
+    /** PATCH /admin/tai-xe/{id}/duyet — Duyệt tài xế (Admin only) */
+    public function approve(int $id): JsonResponse
+    {
+        $taiXe = $this->service->getById($id);
+        if (!$taiXe) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tài xế.'], 404);
+        }
+
+        $taiXe = $this->service->updateStatus($id, 'hoat_dong');
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã duyệt tài xế thành công. Tài xế có thể đăng nhập.',
+            'data'    => new TaiXeResource($taiXe),
+        ]);
+    }
+
+    public function destroy(int $id, DeleteTaiXeRequest $request): JsonResponse
     {
         $user = $request->user('sanctum');
         $taiXe = $this->service->getById($id);

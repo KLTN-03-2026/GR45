@@ -1,21 +1,86 @@
 @import './base.css';
 
-#app {
+/* CSS Reset & Global Layout cho ứng dụng Dashboard/Admin */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #app {
   width: 100%;
   min-height: 100vh;
-  font-weight: normal;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8fafc; /* Nền sáng dịu mặc định */
+  color: #1e293b;
+  overflow-x: hidden;
 }
 
-a,
-.green {
+#app {
+  display: block; /* Xóa thuộc tính grid/flex mặc định của Vue Vite Template */
+  max-width: none !important;
+}
+
+a {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+  color: inherit;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
+input, button, textarea, select {
+  font-family: inherit;
+}
+
+/* Global theme variables */
+:root {
+  --app-bg: #f8fafc;
+  --app-text: #1e293b;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+}
+
+html[data-theme='dark'] {
+  --app-bg: #0b1220;
+  --app-text: #dbe5f1;
+  --card-bg: #111b2e;
+  --card-border: #243248;
+}
+
+html[data-theme='dark'] body,
+html[data-theme='dark'] #app {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+}
+
+html[data-theme='dark'] .admin-layout-wrapper {
+  background-color: #0b1220 !important;
+  color: #dbe5f1 !important;
+}
+
+html[data-theme='dark'] .admin-header,
+html[data-theme='dark'] .glass-panel,
+html[data-theme='dark'] .glass-card,
+html[data-theme='dark'] .panel,
+html[data-theme='dark'] .page-content,
+html[data-theme='dark'] .stat-card,
+html[data-theme='dark'] .overview-card,
+html[data-theme='dark'] .tracking-item,
+html[data-theme='dark'] .feed-item,
+html[data-theme='dark'] .alarm-item {
+  background: var(--card-bg) !important;
+  border-color: var(--card-border) !important;
+  color: var(--app-text) !important;
+}
+
+html[data-theme='dark'] .page-sub,
+html[data-theme='dark'] .tracking-meta,
+html[data-theme='dark'] .feed-message,
+html[data-theme='dark'] .alarm-content,
+html[data-theme='dark'] .muted,
+html[data-theme='dark'] th,
+html[data-theme='dark'] td {
+  color: #b7c5d8 !important;
 }

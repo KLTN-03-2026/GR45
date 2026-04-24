@@ -1,117 +1,174 @@
 <script setup>
-import { watch, onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
 
 const props = defineProps({
-  modelValue: { type: Boolean, default: false },
-  title: { type: String, default: '' },
-  maxWidth: { type: String, default: '520px' },
+  modelValue: {
+    type: Boolean,
+    default: false
+  },
+  title: {
+    type: String,
+    default: ''
+  },
+  maxWidth: {
+    type: String,
+    default: '500px'
+  },
+  bodyOverflow: {
+    type: String,
+    default: 'auto'
+  }
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'close']);
 
-const close = () => emit('update:modelValue', false);
-
-const onKeydown = (e) => {
-  if (e.key === 'Escape' && props.modelValue) close();
+const close = () => {
+  emit('update:modelValue', false);
+  emit('close');
 };
 
-watch(
-  () => props.modelValue,
-  (open) => {
-    document.body.style.overflow = open ? 'hidden' : '';
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && props.modelValue) {
+    close();
   }
-);
+};
 
-onMounted(() => window.addEventListener('keydown', onKeydown));
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown);
+});
+
 onUnmounted(() => {
-  window.removeEventListener('keydown', onKeydown);
-  document.body.style.overflow = '';
+  document.removeEventListener('keydown', handleKeydown);
+});
+
+watch(() => props.modelValue, (val) => {
+  if (val) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = '';
+  }
 });
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="modal-overlay" role="dialog" aria-modal="true" @click.self="close">
-      <div class="modal-panel" :style="{ maxWidth }">
-        <header class="modal-header">
-          <h3 class="modal-title">{{ title }}</h3>
-          <button type="button" class="modal-close" aria-label="Đóng" @click="close">×</button>
-        </header>
-        <div class="modal-body">
-          <slot />
+    <Transition name="modal">
+      <div v-if="modelValue" class="modal-backdrop" @click.self="close">
+        <div class="modal-dialog" :style="{ maxWidth: maxWidth }">
+          <div class="modal-header">
+            <h3 class="modal-title">{{ title }}</h3>
+            <button class="btn-close" @click="close">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body" :style="{ overflowY: bodyOverflow }">
+            <slot></slot>
+          </div>
+          <div v-if="$slots.footer" class="modal-footer">
+            <slot name="footer"></slot>
+          </div>
         </div>
-        <footer v-if="$slots.footer" class="modal-footer">
-          <slot name="footer" />
-        </footer>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
 <style scoped>
-.modal-overlay {
+.modal-backdrop {
   position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(15, 23, 42, 0.45);
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 24px 16px;
-  overflow-y: auto;
+  z-index: 9999;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
-.modal-panel {
-  width: 100%;
-  margin: auto;
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
-  border: 1px solid #e2e8f0;
+.modal-dialog {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  pointer-events: auto; /* Đảm bảo có thể click vào modal content */
 }
 
 .modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
+  padding: 1.25rem 1.5rem;
   border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .modal-title {
   margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e293b;
 }
 
-.modal-close {
+.btn-close {
+  background: transparent;
   border: none;
-  background: #f1f5f9;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  font-size: 1.35rem;
-  line-height: 1;
+  color: #64748b;
   cursor: pointer;
-  color: #475569;
+  padding: 0.25rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.modal-close:hover {
-  background: #e2e8f0;
+.btn-close:hover {
+  background-color: #f1f5f9;
+  color: #ef4444;
 }
 
 .modal-body {
-  padding: 18px;
+  padding: 1.5rem;
+  overflow-y: auto;
 }
 
 .modal-footer {
-  padding: 12px 18px 16px;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  border-top: 1px solid #f1f5f9;
+  gap: 0.75rem;
+  background-color: #f8fafc;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+/* Transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.modal-enter-active .modal-dialog,
+.modal-leave-active .modal-dialog {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-from .modal-dialog,
+.modal-leave-to .modal-dialog {
+  transform: scale(0.95) translateY(10px);
 }
 </style>

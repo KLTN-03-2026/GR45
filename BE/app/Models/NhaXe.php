@@ -20,6 +20,8 @@ class NhaXe extends Authenticatable
         'email',
         'password',
         'so_dien_thoai',
+        'ty_le_chiet_khau',
+        'tai_khoan_nhan_tien',
         'tinh_trang',
         'id_chuc_vu',
         'id_nhan_vien_quan_ly',

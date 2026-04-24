@@ -164,11 +164,12 @@ class XeController extends Controller
     public function destroy($id): JsonResponse
     {
         try {
-            $this->xeService->delete($id);
+            $result = $this->xeService->delete($id);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Xóa xe thành công.',
+                'message' => $result['message'] ?? 'Xử lý thành công.',
+                'data' => $result,
             ]);
         } catch (\Exception $e) {
             $msg = $e->getMessage();

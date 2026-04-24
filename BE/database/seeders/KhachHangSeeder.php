@@ -66,17 +66,6 @@ class KhachHangSeeder extends Seeder
                 'created_at'     => now(),
                 'updated_at'     => now(),
             ],
-            [
-                'email'          => 'thanhtruc5699+3@gmail.com',
-                'ho_va_ten'      => 'Truc Member Demo',
-                'password'       => Hash::make('Truc@123456'),
-                'so_dien_thoai'  => '0933444555',
-                'dia_chi'        => 'Đà Nẵng',
-                'ngay_sinh'      => '2000-01-01',
-                'tinh_trang'     => 'hoat_dong',
-                'created_at'     => now(),
-                'updated_at'     => now(),
-            ],
         ];
 
         DB::table('khach_hangs')->insert($khachHangs);

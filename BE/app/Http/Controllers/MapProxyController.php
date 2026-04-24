@@ -22,8 +22,12 @@ class MapProxyController extends Controller
 
         try {
             $response = Http::timeout(10)->get('https://mapapis.openmap.vn/v1/direction', $params);
-
-            return response()->json($response->json(), $response->status());
+            $status = $response->status();
+            // Tránh trả về 401 (lỗi từ map API ráp key sai) làm frontend nhầm là lỗi Token đăng nhập
+            if ($status === 401 || $status === 403) {
+                $status = 400; 
+            }
+            return response()->json($response->json(), $status);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Map proxy error: ' . $e->getMessage()], 500);
         }

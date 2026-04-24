@@ -56,7 +56,7 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
         }
 
         $chuyenXe = $this->model->query()
-            ->with(['tuyenDuong', 'xe', 'taiXe', 'tuyenDuong.tramDungs'])
+            ->with(['tuyenDuong', 'xe', 'taiXe', 'tuyenDuong.tramDungs', 'danhGias.khachHang'])
             ->find($id);
 
         if (!$chuyenXe) {

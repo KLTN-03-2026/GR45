@@ -25,7 +25,7 @@ export const getVoucherStatus = (status) => {
     case 'active':      return { text: 'Hoạt động', class: 'status-approved' };
     case 'tam_ngung':
     case 'stopped':     return { text: 'Tạm ngưng', class: 'status-info' };
-    case 'vo_hieu':
+    case 'vo_hieu':     return { text: 'Vô hiệu', class: 'status-rejected' };
     case 'het_han':
     case 'expired':     return { text: 'Hết hiệu lực', class: 'status-expired' };
     default:            return { text: 'Không rõ', class: '' };
@@ -40,4 +40,3 @@ export const getStaffStatus = (status) => {
     default:           return { text: 'Không rõ', class: '' };
   }
 };
-

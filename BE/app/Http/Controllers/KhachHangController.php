@@ -49,11 +49,17 @@ class KhachHangController extends Controller
     {
         try {
             $result = $this->service->register($request->all());
+            $needEmailActivation = !empty($request->input('email'));
 
             return response()->json([
                 'success' => true,
-                'message' => 'Dang ky thanh cong.',
-                'data'    => $result,
+                'message' => $needEmailActivation
+                    ? 'Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản.'
+                    : 'Đăng ký thành công.',
+                'data'    => [
+                    ...$result,
+                    'requires_email_activation' => $needEmailActivation,
+                ],
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
@@ -90,6 +96,15 @@ class KhachHangController extends Controller
             'email' => 'required|email',
             'token' => 'required|string',
             'mat_khau_moi' => 'required|string|min:6|confirmed',
+        ], [
+            'role.required' => 'Vui lòng chọn vai trò.',
+            'role.in' => 'Vai trò không hợp lệ.',
+            'email.required' => 'Email không được để trống.',
+            'email.email' => 'Email không đúng định dạng.',
+            'token.required' => 'Thiếu token đặt lại mật khẩu.',
+            'mat_khau_moi.required' => 'Vui lòng nhập mật khẩu mới.',
+            'mat_khau_moi.min' => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+            'mat_khau_moi.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
         ]);
 
         if ($validator->fails()) {
@@ -107,6 +122,39 @@ class KhachHangController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+            ], 422);
+        }
+    }
+
+    public function kichHoatTaiKhoan(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'token' => 'required|string',
+        ], [
+            'email.required' => 'Email không được để trống.',
+            'email.email' => 'Email không đúng định dạng.',
+            'token.required' => 'Thiếu token kích hoạt.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            $this->service->kichHoatTaiKhoan($request->email, $request->token);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kích hoạt tài khoản thành công. Vui lòng đăng nhập.',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
@@ -273,6 +321,48 @@ class KhachHangController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Xoa khach hang thanh cong.',
+        ]);
+    }
+
+    // ── PUBLIC SEARCH DATA ────────────────────────────────────────────
+
+    public function getProvinces(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->service->getTinhThanhs(),
+        ]);
+    }
+
+    public function searchChuyenXe(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->service->searchChuyenXe($request->all()),
+        ]);
+    }
+
+    public function getGheChuyenXe(int $id): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->service->getGheChuyenXe($id),
+        ]);
+    }
+
+    public function getTramDungChuyenXe(int $id): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->service->getTramDungChuyenXe($id),
+        ]);
+    }
+
+    public function getVoucherCongKhai(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->service->getVoucherCongKhai($request->all()),
         ]);
     }
 }

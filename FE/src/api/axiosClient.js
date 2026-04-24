@@ -2,16 +2,14 @@ import axios from 'axios';
 
 // Mapping từ role → token key trong localStorage
 const ROLE_TOKEN_MAP = {
-  admin    : 'auth.admin.token',
-  client   : 'auth.client.token',
-  operator : 'auth.operator.token',
-  driver   : 'auth.driver.token',
+  admin: 'auth.admin.token',
+  client: 'auth.client.token',
+  operator: 'auth.operator.token',
+  driver: 'auth.driver.token',
 };
 
-const apiRoot = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
-
 const axiosClient = axios.create({
-  baseURL: `${apiRoot}/api/`,
+  baseURL: 'http://127.0.0.1:8000/api/',
   headers: { 'Content-Type': 'application/json' },
   timeout: 10000,
 });
@@ -21,12 +19,18 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     const activeRole = localStorage.getItem('auth.active_role');
-    const tokenKey   = ROLE_TOKEN_MAP[activeRole];
-    const token      = tokenKey ? localStorage.getItem(tokenKey) : null;
+    const tokenKey = ROLE_TOKEN_MAP[activeRole];
+    const token = tokenKey ? localStorage.getItem(tokenKey) : null;
 
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+
+    // Tự xoá Content-Type nếu dữ liệu là form data để cho phép browser tự gen config Multipart
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -39,7 +43,7 @@ axiosClient.interceptors.response.use(
     // Nếu 401 → xóa token của role đang active
     if (error.response?.status === 401) {
       const activeRole = localStorage.getItem('auth.active_role');
-      const tokenKey   = ROLE_TOKEN_MAP[activeRole];
+      const tokenKey = ROLE_TOKEN_MAP[activeRole];
       if (tokenKey) {
         localStorage.removeItem(tokenKey);
         localStorage.removeItem(tokenKey.replace('.token', '.user'));

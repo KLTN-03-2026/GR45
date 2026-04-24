@@ -50,7 +50,7 @@ class UpdateXeRequest extends FormRequest
             'hinh_bien_so' => 'nullable|string|max:500',
             'ghi_chu' => 'nullable|string|max:1000',
             'tien_nghi' => 'nullable|string|max:500',
-            'trang_thai' => 'nullable|in:hoat_dong,bao_tri,cho_duyet',
+            'trang_thai' => 'nullable|in:hoat_dong,bao_tri,cho_duyet,ngung_su_dung',
         ];
     }
 
@@ -66,7 +66,7 @@ class UpdateXeRequest extends FormRequest
             'tien_nghi.max' => 'Thông tin tiện nghi không được vượt quá 500 ký tự.',
             'ngay_het_han_dang_kiem.after_or_equal' => 'Ngày hết hạn đăng kiểm phải sau hoặc bằng ngày đăng kiểm.',
             'ngay_het_han_bao_hiem.after_or_equal' => 'Ngày hết hạn bảo hiểm phải sau hoặc bằng ngày hiệu lực.',
-            'trang_thai.in' => 'Trạng thái không hợp lệ. Chỉ chấp nhận: hoat_dong, bao_tri, cho_duyet.',
+            'trang_thai.in' => 'Trạng thái không hợp lệ. Chỉ chấp nhận: hoat_dong, bao_tri, cho_duyet, ngung_su_dung.',
         ];
     }
 

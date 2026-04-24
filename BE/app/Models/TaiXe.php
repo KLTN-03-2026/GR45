@@ -18,9 +18,11 @@ class TaiXe extends Authenticatable
     protected $table = 'tai_xes';
 
     protected $fillable = [
+        'ho_va_ten',
         'email',
         'password',
         'cccd',
+        'so_dien_thoai',
         'ma_nha_xe',
         'tinh_trang',
     ];

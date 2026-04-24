@@ -3,6 +3,7 @@ import axiosClient from './axiosClient.js';
 const authApi = {
   // --- KHÁCH HÀNG ---
   clientRegister: (data) => axiosClient.post('/v1/dang-ky', data),
+  activateClientAccount: (data) => axiosClient.post('/v1/kich-hoat-tai-khoan', data),
   clientLogin: (data) => axiosClient.post('/v1/dang-nhap', data),
   clientLogout: () => axiosClient.post('/v1/dang-xuat'),
   requestPasswordReset: (data) => axiosClient.post('/v1/quen-mat-khau', data),

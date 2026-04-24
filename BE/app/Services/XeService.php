@@ -11,6 +11,8 @@ use App\Models\Ghe;
 use App\Models\LoaiGhe;
 use App\Models\LoaiXe;
 use App\Models\NhaXe;
+use App\Models\NhatKyBaoDong;
+use App\Models\TrackingHanhTrinh;
 use App\Models\Xe;
 use App\Models\TuyenDuong;
 use App\Models\Ve;
@@ -106,22 +108,17 @@ class XeService
         }
 
         if ($shouldSyncSeatsByLoaiXe) {
-            $hasBookings = \App\Models\ChiTietVe::query()
-                ->whereIn('id_ghe', Ghe::query()->where('id_xe', $id)->pluck('id'))
-                ->whereHas('ve', function ($q) {
-                    $q->whereIn('tinh_trang', ['dang_cho', 'da_thanh_toan']);
-                })
-                ->exists();
-            if ($hasBookings) {
-                throw new \Exception('Xe đã có ghế gắn với vé đang hoạt động. Vui lòng xử lý vé trước khi đổi loại xe.');
+            $seatIds = Ghe::query()->where('id_xe', $id)->pluck('id')->all();
+            $hasNotCancelledSeatTickets = $this->hasNotCancelledSeatTickets($seatIds);
+            if ($hasNotCancelledSeatTickets) {
+                throw new \Exception('Chỉ có thể đổi sơ đồ ghế khi toàn bộ vé liên quan đã hủy.');
             }
         }
 
         $updated = $this->xeRepo->update($id, $data);
 
         if ($updated && $shouldSyncSeatsByLoaiXe && isset($loaiXe)) {
-            Ghe::query()->where('id_xe', $updated->id)->delete();
-            $this->autoGenerateSeatsForVehicle($updated->id, $loaiXe);
+            $this->syncSeatsForLoaiXeWithoutDeletingReferenced($updated->id, $loaiXe);
         }
 
         return $updated;
@@ -132,31 +129,75 @@ class XeService
         $xe = $this->xeRepo->getById($id);
         if (!$xe) {
             // Make delete idempotent to avoid noisy errors on duplicated requests.
-            return true;
+            return [
+                'action' => 'noop',
+                'message' => 'Xe không tồn tại.',
+            ];
         }
 
         $user = Auth::user();
         try {
             if ($user instanceof Admin) {
-                $this->assertXeHasNoRouteOrTripLinks($id);
-                return $this->xeRepo->delete($id);
+                return $this->deleteOrArchiveVehicle($xe);
             }
             if ($user instanceof NhaXe) {
                 if ($xe->ma_nha_xe !== $user->ma_nha_xe) {
                     throw new \Exception('Bạn không có quyền xóa xe này.');
                 }
-                $this->assertXeHasNoRouteOrTripLinks($id);
-                return $this->xeRepo->delete($id);
+                return $this->deleteOrArchiveVehicle($xe);
             }
             throw new \Exception('Bạn không có quyền xóa xe.');
         } catch (QueryException $e) {
             // FK 1451: xe đang được tham chiếu bởi tuyến/chuyến -> không thể xóa trực tiếp.
             $errorCode = (int) ($e->errorInfo[1] ?? 0);
             if ($errorCode === 1451) {
-                throw new \Exception('Xe đang được sử dụng ở tuyến đường/chuyến xe. Vui lòng cập nhật hoặc đổi xe trong các tuyến/chuyến liên quan trước khi xóa.');
+                // Fallback an toàn: nếu có race condition FK thì vẫn chuyển sang ngừng sử dụng.
+                $xe->trang_thai = 'ngung_su_dung';
+                $xe->save();
+                return [
+                    'action' => 'archived',
+                    'message' => 'Xe có dữ liệu liên quan nên đã chuyển sang trạng thái ngừng sử dụng thay vì xóa.',
+                    'xe_id' => (int) $xe->id,
+                ];
             }
             throw $e;
         }
+    }
+
+    private function deleteOrArchiveVehicle(Xe $xe): array
+    {
+        $activeTripCount = ChuyenXe::query()
+            ->where('id_xe', (int) $xe->id)
+            ->whereIn('trang_thai', ['hoat_dong', 'dang_di_chuyen'])
+            ->count();
+        if ($activeTripCount > 0) {
+            throw new \Exception("Không thể ngừng sử dụng/xóa xe vì còn {$activeTripCount} chuyến đang hoạt động.");
+        }
+
+        $summary = $this->getXeDependencySummary((int) $xe->id);
+        $hasDependencies = array_sum($summary) > 0;
+
+        if (!$hasDependencies) {
+            $deleted = $this->xeRepo->delete((int) $xe->id);
+            if (!$deleted) {
+                throw new \Exception('Không thể xóa xe.');
+            }
+            return [
+                'action' => 'deleted',
+                'message' => 'Xóa xe thành công.',
+                'xe_id' => (int) $xe->id,
+            ];
+        }
+
+        $xe->trang_thai = 'ngung_su_dung';
+        $xe->save();
+
+        return [
+            'action' => 'archived',
+            'message' => 'Xe có dữ liệu liên quan nên đã chuyển sang trạng thái ngừng sử dụng thay vì xóa.',
+            'xe_id' => (int) $xe->id,
+            'dependencies' => $summary,
+        ];
     }
 
     /**
@@ -164,9 +205,14 @@ class XeService
      */
     protected function assertXeHasNoRouteOrTripLinks(int $idXe): void
     {
-        $tuyenCount = TuyenDuong::query()->where('id_xe', $idXe)->count();
-        $chuyenCount = ChuyenXe::query()->where('id_xe', $idXe)->count();
-        if ($tuyenCount === 0 && $chuyenCount === 0) {
+        $summary = $this->getXeDependencySummary($idXe);
+        $tuyenCount = $summary['tuyen_count'];
+        $chuyenCount = $summary['chuyen_count'];
+        $trackingCount = $summary['tracking_count'];
+        $baoDongCount = $summary['bao_dong_count'];
+        $chiTietVeCount = $summary['chi_tiet_ve_count'];
+
+        if ($tuyenCount === 0 && $chuyenCount === 0 && $trackingCount === 0 && $baoDongCount === 0 && $chiTietVeCount === 0) {
             return;
         }
 
@@ -177,11 +223,40 @@ class XeService
         if ($chuyenCount > 0) {
             $parts[] = $chuyenCount . ' chuyến xe';
         }
+        if ($trackingCount > 0) {
+            $parts[] = $trackingCount . ' bản ghi tracking';
+        }
+        if ($baoDongCount > 0) {
+            $parts[] = $baoDongCount . ' bản ghi cảnh báo';
+        }
+        if ($chiTietVeCount > 0) {
+            $parts[] = $chiTietVeCount . ' chi tiết vé';
+        }
 
         throw new \Exception(
             'Không thể xóa xe: đang liên kết với ' . implode(' và ', $parts)
-            . '. Vui lòng gỡ xe khỏi tuyến/chuyến (hoặc đổi xe) trước khi xóa.'
+            . '. Vui lòng gỡ các liên kết này (hoặc chuyển trạng thái xe) trước khi xóa.'
         );
+    }
+
+    private function getXeDependencySummary(int $idXe): array
+    {
+        $tuyenCount = TuyenDuong::query()->where('id_xe', $idXe)->count();
+        $chuyenCount = ChuyenXe::query()->where('id_xe', $idXe)->count();
+        $trackingCount = TrackingHanhTrinh::query()->where('id_xe', $idXe)->count();
+        $baoDongCount = NhatKyBaoDong::query()->where('id_xe', $idXe)->count();
+        $seatIds = Ghe::query()->where('id_xe', $idXe)->pluck('id')->all();
+        $chiTietVeCount = $seatIds === []
+            ? 0
+            : ChiTietVe::query()->whereIn('id_ghe', $seatIds)->count();
+
+        return [
+            'tuyen_count' => $tuyenCount,
+            'chuyen_count' => $chuyenCount,
+            'tracking_count' => $trackingCount,
+            'bao_dong_count' => $baoDongCount,
+            'chi_tiet_ve_count' => $chiTietVeCount,
+        ];
     }
 
     public function updateStatus(int $id, string $status)
@@ -488,15 +563,23 @@ class XeService
         $seats = Ghe::with('loaiGhe')
             ->where('id_xe', $vehicleId)
             ->orderBy('tang')
-            ->orderBy('id')
+            ->orderBy('ma_ghe')
             ->get();
 
         $bookedIds = $this->getSeatIdsWithActiveBookings($seats->pluck('id')->all());
         $bookedSet = array_flip($bookedIds);
+        $seatIdsWithAnyTickets = $this->getSeatIdsWithAnyTickets($seats->pluck('id')->all());
+        $seatIdsWithAnyTicketsSet = array_flip($seatIdsWithAnyTickets);
 
-        return $seats->map(function (Ghe $seat) use ($bookedSet) {
+        return $seats->map(function (Ghe $seat) use ($bookedSet, $seatIdsWithAnyTicketsSet) {
             $data = $seat->toArray();
-            $data['dang_co_ve'] = isset($bookedSet[(int) $seat->id]);
+            $seatId = (int) $seat->id;
+            $hasActiveTicket = isset($bookedSet[$seatId]);
+            $hasAnyTicket = isset($seatIdsWithAnyTicketsSet[$seatId]);
+
+            $data['dang_co_ve'] = $hasActiveTicket;
+            // Chỉ chứa lịch sử vé đã hủy -> frontend sẽ ẩn khỏi sơ đồ và số đếm
+            $data['chi_co_ve_huy'] = $hasAnyTicket && !$hasActiveTicket;
 
             return $data;
         });
@@ -522,12 +605,60 @@ class XeService
             ->all();
     }
 
+    private function getSeatIdsWithAnyTickets(array $seatIds): array
+    {
+        if ($seatIds === []) {
+            return [];
+        }
+
+        return ChiTietVe::query()
+            ->whereIn('id_ghe', $seatIds)
+            ->distinct()
+            ->pluck('id_ghe')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     /** Vé đang chờ / đã thanh toán — không cho sửa/xóa ghế */
     private function seatHasActiveBooking(Ghe $seat): bool
     {
         return $seat->chiTietVe()->whereHas('ve', function ($q) {
             $q->whereIn('tinh_trang', ['dang_cho', 'da_thanh_toan']);
         })->exists();
+    }
+
+    /**
+     * Ghế từng phát sinh chi tiết vé (mọi trạng thái) sẽ không được xóa
+     * vì FK chi_tiet_ves.id_ghe -> ghes.id đang ON DELETE RESTRICT.
+     */
+    private function seatHasAnyTicketHistory(Ghe $seat): bool
+    {
+        return $seat->chiTietVe()->exists();
+    }
+
+    private function hasAnySeatTickets(array $seatIds): bool
+    {
+        if ($seatIds === []) {
+            return false;
+        }
+
+        return \App\Models\ChiTietVe::query()
+            ->whereIn('id_ghe', $seatIds)
+            ->exists();
+    }
+
+    private function hasNotCancelledSeatTickets(array $seatIds): bool
+    {
+        if ($seatIds === []) {
+            return false;
+        }
+
+        return \App\Models\ChiTietVe::query()
+            ->whereIn('id_ghe', $seatIds)
+            ->whereHas('ve', function ($q) {
+                $q->where('tinh_trang', '!=', 'huy');
+            })
+            ->exists();
     }
 
     public function createSeat(int $vehicleId, array $data)
@@ -563,8 +694,8 @@ class XeService
             throw new \Exception('Ghế không tồn tại.');
         }
 
-        if ($this->seatHasActiveBooking($seat)) {
-            throw new \Exception('Ghế đã có vé đặt, không thể cập nhật.');
+        if ($this->seatHasAnyTicketHistory($seat)) {
+            throw new \Exception('Ghế đã phát sinh vé trong hệ thống, không thể cập nhật.');
         }
 
         if (!empty($data['ma_ghe']) && $data['ma_ghe'] !== $seat->ma_ghe) {
@@ -591,8 +722,8 @@ class XeService
             throw new \Exception('Ghế không tồn tại.');
         }
 
-        if ($this->seatHasActiveBooking($seat)) {
-            throw new \Exception('Ghế đã có vé đặt, không thể xóa.');
+        if ($this->seatHasAnyTicketHistory($seat)) {
+            throw new \Exception('Ghế đã phát sinh vé trong hệ thống, không thể xóa.');
         }
 
         $seat->delete();
@@ -610,15 +741,9 @@ class XeService
             return 0;
         }
 
-        $bookedSeatIds = $seats->pluck('id')->all();
-        $hasBookings = \App\Models\ChiTietVe::query()
-            ->whereIn('id_ghe', $bookedSeatIds)
-            ->whereHas('ve', function ($q) {
-                $q->whereIn('tinh_trang', ['dang_cho', 'da_thanh_toan']);
-            })
-            ->exists();
-        if ($hasBookings) {
-            throw new \Exception('Một số ghế đã có vé, không thể xóa toàn bộ.');
+        $seatIds = $seats->pluck('id')->all();
+        if ($this->hasAnySeatTickets($seatIds)) {
+            throw new \Exception('Một số ghế đã phát sinh vé trong hệ thống, không thể xóa toàn bộ.');
         }
 
         return Ghe::query()->where('id_xe', $vehicleId)->delete();
@@ -654,5 +779,98 @@ class XeService
                 ]);
             }
         }
+    }
+
+    /**
+     * Đồng bộ sơ đồ ghế theo loại xe mới mà không xóa ghế cũ đã từng tham chiếu vé.
+     * - Ghế không còn trong layout mới sẽ chuyển sang trạng thái khóa/bảo trì.
+     * - Ghế thiếu sẽ được tạo thêm.
+     * - Ghế nằm trong layout mới sẽ bật lại hoạt động.
+     */
+    private function syncSeatsForLoaiXeWithoutDeletingReferenced(int $vehicleId, LoaiXe $loaiXe): void
+    {
+        $desiredSeatCodesByFloor = $this->buildSeatCodePlan($loaiXe);
+        $desiredCodeSet = [];
+        foreach ($desiredSeatCodesByFloor as $floor => $codes) {
+            foreach ($codes as $code) {
+                $desiredCodeSet[$code] = (int) $floor;
+            }
+        }
+
+        $defaultSeatType = LoaiGhe::query()->first();
+        if (!$defaultSeatType) {
+            throw new \Exception('Chưa có loại ghế mặc định để đồng bộ sơ đồ ghế.');
+        }
+
+        $existingSeats = Ghe::query()->where('id_xe', $vehicleId)->get();
+        $existingByCode = $existingSeats->keyBy('ma_ghe');
+
+        foreach ($desiredCodeSet as $maGhe => $floor) {
+            /** @var Ghe|null $seat */
+            $seat = $existingByCode->get($maGhe);
+            if ($seat) {
+                $update = [];
+                if ((int) $seat->tang !== (int) $floor) {
+                    $update['tang'] = (int) $floor;
+                }
+                if ((int) $seat->id_loai_ghe <= 0) {
+                    $update['id_loai_ghe'] = (int) $defaultSeatType->id;
+                }
+                if ($seat->trang_thai !== 'hoat_dong') {
+                    $update['trang_thai'] = 'hoat_dong';
+                }
+                if ($update !== []) {
+                    $seat->fill($update);
+                    $seat->save();
+                }
+                continue;
+            }
+
+            Ghe::query()->create([
+                'id_xe' => $vehicleId,
+                'id_loai_ghe' => (int) $defaultSeatType->id,
+                'ma_ghe' => $maGhe,
+                'tang' => (int) $floor,
+                'trang_thai' => 'hoat_dong',
+            ]);
+        }
+
+        foreach ($existingSeats as $seat) {
+            if (!isset($desiredCodeSet[$seat->ma_ghe])) {
+                if ($this->seatHasAnyTicketHistory($seat)) {
+                    if ($seat->trang_thai !== 'an_ghe') {
+                        $seat->trang_thai = 'an_ghe';
+                        $seat->save();
+                    }
+                } else {
+                    $seat->delete();
+                }
+            }
+        }
+    }
+
+    /**
+     * Sinh danh sách mã ghế chuẩn theo loại xe (ví dụ A01.., B01..).
+     *
+     * @return array<int, array<int, string>> [floor => [seatCode...]]
+     */
+    private function buildSeatCodePlan(LoaiXe $loaiXe): array
+    {
+        $totalSeats = max(1, (int) ($loaiXe->so_ghe_mac_dinh ?? 0));
+        $floors = max(1, (int) ($loaiXe->so_tang ?? 1));
+        $basePerFloor = intdiv($totalSeats, $floors);
+        $remainder = $totalSeats % $floors;
+
+        $result = [];
+        for ($floor = 1; $floor <= $floors; $floor++) {
+            $seatsOnThisFloor = $basePerFloor + ($floor <= $remainder ? 1 : 0);
+            $prefix = $floor <= 26 ? chr(64 + $floor) : 'T' . $floor;
+            $result[$floor] = [];
+            for ($i = 1; $i <= $seatsOnThisFloor; $i++) {
+                $result[$floor][] = $prefix . str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+            }
+        }
+
+        return $result;
     }
 }

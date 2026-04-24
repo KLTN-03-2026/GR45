@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   TrendingUp,
+  Star,
   Settings,
   ChevronDown,
   Bus,
@@ -78,6 +79,12 @@ const menuList = [
     name: 'Voucher',
     path: '/nha-xe/voucher',
     icon: Gift
+  },
+  {
+    id: 'danh-gia',
+    name: 'Đánh giá chuyến xe',
+    path: '/nha-xe/danh-gia',
+    icon: Star,
   },
 
   // --- Nhân sự ---

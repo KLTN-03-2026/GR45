@@ -3,9 +3,10 @@ import axiosClient from './axiosClient.js';
 const adminApi = {
   // --- PROFILE ---
   getMe: () => axiosClient.get('/v1/admin/me'),
+  changePassword: (data) => axiosClient.post('/v1/admin/doi-mat-khau', data),
 
   // --- QUẢN LÝ NHÂN VIÊN ---
-  getStaffs: () => axiosClient.get('/v1/admin/nhan-vien'),
+  getStaffs: (params) => axiosClient.get('/v1/admin/nhan-vien', { params }),
   getStaffDetails: (id) => axiosClient.get(`/v1/admin/nhan-vien/${id}`),
   createStaff: (data) => axiosClient.post('/v1/admin/nhan-vien', data),
   updateStaff: (id, data) => axiosClient.put(`/v1/admin/nhan-vien/${id}`, data),
@@ -15,6 +16,8 @@ const adminApi = {
   // --- QUẢN LÝ KHÁCH HÀNG ---
   getClients: (params) => axiosClient.get('/v1/admin/khach-hang', { params }),
   getClientDetails: (id) => axiosClient.get(`/v1/admin/khach-hang/${id}`),
+  createClient: (data) => axiosClient.post('/v1/admin/khach-hang', data),
+  updateClient: (id, data) => axiosClient.put(`/v1/admin/khach-hang/${id}`, data),
   toggleClientStatus: (id) => axiosClient.patch(`/v1/admin/khach-hang/${id}/trang-thai`),
   deleteClient: (id) => axiosClient.delete(`/v1/admin/khach-hang/${id}`),
 
@@ -22,6 +25,7 @@ const adminApi = {
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
   createOperator: (data) => axiosClient.post('/v1/admin/nha-xe', data),
+  updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
   toggleOperatorStatus: (id) => axiosClient.patch(`/v1/admin/nha-xe/${id}/trang-thai`),
   deleteOperator: (id) => axiosClient.delete(`/v1/admin/nha-xe/${id}`),
 
@@ -37,25 +41,25 @@ const adminApi = {
     return axiosClient.put(`/v1/admin/tai-xe/${id}`, data);
   },
   toggleDriverStatus: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/trang-thai`),
+  approveDriver: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/duyet`),
   deleteDriver: (id) => axiosClient.delete(`/v1/admin/tai-xe/${id}`),
 
   // --- QUẢN LÝ XE ---
-  getLoaiXe: () => axiosClient.get('/v1/admin/loai-xe'),
-  createLoaiXe: (data) => axiosClient.post('/v1/admin/loai-xe', data),
-  getSeatTypes: () => axiosClient.get('/v1/admin/loai-ghe'),
   getVehicles: (params) => axiosClient.get('/v1/admin/xe', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/admin/xe/${id}`),
   createVehicle: (data) => axiosClient.post('/v1/admin/xe', data),
   updateVehicle: (id, data) => axiosClient.put(`/v1/admin/xe/${id}`, data),
   deleteVehicle: (id) => axiosClient.delete(`/v1/admin/xe/${id}`),
   updateVehicleStatus: (id, data) => axiosClient.patch(`/v1/admin/xe/${id}/trang-thai`, data),
-  getVehicleStatusChangeWarning: (id, params) =>
-    axiosClient.get(`/v1/admin/xe/${id}/canh-bao-doi-trang-thai`, { params }),
+  getLoaiXe: () => axiosClient.get('/v1/admin/loai-xe'),
+  getLoaiGhe: () => axiosClient.get('/v1/admin/loai-ghe'),
+  getSeatTypes: () => axiosClient.get('/v1/admin/loai-ghe'),
   getVehicleSeats: (id) => axiosClient.get(`/v1/admin/xe/${id}/ghe`),
   createVehicleSeat: (id, data) => axiosClient.post(`/v1/admin/xe/${id}/ghe`, data),
-  clearVehicleSeats: (id) => axiosClient.delete(`/v1/admin/xe/${id}/ghe`),
-  updateVehicleSeat: (id, seatId, data) => axiosClient.put(`/v1/admin/xe/${id}/ghe/${seatId}`, data),
-  deleteVehicleSeat: (id, seatId) => axiosClient.delete(`/v1/admin/xe/${id}/ghe/${seatId}`),
+  updateVehicleSeat: (id, gheId, data) => axiosClient.put(`/v1/admin/xe/${id}/ghe/${gheId}`, data),
+  deleteVehicleSeat: (id, gheId) => axiosClient.delete(`/v1/admin/xe/${id}/ghe/${gheId}`),
+  getVehicleStatusChangeWarning: (id, params) =>
+    axiosClient.get(`/v1/admin/xe/${id}/trang-thai/canh-bao`, { params }),
 
   // --- QUẢN LÝ TUYẾN ĐƯỜNG ---
   getRoutes: (params) => axiosClient.get('/v1/admin/tuyen-duong', { params }),
@@ -69,6 +73,7 @@ const adminApi = {
   // --- QUẢN LÝ VÉ ---
   getTickets: (params) => axiosClient.get('/v1/admin/ve', { params }),
   getTicketDetails: (id) => axiosClient.get(`/v1/admin/ve/${id}`),
+  bookTicket: (data) => axiosClient.post('/v1/admin/ve/dat-ve', data),
   updateTicketStatus: (id, data) => axiosClient.patch(`/v1/admin/ve/${id}/trang-thai`, data),
   cancelTicket: (id) => axiosClient.patch(`/v1/admin/ve/${id}/huy`),
 
@@ -90,6 +95,9 @@ const adminApi = {
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),
   approveVoucher: (id, data) => axiosClient.patch(`/v1/admin/voucher/${id}/duyet`, data),
 
+  // --- QUẢN LÝ ĐÁNH GIÁ ---
+  getRatings: (params) => axiosClient.get('/v1/admin/ratings', { params }),
+
   // --- PHÂN QUYỀN & CHỨC NĂNG ---
   getMyPermissions: () => axiosClient.get('/v1/admin/phan-quyen'),
   getFunctions: () => axiosClient.get('/v1/admin/chuc-nangs'),
@@ -102,6 +110,14 @@ const adminApi = {
   getRoles: () => axiosClient.get('/v1/admin/chuc-vus'),
   getRolePermissions: (id) => axiosClient.get(`/v1/admin/chuc-vus/${id}/phan-quyen`),
   syncRolePermissions: (id, data) => axiosClient.post(`/v1/admin/chuc-vus/${id}/phan-quyen`, data),
+
+  // --- QUẢN LÝ THANH TOÁN ---
+  // GET /api/v1/admin/thanh-toan?search=...&trang_thai=1&phuong_thuc=1&tu_ngay=...&den_ngay=...&per_page=15
+  getPayments: (params) => axiosClient.get('/v1/admin/thanh-toan', { params }),
+  // GET /api/v1/admin/thanh-toan/{id}
+  getPaymentDetails: (id) => axiosClient.get(`/v1/admin/thanh-toan/${id}`),
+  // GET /api/v1/admin/thanh-toan/thong-ke?tu_ngay=...&den_ngay=...
+  getPaymentStats: (params) => axiosClient.get('/v1/admin/thanh-toan/thong-ke', { params }),
 
   // --- TIỆN ÍCH ---
   autoGenerateSeats: () => axiosClient.post('/v1/admin/xe/auto-generate-seats'),

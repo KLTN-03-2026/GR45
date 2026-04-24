@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Http\Resources\TaiXeResource;
-use App\Models\NhaXe;
+use App\Models\HoSoTaiXe;
 use App\Models\TaiXe;
 use App\Repositories\TaiXe\TaiXeRepositoryInterface;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -14,7 +18,8 @@ class TaiXeService
 {
     public function __construct(
         protected TaiXeRepositoryInterface $repo
-    ) {}
+    ) {
+    }
 
     // ── AUTH ──────────────────────────────────────────────────────────
 
@@ -25,11 +30,11 @@ class TaiXeService
     public function login(array $data): array
     {
         $validator = Validator::make($data, [
-            'email'    => 'required|email',
+            'email' => 'required|email',
             'password' => 'required|string',
         ], [
-            'email.required'    => 'Email không được để trống.',
-            'email.email'       => 'Email không đúng định dạng.',
+            'email.required' => 'Email không được để trống.',
+            'email.email' => 'Email không đúng định dạng.',
             'password.required' => 'Mật khẩu không được để trống.',
         ]);
 
@@ -55,8 +60,8 @@ class TaiXeService
         $token = $taiXe->createToken('tai-xe-token')->plainTextToken;
 
         return [
-            'tai_xe'     => new TaiXeResource($taiXe->load(['hoSo', 'nhaXe'])),
-            'token'      => $token,
+            'tai_xe' => new TaiXeResource($taiXe->load(['hoSo', 'nhaXe'])),
+            'token' => $token,
             'token_type' => 'Bearer',
         ];
     }
@@ -85,15 +90,16 @@ class TaiXeService
     public function doiMatKhau(TaiXe $taiXe, array $data): void
     {
         $validator = Validator::make($data, [
-            'mat_khau_cu'  => 'required|string',
+            'mat_khau_cu' => 'required|string',
             'mat_khau_moi' => 'required|string|min:6|confirmed',
         ], [
-            'mat_khau_cu.required'   => 'Vui lòng nhập mật khẩu hiện tại.',
-            'mat_khau_moi.min'       => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+            'mat_khau_cu.required' => 'Vui lòng nhập mật khẩu hiện tại.',
+            'mat_khau_moi.min' => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
             'mat_khau_moi.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
         ]);
 
-        if ($validator->fails()) throw new ValidationException($validator);
+        if ($validator->fails())
+            throw new ValidationException($validator);
 
         if (!Hash::check($data['mat_khau_cu'], $taiXe->password)) {
             throw ValidationException::withMessages([
@@ -125,11 +131,18 @@ class TaiXeService
      */
     private function uploadToCloudinary($file): ?string
     {
-        if (!$file) return null;
+        if (!$file)
+            return null;
         try {
-            return \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::upload($file->getRealPath(), [
+            $uploaded = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload($file->getRealPath(), [
                 'folder' => 'do_an_kltn/tai_xe',
-            ])->getSecurePath();
+            ]);
+            
+            if (!$uploaded) {
+                return null;
+            }
+
+            return is_array($uploaded) ? ($uploaded['secure_url'] ?? null) : ($uploaded->offsetGet('secure_url') ?? null);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Cloudinary upload error: ' . $e->getMessage());
             return null;
@@ -142,44 +155,57 @@ class TaiXeService
      */
     public function create(array $data): TaiXeResource
     {
-        // Handle file uploads
-        $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau', 'anh_gplx', 'anh_gplx_mat_sau'];
-        foreach ($imageFields as $field) {
-            if (isset($data[$field]) && $data[$field] instanceof \Illuminate\Http\UploadedFile) {
-                $data[$field] = $this->uploadToCloudinary($data[$field]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
+            // Handle file uploads
+            $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau'];
+            foreach ($imageFields as $field) {
+                if (isset($data[$field]) && $data[$field] instanceof \Illuminate\Http\UploadedFile) {
+                    $data[$field] = $this->uploadToCloudinary($data[$field]);
+                }
             }
-        }
 
-        // Chỉ chứa Auth config
-        $taiXeData = [
-            'email'      => $data['email'],
-            'cccd'       => $data['cccd'],
-            'password'   => Hash::make($data['password']),
-            'ma_nha_xe'  => $data['ma_nha_xe'],
-            'tinh_trang' => $data['tinh_trang'] ?? 'hoat_dong',
-        ];
+            // 1. Tạo tài khoản đăng nhập (tai_xes)
+            $taiXeData = [
+                'ho_va_ten' => $data['ho_va_ten'] ?? $data['email'],
+                'email' => $data['email'],
+                'cccd' => $data['cccd'],
+                'password' => Hash::make($data['password']),
+                'ma_nha_xe' => $data['ma_nha_xe'],
+                'tinh_trang' => $data['tinh_trang'] ?? 'cho_duyet',
+            ];
 
-        // Mở transaction nếu muốn an toàn (bước này đơn giản nên gọi luôn)
-        $taiXe = $this->repo->create($taiXeData);
+            $taiXe = $this->repo->create($taiXeData);
 
-        // Tạo hồ sơ liên kết
-        $hoSoData = [
-            'ma_nha_xe'     => $data['ma_nha_xe'],
-            'ho_va_ten'     => $data['email'], // Mặc định do front-end không truyền
-            'email'         => $data['email'],
-            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
-            'so_cccd'       => $data['cccd'],
-        ];
+            // 2. Tạo hồ sơ chi tiết (ho_so_tai_xes)
+            $hoSo = new \App\Models\HoSoTaiXe();
+            $hoSo->id_tai_xe = $taiXe->id;
+            $hoSo->ma_nha_xe = $data['ma_nha_xe'];
+            $hoSo->ho_va_ten = $data['ho_va_ten'] ?? $data['email'];
+            $hoSo->email = $data['email'];
+            $hoSo->so_dien_thoai = $data['so_dien_thoai'] ?? null;
+            $hoSo->so_cccd = $data['cccd'];
+            $hoSo->ngay_sinh = $data['ngay_sinh'] ?? null;
+            $hoSo->dia_chi = $data['dia_chi'] ?? null;
+            $hoSo->avatar = $data['avatar'] ?? null;
+            $hoSo->so_gplx = $data['so_gplx'] ?? null;
+            $hoSo->hang_bang_lai = $data['hang_bang_lai'] ?? null;
+            $hoSo->ngay_cap_gplx = $data['ngay_cap_gplx'] ?? null;
+            $hoSo->ngay_het_han_gplx = $data['ngay_het_han_gplx'] ?? null;
+            $hoSo->trang_thai_duyet = 'pending';
+            $hoSo->nguoi_tao_id = auth()->id();
 
-        foreach ($imageFields as $field) {
-            if (isset($data[$field])) {
-                $hoSoData[$field] = $data[$field];
-            }
-        }
+            // Thêm các ảnh CCCD và Avatar nếu có
+            if (isset($data['avatar']))
+                $hoSo->avatar = $data['avatar'];
+            if (isset($data['anh_cccd_mat_truoc']))
+                $hoSo->anh_cccd_mat_truoc = $data['anh_cccd_mat_truoc'];
+            if (isset($data['anh_cccd_mat_sau']))
+                $hoSo->anh_cccd_mat_sau = $data['anh_cccd_mat_sau'];
 
-        $taiXe->hoSo()->create($hoSoData);
+            $hoSo->save();
 
-        return new TaiXeResource($taiXe->load('hoSo'));
+            return new TaiXeResource($taiXe->load('hoSo'));
+        });
     }
 
     /**
@@ -187,43 +213,55 @@ class TaiXeService
      */
     public function update(int $id, array $data): ?TaiXe
     {
-        $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau', 'anh_gplx', 'anh_gplx_mat_sau'];
-        foreach ($imageFields as $field) {
-            if (isset($data[$field]) && $data[$field] instanceof \Illuminate\Http\UploadedFile) {
-                $data[$field] = $this->uploadToCloudinary($data[$field]);
-            } else {
-                // If it's not a file (might be empty or removed), we don't update this field unless intentionally cleared
-                unset($data[$field]);
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($id, $data) {
+            $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau'];
+            foreach ($imageFields as $field) {
+                if (isset($data[$field]) && $data[$field] instanceof \Illuminate\Http\UploadedFile) {
+                    $data[$field] = $this->uploadToCloudinary($data[$field]);
+                } else if (!isset($data[$field])) {
+                    unset($data[$field]);
+                }
             }
-        }
 
-        if (isset($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
-            unset($data['password']);
-        }
+            if (isset($data['password'])) {
+                $data['password'] = Hash::make($data['password']);
+            } else {
+                unset($data['password']);
+            }
 
-        // Tách riêng dữ liệu cho bảng tai_xes
-        $taiXeData = array_intersect_key($data, array_flip(['email', 'cccd', 'password', 'ma_nha_xe', 'tinh_trang']));
-        $taiXe = $this->repo->update($id, $taiXeData);
+            // 1. Cập nhật tai_xes
+            $taiXeData = array_intersect_key($data, array_flip(['ho_va_ten', 'email', 'cccd', 'password', 'ma_nha_xe', 'tinh_trang']));
+            $taiXe = $this->repo->update($id, $taiXeData);
 
-        // Dữ liệu còn lại đẩy vào ho_so_tai_xes
-        $hoSoData = array_diff_key($data, array_flip(['password', 'tinh_trang']));
-        if (isset($data['cccd'])) {
-            $hoSoData['so_cccd'] = $data['cccd'];
-            unset($hoSoData['cccd']);
-        }
-        
-        // Cần đảm bảo nếu name rỗng thì có default (do bắt buộc ở DB ho_so_tai_xes ho_va_ten)
-        // Nếu user update mã nhà xe thì hồ sơ cũng cập nhật mã
-        if ($taiXe && !empty($hoSoData)) {
+            if (!$taiXe)
+                return null;
+
+            // 2. Cập nhật hoặc Tạo mới ho_so_tai_xes
+            // Lọc bỏ các giá trị rỗng để không ghi đè dữ liệu cũ bằng chuỗi trống
+            $hoSoData = array_filter($data, function ($value, $key) {
+                return !in_array($key, ['password', 'tinh_trang']) && $value !== '' && $value !== null;
+            }, ARRAY_FILTER_USE_BOTH);
+            if (isset($data['cccd'])) {
+                $hoSoData['so_cccd'] = $data['cccd'];
+            }
+
+            // Ánh xạ trạng thái duyệt nếu có thay đổi tinh_trang
+            if (isset($data['tinh_trang'])) {
+                $statusMap = [
+                    'cho_duyet' => 'pending',
+                    'hoat_dong' => 'approved',
+                    'khoa' => 'rejected' // Hoặc giữ nguyên pending tùy logic
+                ];
+                $hoSoData['trang_thai_duyet'] = $statusMap[$data['tinh_trang']] ?? 'pending';
+            }
+
             $taiXe->hoSo()->updateOrCreate(
-                ['id_tai_xe' => $id],
+                ['id_tai_xe' => $taiXe->id],
                 $hoSoData
             );
-        }
 
-        return $taiXe ? $taiXe->fresh(['hoSo', 'nhaXe']) : null;
+            return $taiXe->fresh(['hoSo', 'nhaXe']);
+        });
     }
 
     /**
@@ -231,7 +269,18 @@ class TaiXeService
      */
     public function updateStatus(int $id, string $status): ?TaiXe
     {
-        return $this->repo->update($id, ['tinh_trang' => $status]);
+        $taiXe = $this->repo->update($id, ['tinh_trang' => $status]);
+        
+        if ($taiXe && $taiXe->hoSo) {
+            $statusMap = [
+                'cho_duyet' => 'pending',
+                'hoat_dong' => 'approved',
+                'khoa'      => 'rejected'
+            ];
+            $taiXe->hoSo->update(['trang_thai_duyet' => $statusMap[$status] ?? 'pending']);
+        }
+
+        return $taiXe;
     }
 
     public function toggleStatus(int $id): ?TaiXe
@@ -252,34 +301,5 @@ class TaiXeService
     public function getByNhaXe(string $maNhaXe, array $filters = [])
     {
         return $this->repo->getByNhaXe($maNhaXe, $filters);
-    }
-
-    public function paginateDriversForNhaXe(NhaXe $nhaXe, array $query): array
-    {
-        $perPage = (int) ($query['per_page'] ?? 15);
-        $perPage = min(200, max(1, $perPage));
-
-        $repoFilters = ['per_page' => $perPage];
-
-        $search = isset($query['search']) ? trim((string) $query['search']) : '';
-        if ($search !== '') {
-            $repoFilters['search'] = $search;
-        }
-
-        $tt = $query['tinh_trang'] ?? null;
-        if ($tt !== null && $tt !== '') {
-            $repoFilters['tinh_trang'] = $tt;
-        }
-
-        $paginator = $this->repo->getByNhaXe($nhaXe->ma_nha_xe, $repoFilters);
-
-        $paginator->getCollection()->transform(static function (TaiXe $t) {
-            return (new TaiXeResource($t))->resolve();
-        });
-
-        return [
-            'success' => true,
-            'data' => $paginator->toArray(),
-        ];
     }
 }

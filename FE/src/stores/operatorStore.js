@@ -4,7 +4,7 @@ import authApi from '@/api/authApi.js';
 
 // Key localStorage của Nhà Xe
 const TOKEN_KEY = 'auth.operator.token';
-const USER_KEY  = 'auth.operator.user';
+const USER_KEY = 'auth.operator.user';
 
 // Hàm đọc user an toàn từ localStorage
 function readUser() {
@@ -18,11 +18,12 @@ function readUser() {
 
 export const useOperatorStore = defineStore('operator', () => {
   // ─── State ───────────────────────────────────────────────
-  const token   = ref(localStorage.getItem(TOKEN_KEY) || null);
-  const user    = ref(readUser());
+  const token = ref(localStorage.getItem(TOKEN_KEY) || null);
+  const user = ref(readUser());
   const loading = ref(false);
-  const error   = ref(null);
+  const error = ref(null);
   const isTokenVerified = ref(false);
+  const notifications = ref([]);
 
   // ─── Getters ─────────────────────────────────────────────
   const isLoggedIn = computed(() => !!token.value);
@@ -32,12 +33,12 @@ export const useOperatorStore = defineStore('operator', () => {
   // Đăng nhập Nhà Xe
   async function login(credentials) {
     loading.value = true;
-    error.value   = null;
+    error.value = null;
     try {
-      const res     = await authApi.operatorLogin(credentials);
+      const res = await authApi.operatorLogin(credentials);
       const payload = res.data || res;
-      const t       = payload.token || payload.access_token || null;
-      const u       = payload.nha_xe || payload.user || null;
+      const t = payload.token || payload.access_token || null;
+      const u = payload.nha_xe || payload.user || null;
 
       if (!t) {
         error.value = res.message || 'Đăng nhập thất bại.';
@@ -45,7 +46,7 @@ export const useOperatorStore = defineStore('operator', () => {
       }
 
       token.value = t;
-      user.value  = u;
+      user.value = u;
       isTokenVerified.value = true;
       localStorage.setItem(TOKEN_KEY, t);
       localStorage.setItem(USER_KEY, JSON.stringify(u));
@@ -61,15 +62,31 @@ export const useOperatorStore = defineStore('operator', () => {
     }
   }
 
-  // Đăng xuất Nhà Xe
+  // Thêm thông báo mới vào danh sách
+  function addNotification(note) {
+    notifications.value.unshift({
+      id: Date.now(),
+      read: false,
+      time: 'Vừa xong',
+      ...note
+    });
+    // Giới hạn 20 thông báo gần nhất
+    if (notifications.value.length > 20) {
+      notifications.value.pop();
+    }
+  }
+
   function logout() {
     token.value = null;
-    user.value  = null;
+    user.value = null;
     isTokenVerified.value = false;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem('auth.active_role');
   }
 
-  return { token, user, loading, error, isTokenVerified, isLoggedIn, login, logout };
+  return {
+    token, user, loading, error, isTokenVerified, isLoggedIn,
+    notifications, login, logout, addNotification
+  };
 });

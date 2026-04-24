@@ -5,20 +5,36 @@ const operatorApi = {
   getProfile: () => axiosClient.get('/v1/nha-xe/profile'),
   changePassword: (data) => axiosClient.post('/v1/nha-xe/doi-mat-khau', data),
 
+  // --- THỐNG KÊ NHÀ XE ---
+  getStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke', { params }),
+  getStatisticsByRoute: (params) => axiosClient.get('/v1/nha-xe/thong-ke/theo-tuyen', { params }),
+  getStatisticsTicketStatus: (params) => axiosClient.get('/v1/nha-xe/thong-ke/trang-thai-ve', { params }),
+  getStatisticsTickets: (params) => axiosClient.get('/v1/nha-xe/ve', { params }),
+  exportStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params, responseType: 'blob' }),
+  exportStatisticsExcel: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params: { ...params, loai: 'dashboard' }, responseType: 'blob' }),
+  exportStatisticsPdf: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params: { ...params, loai: 'dashboard' }, responseType: 'blob' }),
+
   // --- XE / PHƯƠNG TIỆN ---
-  getLoaiXe: () => axiosClient.get('/v1/nha-xe/loai-xe'),
-  getDrivers: (params) => axiosClient.get('/v1/nha-xe/tai-xe', { params }),
   getVehicles: (params) => axiosClient.get('/v1/nha-xe/xe', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}`),
   createVehicle: (data) => axiosClient.post('/v1/nha-xe/xe', data),
   updateVehicle: (id, data) => axiosClient.put(`/v1/nha-xe/xe/${id}`, data),
   deleteVehicle: (id) => axiosClient.delete(`/v1/nha-xe/xe/${id}`),
-  getSeatTypes: () => axiosClient.get('/v1/nha-xe/loai-ghe'),
+  updateVehicleDocument: (id, formData) => axiosClient.post(`/v1/nha-xe/xe/${id}/ho-so`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+
+  // Sơ đồ ghế xe
   getVehicleSeats: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}/ghe`),
   createVehicleSeat: (id, data) => axiosClient.post(`/v1/nha-xe/xe/${id}/ghe`, data),
-  clearVehicleSeats: (id) => axiosClient.delete(`/v1/nha-xe/xe/${id}/ghe`),
-  updateVehicleSeat: (id, seatId, data) => axiosClient.put(`/v1/nha-xe/xe/${id}/ghe/${seatId}`, data),
-  deleteVehicleSeat: (id, seatId) => axiosClient.delete(`/v1/nha-xe/xe/${id}/ghe/${seatId}`),
+  updateVehicleSeat: (id, gheId, data) => axiosClient.put(`/v1/nha-xe/xe/${id}/ghe/${gheId}`, data),
+  deleteVehicleSeat: (id, gheId) => axiosClient.delete(`/v1/nha-xe/xe/${id}/ghe/${gheId}`),
+  updateSeatStatus: (id, gheId, data) => axiosClient.patch(`/v1/nha-xe/xe/${id}/ghe/${gheId}/trang-thai`, data),
+
+  // Danh mục hỗ trợ
+  getLoaiXe: () => axiosClient.get('/v1/nha-xe/loai-xe'),
+  getLoaiGhe: () => axiosClient.get('/v1/nha-xe/loai-ghe'),
+  getSeatTypes: () => axiosClient.get('/v1/nha-xe/loai-ghe'),
 
   // --- TUYẾN ĐƯỜNG ---
   getRoutes: (params) => axiosClient.get('/v1/nha-xe/tuyen-duong', { params }),
@@ -30,11 +46,12 @@ const operatorApi = {
   // --- VÉ ---
   getTickets: (params) => axiosClient.get('/v1/nha-xe/ve', { params }),
   getTicketDetail: (id) => axiosClient.get(`/v1/nha-xe/ve/${id}`),
+  bookTicket: (data) => axiosClient.post('/v1/nha-xe/ve/dat-ve', data),
   updateTicketStatus: (id, data) => axiosClient.patch(`/v1/nha-xe/ve/${id}/trang-thai`, data),
   cancelTicket: (id) => axiosClient.patch(`/v1/nha-xe/ve/${id}/huy`),
 
   // --- CHUYẾN XE ---
-  getTrips: (params) => axiosClient.get(`/v1/nha-xe/chuyen-xe/`, { params }),
+  getTrips: (params) => axiosClient.get('/v1/nha-xe/chuyen-xe', { params }),
   getTripDetails: (id) => axiosClient.get(`/v1/nha-xe/chuyen-xe/${id}`),
   createTrip: (data) => axiosClient.post('/v1/nha-xe/chuyen-xe', data),
   updateTrip: (id, data) => axiosClient.put(`/v1/nha-xe/chuyen-xe/${id}`, data),
@@ -45,6 +62,7 @@ const operatorApi = {
   getTripTrackingHistory: (id, params) =>
     axiosClient.get(`/v1/nha-xe/chuyen-xe/${id}/tracking`, { params }),
   getTripTrackingLive: (id) => axiosClient.get(`/v1/nha-xe/chuyen-xe/${id}/tracking/live`),
+  getTripStops: (id) => axiosClient.get(`/v1/chuyen-xe/${id}/tram-dung`),
 
   // --- VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/nha-xe/voucher'),
@@ -56,14 +74,21 @@ const operatorApi = {
   createDriver: (data) => axiosClient.post('/v1/nha-xe/tai-xe', data),
   updateDriver: (id, data) => {
     if (data instanceof FormData) {
-      if (!data.has("_method")) data.append("_method", "PUT");
+      if (!data.has('_method')) data.append('_method', 'PUT');
       return axiosClient.post(`/v1/nha-xe/tai-xe/${id}`, data);
     }
     return axiosClient.put(`/v1/nha-xe/tai-xe/${id}`, data);
   },
-  toggleDriverStatus: (id) =>
-    axiosClient.patch(`/v1/nha-xe/tai-xe/${id}/trang-thai`),
+  toggleDriverStatus: (id) => axiosClient.patch(`/v1/nha-xe/tai-xe/${id}/trang-thai`),
   deleteDriver: (id) => axiosClient.delete(`/v1/nha-xe/tai-xe/${id}`),
+
+  // --- CẢNH BÁO / BÁO ĐỘNG AI ---
+  getAlarms: (params) => axiosClient.get('/v1/nha-xe/bao-dong', { params }),
+  getAlarmDetails: (id) => axiosClient.get(`/v1/nha-xe/bao-dong/${id}`),
+  toggleAlarmStatus: (id) => axiosClient.patch(`/v1/nha-xe/bao-dong/${id}/trang-thai`),
+
+  // --- ĐÁNH GIÁ CHUYẾN XE ---
+  getRatings: (params) => axiosClient.get('/v1/nha-xe/ratings', { params }),
 };
 
 export default operatorApi;

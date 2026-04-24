@@ -1,14 +1,17 @@
 <script setup>
 import { reactive } from 'vue';
+import { useRouter } from 'vue-router';
 import { useDriverStore } from '@/stores/driverStore.js';
 import BaseInput from '@/components/common/BaseInput.vue';
 import BaseButton from '@/components/common/BaseButton.vue';
 
+const router      = useRouter();
 const driverStore = useDriverStore();
 const form        = reactive({ email: '', password: '' });
 
 const handleLogin = async () => {
-  await driverStore.login(form);
+  const success = await driverStore.login(form);
+  if (success) router.push('/tai-xe');
 };
 </script>
 

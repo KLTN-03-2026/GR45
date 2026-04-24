@@ -1,11 +1,15 @@
 <script setup>
+/**
+ * Thống kê Admin — GET /v1/admin/bao-cao/* cho biểu đồ/tuyến; KPI tổng doanh thu = tổng tiền thanh toán thành công
+ * (GET /v1/admin/thanh-toan, phân trang đủ trang theo tu_ngay/den_ngay). /thanh-toan/thong-ke + vé: bổ sung/fallback.
+ */
 // Trang Thống Kê & Báo Cáo Doanh Thu – Admin (toàn hệ thống)
 import { ref, computed, onMounted } from 'vue'
 import {
   TrendingUp, DollarSign, Ticket, Users,
   BarChart2, PieChart, Calendar, Download, RefreshCw,
   CheckCircle, XCircle, Clock, ArrowUpRight, ArrowDownRight,
-  Bus, MapPin, Star, Filter, Building2
+  Bus, MapPin, Star, Filter, Building2, Percent, FileText
 } from 'lucide-vue-next'
 import {
   Chart as ChartJS,
@@ -23,12 +27,13 @@ ChartJS.register(
 
 // ─── Bộ lọc thời gian ───────────────────────────────────────────────
 const filterType = ref('year') // 'range' | 'month' | 'quarter' | 'year'
-const dateFrom   = ref('2025-01-01')
-const dateTo     = ref('2025-12-31')
-const selectedMonth       = ref('2025-03')
-const selectedQuarterYear = ref('2025')    // năm quý
+const y0 = String(new Date().getFullYear())
+const dateFrom   = ref(`${y0}-01-01`)
+const dateTo     = ref(`${y0}-12-31`)
+const selectedMonth       = ref(`${y0}-01`)
+const selectedQuarterYear = ref(y0)    // năm quý
 const selectedQuarterNum  = ref('1')       // số quý 1-4
-const selectedYear        = ref(String(new Date().getFullYear()))
+const selectedYear        = ref(y0)
 const compareMode = ref(false)
 
 const filterTabs = [
@@ -50,7 +55,154 @@ const totalStats = ref({
   veHoanThanh: 0, veHuy: 0, veCho: 0,
   tyLeHoanThanh: 0, tyLeHuy: 0, tyLeCho: 0,
   tangTruong: 'N/A', tangTruongPositive: true,
+  /** Tiêu chí chấp nhận */
+  tongVeDaBan: 0,
+  tyLeLapDay: 0,
+  khachHangMoi: 0,
 })
+
+/** Phân bổ vé cho biểu đồ tròn: Đã TT (không tiền mặt) | Tiền mặt | Đã hủy */
+const ticketVeSlice = ref({ daThanhToanNonCash: 0, tienMat: 0, daHuy: 0 })
+
+/** Tăng mỗi lần áp dụng bộ lọc — bỏ qua phản hồi cũ (race). Chart/tuyến ưu tiên bao-cao; KPI tổng doanh thu lấy từ tổng API thanh-toan trong kỳ. */
+const thongKeLoadGen = ref(0)
+const baoCaoSetsPrimaryKpi = ref(false)
+
+/** Thống kê theo tuyến (từ danh sách vé) */
+const routeTop = ref([])
+const routeBottom = ref([])
+
+const unwrapApi = (res) => {
+  if (res == null) return null
+  if (res.success === false) return null
+  return res.data !== undefined ? res.data : res
+}
+
+const extractPaginatedRows = (res) => {
+  const payload = unwrapApi(res)
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.data?.data)) return payload.data.data
+  return []
+}
+
+const extractPaginatedMeta = (res) => {
+  const payload = unwrapApi(res)
+  if (!payload || typeof payload !== 'object') {
+    return { current_page: 1, last_page: 1, total: 0, per_page: 15 }
+  }
+  const metaSource = payload?.data?.current_page ? payload.data : payload
+  return {
+    current_page: Number(metaSource?.current_page ?? 1),
+    last_page: Number(metaSource?.last_page ?? 1),
+    total: Number(metaSource?.total ?? 0),
+    per_page: Number(metaSource?.per_page ?? 15),
+  }
+}
+
+const normalizeTuyenRow = (x) => {
+  if (!x || typeof x !== 'object') return null
+  const label =
+    x.ten_tuyen_duong ||
+    x.ten_tuyen ||
+    x.label ||
+    [x.diem_bat_dau, x.diem_ket_thuc].filter(Boolean).join(' → ') ||
+    (typeof x.tuyen_duong === 'string' ? x.tuyen_duong : null) ||
+    `Tuyến #${x.id_tuyen_duong ?? x.id ?? ''}`
+  return {
+    label,
+    ten_tuyen: label,
+    doanh_thu: Number(x.doanh_thu ?? x.tong_doanh_thu ?? x.doanhThu ?? 0),
+    so_ve: Number(x.so_ve ?? x.so_luong_ve ?? x.soVe ?? 0),
+  }
+}
+
+/** Gộp dữ liệu từ BaoCaoController (admin) */
+const fetchBaoCaoAdmin = async (tuNgay, denNgay, gen) => {
+  if (!tuNgay || !denNgay) return
+  const prm = { tu_ngay: tuNgay, den_ngay: denNgay }
+  try {
+    const [dashRes, tuyenRes, ttRes] = await Promise.all([
+      adminApi.getBaoCaoDashboard(prm),
+      adminApi.getBaoCaoTheoTuyenDuong(prm),
+      adminApi.getBaoCaoTrangThaiVe(prm),
+    ])
+    if (gen !== undefined && gen !== thongKeLoadGen.value) return
+
+    const d = unwrapApi(dashRes)
+    if (d && typeof d === 'object') {
+      baoCaoSetsPrimaryKpi.value =
+        (Array.isArray(d.theo_thang) && d.theo_thang.length > 0) ||
+        (Array.isArray(d.theo_nha_xe) && d.theo_nha_xe.length > 0) ||
+        (d.tong_ve_da_ban != null && d.tong_ve_da_ban !== '')
+      if (d.tong_ve_da_ban != null) totalStats.value.tongVeDaBan = Number(d.tong_ve_da_ban)
+      if (d.ty_le_lap_day_tb != null) totalStats.value.tyLeLapDay = Number(d.ty_le_lap_day_tb)
+      if (d.khach_hang_moi != null) totalStats.value.khachHangMoi = Number(d.khach_hang_moi)
+      if (d.tong_ve != null) totalStats.value.tongVe = Number(d.tong_ve)
+      if (d.tong_giao_dich != null) totalStats.value.tongVe = Number(d.tong_giao_dich)
+      if (Array.isArray(d.theo_thang) && d.theo_thang.length) {
+        const arrR = Array(12).fill(0)
+        const arrV = Array(12).fill(0)
+        d.theo_thang.forEach((item) => {
+          const m =
+            typeof item.thang === 'string'
+              ? parseInt(item.thang.split('-')[1], 10) - 1
+              : Number(item.thang) - 1
+          if (m >= 0 && m < 12) {
+            arrR[m] = Number(item.doanh_thu ?? item.doanhThu ?? 0)
+            arrV[m] = Number(item.so_ve ?? item.soVe ?? 0)
+          }
+        })
+        monthlyRevenue.value = arrR
+        monthlyTickets.value = arrV
+      }
+      if (Array.isArray(d.theo_nha_xe) && d.theo_nha_xe.length) {
+        const maxDT = Math.max(...d.theo_nha_xe.map((x) => Number(x.doanh_thu ?? 0)), 1)
+        revenueByBus.value = d.theo_nha_xe.slice(0, 7).map((x) => ({
+          name: x.ten_nha_xe ?? x.name ?? 'N/A',
+          revenue: Number(x.doanh_thu ?? 0),
+          tickets: Number(x.so_ve ?? 0),
+          pct: Math.round((Number(x.doanh_thu ?? 0) / maxDT) * 100),
+        }))
+      }
+    }
+
+    const t = unwrapApi(tuyenRes)
+    if (t) {
+      if (Array.isArray(t.cao) || Array.isArray(t.tuyen_doanh_thu_cao)) {
+        const arr = mapTuyenList(t.cao ?? t.tuyen_doanh_thu_cao)
+        if (arr.length) routeTop.value = arr.slice(0, 8)
+      }
+      if (Array.isArray(t.thap) || Array.isArray(t.tuyen_it_khach)) {
+        const arr = mapTuyenList(t.thap ?? t.tuyen_it_khach)
+        if (arr.length) routeBottom.value = arr.slice(0, 8)
+      }
+      if (!routeTop.value.length && Array.isArray(t.du_lieu)) {
+        const arr = mapTuyenList(t.du_lieu).filter(Boolean)
+        routeTop.value = [...arr].sort((a, b) => b.doanh_thu - a.doanh_thu).slice(0, 8)
+        routeBottom.value = [...arr].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+      }
+    }
+
+    const v = unwrapApi(ttRes)
+    if (v && typeof v === 'object') {
+      ticketVeSlice.value = {
+        daThanhToanNonCash: Number(
+          v.da_thanh_toan_khong_tien_mat ?? v.khong_tien_mat ?? v.da_tt_khong_tm ?? 0
+        ),
+        tienMat: Number(v.tien_mat ?? v.ve_tien_mat ?? v.thanh_toan_tien_mat ?? 0),
+        daHuy: Number(v.da_huy ?? v.huy ?? 0),
+      }
+    }
+  } catch (e) {
+    console.warn('[ThongKe] bao-cao admin:', e?.message ?? e)
+  }
+}
+
+function mapTuyenList(raw) {
+  if (!Array.isArray(raw)) return []
+  return raw.map(normalizeTuyenRow).filter(Boolean)
+}
 
 // ─── Helper tính khoảng ngày từ filterType ──────────────────────────
 const buildDateRange = () => {
@@ -67,53 +219,242 @@ const buildDateRange = () => {
   return { tuNgay: `${selectedYear.value}-01-01`, denNgay: `${selectedYear.value}-12-31` }
 }
 
+const parseTicketsFromResponse = (res) => {
+  const d = res?.data ?? res
+  let list = []
+  if (d?.data?.data?.data) list = d.data.data.data
+  else if (d?.data?.data) list = d.data.data
+  else if (Array.isArray(d?.data)) list = d.data
+  else if (Array.isArray(d)) list = d
+  return Array.isArray(list) ? list : []
+}
+
+const isHuyVe = (t) => {
+  const s = String(t?.tinh_trang ?? '').toLowerCase()
+  return s === 'huy' || s === 'da_huy'
+}
+const isDaThanhToan = (t) => String(t?.tinh_trang ?? '').toLowerCase() === 'da_thanh_toan'
+const isTienMat = (t) => String(t?.phuong_thuc_thanh_toan ?? '').toLowerCase() === 'tien_mat'
+
+/** Lấy toàn bộ vé trong khoảng ngày (phân trang) để tính tuyến / pie / lấp đầy */
+const fetchTicketsAnalytics = async (tuNgay, denNgay, gen) => {
+  const acc = []
+  let page = 1
+  const perPage = 100
+  try {
+    do {
+      const params = { page, per_page: perPage }
+      if (tuNgay) params.tu_ngay = tuNgay
+      if (denNgay) params.den_ngay = denNgay
+      const res = await adminApi.getTickets(params)
+      const chunk = parseTicketsFromResponse(res)
+      acc.push(...chunk)
+      if (chunk.length < perPage) break
+      page += 1
+      if (page > 50) break
+    } while (true)
+  } catch (e) {
+    console.warn('[ThongKe] getTickets analytics:', e?.message)
+  }
+
+  if (gen !== undefined && gen !== thongKeLoadGen.value) return
+
+  // Lọc client-side theo thời điểm tạo bản ghi để khớp với API thanh toán.
+  const fromMs = tuNgay ? new Date(tuNgay).getTime() : null
+  const toMs = denNgay ? new Date(`${denNgay}T23:59:59`).getTime() : null
+  const inRangeTickets = acc.filter((t) => {
+    const rawDate = t.created_at || t.ngay_tao || t.thoi_gian_dat || t?.chuyen_xe?.ngay_khoi_hanh || ''
+    const d = new Date(rawDate)
+    if (Number.isNaN(d.getTime())) return false
+    if (fromMs && d.getTime() < fromMs) return false
+    if (toMs && d.getTime() > toMs) return false
+    return true
+  })
+
+  // Vé đã bán: không tính vé hủy (dùng cho KPI số vé, không dùng để ghi đè doanh thu).
+  const soldTickets = inRangeTickets.filter((t) => !isHuyVe(t))
+  totalStats.value.tongVeDaBan = soldTickets.length
+
+  // Không cập nhật `tongDoanhThu` ở đây nữa vì KPI này phải lấy theo bảng `thanh_toan`.
+  // Phần vé chỉ dùng cho biểu đồ/tuyến/số lượng vé.
+
+  let nonCash = 0
+  let tm = 0
+  let huy = 0
+  inRangeTickets.forEach((t) => {
+    if (isHuyVe(t)) huy += 1
+    else if (isDaThanhToan(t)) {
+      if (isTienMat(t)) tm += 1
+      else nonCash += 1
+    }
+  })
+  ticketVeSlice.value = { daThanhToanNonCash: nonCash, tienMat: tm, daHuy: huy }
+
+  const routeMap = {}
+  const tripSeat = {}
+  inRangeTickets.forEach((t) => {
+    const cx = t.chuyen_xe || {}
+    const td = cx.tuyen_duong || {}
+    const label =
+      [td.diem_bat_dau, td.diem_ket_thuc].filter(Boolean).join(' → ') ||
+      td.ten_tuyen_duong ||
+      t.ten_tuyen ||
+      `Tuyến #${td.id ?? ''}`
+    if (!routeMap[label]) routeMap[label] = { label, doanh_thu: 0, so_ve: 0 }
+    const tien = Number(t.tong_tien ?? t.gia_ve ?? 0)
+    if (isDaThanhToan(t)) routeMap[label].doanh_thu += tien
+    routeMap[label].so_ve += 1
+
+    const cid = cx.id
+    if (cid) {
+      const cap0 = Number(cx.xe?.so_cho_ngoi ?? cx.phuong_tien?.so_cho_ngoi ?? cx.tong_so_ghe ?? 40) || 40
+      if (!tripSeat[cid]) tripSeat[cid] = { sold: 0, cap: cap0 }
+      tripSeat[cid].sold += 1
+      const cap = Number(cx.xe?.so_cho_ngoi ?? cx.phuong_tien?.so_cho_ngoi ?? cx.tong_so_ghe ?? tripSeat[cid].cap)
+      if (cap > 0) tripSeat[cid].cap = cap
+    }
+  })
+  const routes = Object.values(routeMap).sort((a, b) => b.doanh_thu - a.doanh_thu)
+  routeTop.value = routes.slice(0, 8)
+  routeBottom.value = [...routes].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+
+  const ratios = Object.values(tripSeat)
+    .map((x) => (x.cap > 0 ? Math.min(100, (x.sold / x.cap) * 100) : 0))
+  totalStats.value.tyLeLapDay =
+    ratios.length > 0 ? +((ratios.reduce((a, b) => a + b, 0) / ratios.length).toFixed(1)) : 0
+}
+
+/** Khách hàng mới trong kỳ */
+const fetchNewClientsInRange = async (tuNgay, denNgay) => {
+  totalStats.value.khachHangMoi = 0
+  if (!tuNgay || !denNgay) return
+  const from = new Date(tuNgay).getTime()
+  const to = new Date(denNgay + 'T23:59:59').getTime()
+  const countFromRows = (rows) =>
+    rows.filter((c) => {
+      const raw = c.created_at ?? c.ngay_tao ?? c.createdAt
+      if (!raw) return false
+      const t = new Date(raw).getTime()
+      return t >= from && t <= to
+    }).length
+  const extractRows = (res) => {
+    const p = res?.data ?? res
+    if (Array.isArray(p?.data)) return p.data
+    if (Array.isArray(p?.data?.data)) return p.data.data
+    if (Array.isArray(p)) return p
+    return []
+  }
+  try {
+    const res = await adminApi.getClients({ per_page: 500, page: 1, tu_ngay: tuNgay, den_ngay: denNgay })
+    totalStats.value.khachHangMoi = countFromRows(extractRows(res))
+  } catch {
+    /* ignore */
+  }
+  if (totalStats.value.khachHangMoi > 0) return
+  try {
+    const res = await adminApi.getClients({ per_page: 500, page: 1 })
+    totalStats.value.khachHangMoi = countFromRows(extractRows(res))
+  } catch (e) {
+    console.warn('[ThongKe] khach hang moi:', e)
+  }
+}
+
 // ─── Fetch thống kê doanh thu (endpoint thong-ke, fallback danh sách) ──
 const statsLoading = ref(false)
-const fetchStats = async (tuNgay, denNgay) => {
+const fetchStats = async (tuNgay, denNgay, gen) => {
   statsLoading.value = true
   try {
     const res = await adminApi.getPaymentStats({ tu_ngay: tuNgay, den_ngay: denNgay })
-    const pl  = res?.data ?? res
+    if (gen !== undefined && gen !== thongKeLoadGen.value) return
+    const pl = unwrapApi(res) ?? {}
     console.log('[ThongKe] stats payload:', pl)
 
-    const tongDT = Number(pl?.tong_doanh_thu ?? pl?.total_revenue ?? 0)
+    const tongDT = Number(
+      pl?.tong_doanh_thu ??
+      pl?.tong_thuc_thu ??
+      pl?.tong_tien ??
+      pl?.total_revenue ??
+      0
+    )
     const tc = Number(pl?.trang_thai?.thanh_cong ?? pl?.so_thanh_cong ?? 0)
     const tb = Number(pl?.trang_thai?.that_bai   ?? pl?.so_that_bai   ?? 0)
     const cho= Number(pl?.trang_thai?.cho_xu_ly  ?? pl?.so_cho_xu_ly  ?? 0)
     const tot= tc + tb + cho || Number(pl?.so_giao_dich ?? pl?.total_count ?? 0)
 
+    const preferBaoCao = baoCaoSetsPrimaryKpi.value
+
+    const vb = pl?.ve_phan_bo ?? pl?.phan_bo_ve
+    if (!preferBaoCao && vb && typeof vb === 'object') {
+      ticketVeSlice.value = {
+        daThanhToanNonCash: Number(vb.da_thanh_toan_khong_tien_mat ?? vb.non_cash ?? 0),
+        tienMat: Number(vb.tien_mat ?? vb.tien_mat_da_thanh_toan ?? 0),
+        daHuy: Number(vb.da_huy ?? vb.huy ?? 0),
+      }
+    }
+    if (!preferBaoCao && pl?.tong_ve_da_ban != null) totalStats.value.tongVeDaBan = Number(pl.tong_ve_da_ban)
+    if (!preferBaoCao && pl?.ty_le_lap_day_tb != null) totalStats.value.tyLeLapDay = Number(pl.ty_le_lap_day_tb)
+    if (!preferBaoCao && pl?.khach_hang_moi != null) totalStats.value.khachHangMoi = Number(pl.khach_hang_moi)
+
     // Nếu endpoint trả về dữ liệu có nghĩa (tongVe > 0 hoặc tongDoanhThu > 0), dùng
     if (tot > 0 || tongDT > 0) {
-      if (Array.isArray(pl?.theo_thang) && pl.theo_thang.length) {
-        const arrR = Array(12).fill(0), arrV = Array(12).fill(0)
-        pl.theo_thang.forEach(item => {
-          const m = typeof item.thang === 'string' ? parseInt(item.thang.split('-')[1]) - 1 : Number(item.thang) - 1
-          if (m >= 0 && m < 12) { arrR[m] = Number(item.doanh_thu ?? 0); arrV[m] = Number(item.so_ve ?? 0) }
-        })
-        monthlyRevenue.value = arrR; monthlyTickets.value = arrV
+      if (tongDT > 0) totalStats.value.tongDoanhThu = tongDT
+      if (!preferBaoCao) {
+        if (Array.isArray(pl?.theo_thang) && pl.theo_thang.length) {
+          const arrR = Array(12).fill(0), arrV = Array(12).fill(0)
+          pl.theo_thang.forEach(item => {
+            const m = typeof item.thang === 'string' ? parseInt(item.thang.split('-')[1]) - 1 : Number(item.thang) - 1
+            if (m >= 0 && m < 12) { arrR[m] = Number(item.doanh_thu ?? 0); arrV[m] = Number(item.so_ve ?? 0) }
+          })
+          monthlyRevenue.value = arrR; monthlyTickets.value = arrV
+        }
+        if (Array.isArray(pl?.theo_nha_xe) && pl.theo_nha_xe.length) {
+          const maxDT = Math.max(...pl.theo_nha_xe.map(x => Number(x.doanh_thu ?? 0)), 1)
+          revenueByBus.value = pl.theo_nha_xe.slice(0, 7).map(x => ({ name: x.ten_nha_xe ?? x.name ?? 'N/A', revenue: Number(x.doanh_thu ?? 0), tickets: Number(x.so_ve ?? 0), pct: Math.round((Number(x.doanh_thu ?? 0) / maxDT) * 100) }))
+        }
+        if (Array.isArray(pl?.theo_tuyen) && pl.theo_tuyen.length) {
+          const mapped = pl.theo_tuyen.map((x) => ({
+            label: x.ten_tuyen ?? x.tuyen ?? x.label ?? '—',
+            doanh_thu: Number(x.doanh_thu ?? x.revenue ?? 0),
+            so_ve: Number(x.so_ve ?? x.so_luong_ve ?? 0),
+          }))
+          routeTop.value = [...mapped].sort((a, b) => b.doanh_thu - a.doanh_thu).slice(0, 8)
+          routeBottom.value = [...mapped].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+        }
       }
-      if (Array.isArray(pl?.theo_nha_xe) && pl.theo_nha_xe.length) {
-        const maxDT = Math.max(...pl.theo_nha_xe.map(x => Number(x.doanh_thu ?? 0)), 1)
-        revenueByBus.value = pl.theo_nha_xe.slice(0, 7).map(x => ({ name: x.ten_nha_xe ?? x.name ?? 'N/A', revenue: Number(x.doanh_thu ?? 0), tickets: Number(x.so_ve ?? 0), pct: Math.round((Number(x.doanh_thu ?? 0) / maxDT) * 100) }))
+      totalStats.value = {
+        ...totalStats.value,
+        tongVe: tot,
+        veHoanThanh: tc,
+        veHuy: tb,
+        veCho: cho,
+        tyLeHoanThanh: tot > 0 ? +((tc / tot) * 100).toFixed(1) : 0,
+        tyLeHuy: tot > 0 ? +((tb / tot) * 100).toFixed(1) : 0,
+        tyLeCho: tot > 0 ? +((cho / tot) * 100).toFixed(1) : 0,
       }
-      totalStats.value = { ...totalStats.value, tongDoanhThu: tongDT, tongVe: tot, veHoanThanh: tc, veHuy: tb, veCho: cho, tyLeHoanThanh: tot > 0 ? +((tc/tot)*100).toFixed(1) : 0, tyLeHuy: tot > 0 ? +((tb/tot)*100).toFixed(1) : 0, tyLeCho: tot > 0 ? +((cho/tot)*100).toFixed(1) : 0 }
     } else {
       // Endpoint trả về rỗng hoặc không match field → fallback sang danh sách
-      console.warn('[ThongKe] thong-ke trả về tổng = 0, fallback sang list')
-      await fetchStatsFromList(tuNgay, denNgay)
+      if (!preferBaoCao) {
+        console.warn('[ThongKe] thong-ke trả về tổng = 0, fallback sang list')
+        await fetchStatsFromList(tuNgay, denNgay, gen)
+      }
     }
   } catch (err) {
-    console.warn('[ThongKe] thong-ke lỗi, fallback:', err?.message)
-    await fetchStatsFromList(tuNgay, denNgay)
+    if (gen !== undefined && gen !== thongKeLoadGen.value) return
+    if (!baoCaoSetsPrimaryKpi.value) {
+      console.warn('[ThongKe] thong-ke lỗi, fallback:', err?.message)
+      await fetchStatsFromList(tuNgay, denNgay, gen)
+    }
   } finally { statsLoading.value = false }
 }
 
 // Fallback: tính aggregate từ danh sách khi endpoint thong-ke chưa có hoặc trả về 0
-const fetchStatsFromList = async (tuNgay, denNgay) => {
+const fetchStatsFromList = async (tuNgay, denNgay, gen) => {
+  if (baoCaoSetsPrimaryKpi.value) return
   try {
     // Lấy toàn bộ danh sách (BE có thể không filter theo ngày)
     const res  = await adminApi.getPayments({ per_page: 2000, page: 1 })
-    const list = (res?.data ?? res)?.data ?? []
+    if (gen !== undefined && gen !== thongKeLoadGen.value) return
+    const list = extractPaginatedRows(res)
     if (!list.length) return
     console.log('[ThongKe-fallback] tong ban ghi BE:', list.length, '| sample:', JSON.stringify(list[0]))
 
@@ -142,39 +483,27 @@ const fetchStatsFromList = async (tuNgay, denNgay) => {
       return
     }
 
-    // ── Phân loại trạng thái – BLACKLIST: loại trừ huỷ/chờ, còn lại = hoàn thành ─────
+    // ── Chỉ tính thanh toán thành công trong bảng `thanh_toan` ─────
     const getST = pm => Number(pm.so_tien_thuc_thu ?? pm.so_tien ?? pm.tong_tien ?? pm.amount ?? pm.gia_tien ?? 0)
-    const getTT = pm => String(pm.trang_thai ?? pm.status ?? '').toLowerCase().trim()
+    const isSuccess = pm => isPmThanhToanCong(pm)
 
-    // Vé HUỶ: chỉ các giá trị CHẮC CHẮN là huỷ
-    const huyList = filteredList.filter(pm => {
-      const tt = getTT(pm)
-      return tt === 'huy' || tt === 'da_huy' || tt === 'that_bai' || tt === 'failed' ||
-             tt === 'cancelled' || tt === 'cancel' || tt === 'hoan_tien' || tt === 'refunded'
-    })
-    // Vé ĐANG CHỜ: chưa xử lý
-    const choList = filteredList.filter(pm => {
-      const tt = getTT(pm)
-      return tt === 'cho' || tt === 'cho_xu_ly' || tt === 'pending' || tt === 'processing' || tt === 'dang_cho'
-    })
-    // Vé HOÀN THÀNH: tất cả KHÔNG huỷ KHÔNG chờ
-    // (bao gồm 'thanh_cong', 'success', '1', 1 và các giá trị chưa xác định)
-    const hoanThanhList = filteredList.filter(pm => !huyList.includes(pm) && !choList.includes(pm))
+    const thanhCongList = filteredList.filter(isSuccess)
+    const thatBaiList = filteredList.filter(pm => !isSuccess(pm) && String(pm.trang_thai ?? pm.status ?? '').toLowerCase().trim() !== 'cho' && String(pm.trang_thai ?? pm.status ?? '').toLowerCase().trim() !== 'pending')
+    const choList = filteredList.filter(pm => !isSuccess(pm) && !thatBaiList.includes(pm))
 
     const tot = filteredList.length
-    // Doanh thu = tổng vé HOÀN THÀNH (không tính vé huỷ, không tính đang chờ)
-    const tongDoanhThu = hoanThanhList.reduce((s, pm) => s + getST(pm), 0)
+    const tongDoanhThu = thanhCongList.reduce((s, pm) => s + getST(pm), 0)
 
     totalStats.value = {
       ...totalStats.value,
       tongDoanhThu,
       tongVe:        tot,
-      veHoanThanh:   hoanThanhList.length,
-      veHuy:         huyList.length,
+      veHoanThanh:   thanhCongList.length,
+      veHuy:         thatBaiList.length,
       veCho:         choList.length,
-      tyLeHoanThanh: tot > 0 ? +((hoanThanhList.length / tot) * 100).toFixed(1) : 0,
-      tyLeHuy:       tot > 0 ? +((huyList.length        / tot) * 100).toFixed(1) : 0,
-      tyLeCho:       tot > 0 ? +((choList.length         / tot) * 100).toFixed(1) : 0,
+      tyLeHoanThanh: tot > 0 ? +((thanhCongList.length / tot) * 100).toFixed(1) : 0,
+      tyLeHuy:       tot > 0 ? +((thatBaiList.length   / tot) * 100).toFixed(1) : 0,
+      tyLeCho:       tot > 0 ? +((choList.length        / tot) * 100).toFixed(1) : 0,
     }
 
     // ── Chart: doanh thu + số vé theo tháng ──────────────────────────────
@@ -246,15 +575,8 @@ const fetchPayments = async () => {
       Object.entries(pmFilter.value).filter(([, v]) => v !== '' && v !== null)
     )
     const res = await adminApi.getPayments(params)
-    // BE trả về { success: true, data: { data: [...], current_page, last_page, total, per_page } }
-    const payload = res?.data ?? res
-    payments.value     = payload?.data     ?? []
-    paymentsMeta.value = {
-      current_page: payload?.current_page ?? 1,
-      last_page:    payload?.last_page    ?? 1,
-      total:        payload?.total        ?? 0,
-      per_page:     payload?.per_page     ?? 15,
-    }
+    payments.value = extractPaginatedRows(res)
+    paymentsMeta.value = extractPaginatedMeta(res)
   } catch (err) {
     paymentsError.value = err?.message ?? 'Không thể tải dữ liệu thanh toán'
   } finally {
@@ -284,17 +606,113 @@ const pmPageNumbers = computed(() => {
   return range
 })
 
+/** Số tiền một bản ghi thanh toán (khớp cột bảng + fallback list). */
+const getPmSoTienForTotal = (pm) =>
+  Number(pm.so_tien_thuc_thu ?? pm.so_tien ?? pm.tong_tien ?? pm.amount ?? pm.gia_tien ?? 0)
+
+/**
+ * Giao dịch được tính vào doanh thu: thành công / hoàn tất; loại thất bại, hoàn tiền, chờ.
+ * Bản ghi không có trạng thái (tiền mặt…) vẫn cộng nếu không thuộc nhóm loại trừ.
+ */
+const isPmThanhToanCong = (pm) => {
+  const raw = pm?.trang_thai ?? pm?.status
+  if (raw === null || raw === undefined || raw === '') return true
+  if (raw === 1 || raw === true) return true
+  const tt = String(raw).toLowerCase().trim()
+  if (tt === 'thanh_cong' || tt === 'success' || tt === 'completed' || tt === 'da_thanh_toan') return true
+  if (raw === 0 || tt === '0' || tt === 'that_bai' || tt === 'failed' || tt === 'failure') return false
+  if (raw === 2 || tt === '2' || tt === 'hoan_tien' || tt === 'refund' || tt === 'refunded') return false
+  if (tt === 'huy' || tt === 'da_huy' || tt === 'cancelled' || tt === 'cancel') return false
+  if (tt === 'cho' || tt === 'pending' || tt === 'cho_xu_ly' || tt === 'processing' || tt === 'dang_cho') return false
+  return true
+}
+
+/** Tổng doanh thu KPI = cộng toàn bộ số tiền hiển thị trong danh sách thanh toán theo bộ lọc hiện tại. */
+const applyPaymentRevenueTotal = async (tuNgay, denNgay, gen) => {
+  if (!tuNgay || !denNgay) return
+  let sum = 0
+  try {
+    let page = 1
+    const perPage = 200
+    let lastPage = 1
+    for (;;) {
+      const res = await adminApi.getPayments({
+        tu_ngay: tuNgay,
+        den_ngay: denNgay,
+        page,
+        per_page: perPage,
+      })
+      if (gen !== undefined && gen !== thongKeLoadGen.value) return
+      const rows = extractPaginatedRows(res)
+      const meta = extractPaginatedMeta(res)
+      lastPage = Math.max(1, Number(meta?.last_page ?? 1) || 1)
+      for (const pm of rows) {
+        sum += getPmSoTienForTotal(pm)
+      }
+      if (page >= lastPage || rows.length < perPage) break
+      page += 1
+      if (page > 200) break
+    }
+    if (gen !== undefined && gen !== thongKeLoadGen.value) return
+    if (sum > 0) {
+      totalStats.value.tongDoanhThu = sum
+    }
+  } catch (e) {
+    console.warn('[ThongKe] tổng doanh thu (thanh-toan):', e?.message ?? e)
+  }
+}
+
 // ─── Nút "Áp dụng" chính ─────────────────────────────────────────────
 const handleApplyFilter = async () => {
+  const myGen = ++thongKeLoadGen.value
+  baoCaoSetsPrimaryKpi.value = false
   const { tuNgay, denNgay } = buildDateRange()
   pmFilter.value.tu_ngay = tuNgay; pmFilter.value.den_ngay = denNgay; pmFilter.value.page = 1
-  await Promise.all([fetchStats(tuNgay, denNgay), fetchPayments()])
+  await fetchBaoCaoAdmin(tuNgay, denNgay, myGen)
+  if (myGen !== thongKeLoadGen.value) return
+  await fetchStats(tuNgay, denNgay, myGen)
+  if (myGen !== thongKeLoadGen.value) return
+  await applyPaymentRevenueTotal(tuNgay, denNgay, myGen)
+  if (myGen !== thongKeLoadGen.value) return
+  const tasks = [fetchPayments(), fetchTicketsAnalytics(tuNgay, denNgay, myGen)]
+  if (!totalStats.value.khachHangMoi) tasks.push(fetchNewClientsInRange(tuNgay, denNgay))
+  await Promise.all(tasks)
+}
+
+const onChangeFilterTab = (key) => {
+  filterType.value = key
+  const now = new Date()
+  const yy = String(now.getFullYear())
+  if (key === 'year') {
+    selectedYear.value = yy
+  } else if (key === 'month') {
+    selectedMonth.value = `${yy}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  } else if (key === 'quarter') {
+    selectedQuarterYear.value = yy
+    selectedQuarterNum.value = String(Math.floor(now.getMonth() / 3) + 1)
+  } else if (key === 'range') {
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const d = String(now.getDate()).padStart(2, '0')
+    dateFrom.value = `${yy}-${m}-01`
+    dateTo.value = `${yy}-${m}-${d}`
+  }
+  handleApplyFilter()
 }
 
 onMounted(async () => {
+  const myGen = ++thongKeLoadGen.value
+  baoCaoSetsPrimaryKpi.value = false
   const { tuNgay, denNgay } = buildDateRange()
   pmFilter.value.tu_ngay = tuNgay; pmFilter.value.den_ngay = denNgay
-  await Promise.all([fetchStats(tuNgay, denNgay), fetchPayments(), fetchKhachHang(), fetchNhaXe(), fetchChuyenXe()])
+  await fetchBaoCaoAdmin(tuNgay, denNgay, myGen)
+  if (myGen !== thongKeLoadGen.value) return
+  await fetchStats(tuNgay, denNgay, myGen)
+  if (myGen !== thongKeLoadGen.value) return
+  await applyPaymentRevenueTotal(tuNgay, denNgay, myGen)
+  if (myGen !== thongKeLoadGen.value) return
+  const tasks = [fetchPayments(), fetchKhachHang(), fetchNhaXe(), fetchChuyenXe(), fetchTicketsAnalytics(tuNgay, denNgay, myGen)]
+  if (!totalStats.value.khachHangMoi) tasks.push(fetchNewClientsInRange(tuNgay, denNgay))
+  await Promise.all(tasks)
 })
 
 
@@ -345,11 +763,12 @@ const ticketBarData = computed(() => ({
 
 const quarterBarData = computed(() => {
   const m = monthlyRevenue.value
+  const qYear = filterType.value === 'quarter' ? selectedQuarterYear.value : selectedYear.value
   const qs = [
-    { label: `Q1/${selectedYear.value}`, value: m[0]+m[1]+m[2] },
-    { label: `Q2/${selectedYear.value}`, value: m[3]+m[4]+m[5] },
-    { label: `Q3/${selectedYear.value}`, value: m[6]+m[7]+m[8] },
-    { label: `Q4/${selectedYear.value}`, value: m[9]+m[10]+m[11] },
+    { label: `Q1/${qYear}`, value: m[0]+m[1]+m[2] },
+    { label: `Q2/${qYear}`, value: m[3]+m[4]+m[5] },
+    { label: `Q3/${qYear}`, value: m[6]+m[7]+m[8] },
+    { label: `Q4/${qYear}`, value: m[9]+m[10]+m[11] },
   ]
   return {
     labels: qs.map(q => q.label),
@@ -362,15 +781,27 @@ const quarterBarData = computed(() => {
   }
 })
 
-const ticketStatusData = computed(() => ({
-  labels: ['Hoàn thành', 'Đã huỷ', 'Đang chờ'],
-  datasets: [{
-    data: [totalStats.value.veHoanThanh, totalStats.value.veHuy, totalStats.value.veCho],
-    backgroundColor: ['#22c55e','#ef4444','#f59e0b'],
-    borderColor: ['#16a34a','#dc2626','#d97706'],
-    borderWidth: 2, hoverOffset: 8,
-  }]
-}))
+/** Biểu đồ tròn theo tiêu chí: Đã thanh toán (không tiền mặt), Tiền mặt, Đã hủy */
+const ticketPieData = computed(() => {
+  const s = ticketVeSlice.value
+  const sum = s.daThanhToanNonCash + s.tienMat + s.daHuy
+  if (sum === 0) {
+    return {
+      labels: ['Chưa có dữ liệu vé'],
+      datasets: [{ data: [1], backgroundColor: ['#e2e8f0'], borderColor: ['#cbd5e1'], borderWidth: 2, hoverOffset: 4 }],
+    }
+  }
+  return {
+    labels: ['Đã thanh toán (không tiền mặt)', 'Thanh toán tiền mặt', 'Đã hủy'],
+    datasets: [{
+      data: [s.daThanhToanNonCash, s.tienMat, s.daHuy],
+      backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+      borderColor: ['#16a34a', '#d97706', '#dc2626'],
+      borderWidth: 2,
+      hoverOffset: 8,
+    }],
+  }
+})
 
 const lineOptions = computed(() => ({
   responsive: true, maintainAspectRatio: false,
@@ -424,12 +855,77 @@ const chartTabs = [
 const currentPage = ref(1)
 const dailyData   = ref([])
 
+// ─── Xuất PDF (ưu tiên BE blob; không được thì in trình duyệt) ───────
+const isExportingPdf = ref(false)
+const handleExportPdf = async () => {
+  const { tuNgay, denNgay } = buildDateRange()
+  const s = totalStats.value
+  const v = ticketVeSlice.value
+  const period = `${tuNgay} → ${denNgay}`
+  isExportingPdf.value = true
+  try {
+    const blob = await adminApi.exportBaoCao({ tu_ngay: tuNgay, den_ngay: denNgay, format: 'pdf' })
+    if (blob instanceof Blob && blob.size > 0 && (blob.type.includes('pdf') || blob.type === 'application/octet-stream')) {
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 120000)
+      isExportingPdf.value = false
+      return
+    }
+  } catch (e) {
+    console.warn('[ThongKe] export PDF BE:', e)
+  }
+  const w = window.open('', '_blank')
+  if (!w) {
+    isExportingPdf.value = false
+    alert('Trình duyệt đã chặn cửa sổ mới — hãy cho phép popup để in PDF.')
+    return
+  }
+  const rowsTop = routeTop.value.map((r) => `<tr><td>${r.label}</td><td style="text-align:right">${r.doanh_thu.toLocaleString('vi-VN')}</td><td style="text-align:right">${r.so_ve}</td></tr>`).join('')
+  const rowsLow = routeBottom.value.map((r) => `<tr><td>${r.label}</td><td style="text-align:right">${r.doanh_thu.toLocaleString('vi-VN')}</td><td style="text-align:right">${r.so_ve}</td></tr>`).join('')
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Báo cáo thống kê</title>
+  <style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#0f172a}h1{font-size:20px}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #cbd5e1;padding:8px;font-size:13px}th{background:#1e40af;color:#fff}.kpi{display:flex;gap:12px;flex-wrap:wrap}.box{flex:1;min-width:140px;border:1px solid #e2e8f0;border-radius:8px;padding:12px}</style></head><body>
+  <h1>Báo cáo thống kê — Admin</h1><p>Kỳ: ${period}</p>
+  <div class="kpi"><div class="box"><strong>Tổng doanh thu</strong><br/>${(s.tongDoanhThu || 0).toLocaleString('vi-VN')} ₫</div>
+  <div class="box"><strong>Vé đã bán (đã TT)</strong><br/>${s.tongVeDaBan}</div>
+  <div class="box"><strong>Lấp đầy ghế TB</strong><br/>${s.tyLeLapDay}%</div>
+  <div class="box"><strong>KH mới (ước lượng)</strong><br/>${s.khachHangMoi}</div></div>
+  <h2>Phân bổ vé</h2><p>Đã TT (không TM): ${v.daThanhToanNonCash} · Tiền mặt: ${v.tienMat} · Đã hủy: ${v.daHuy}</p>
+  <h2>Tuyến doanh thu cao</h2><table><thead><tr><th>Tuyến</th><th>Doanh thu</th><th>Số vé</th></tr></thead><tbody>${rowsTop || '<tr><td colspan="3">—</td></tr>'}</tbody></table>
+  <h2>Tuyến ít khách (theo số vé)</h2><table><thead><tr><th>Tuyến</th><th>Doanh thu</th><th>Số vé</th></tr></thead><tbody>${rowsLow || '<tr><td colspan="3">—</td></tr>'}</tbody></table>
+  </body></html>`)
+  w.document.close()
+  w.focus()
+  setTimeout(() => {
+    w.print()
+    isExportingPdf.value = false
+  }, 300)
+}
+
 // ─── Xuất Excel ───────────────────────────────────────────────
 const isExporting = ref(false)
 
 const handleExportExcel = async () => {
   isExporting.value = true
   try {
+    const { tuNgay, denNgay } = buildDateRange()
+    try {
+      const blob = await adminApi.exportBaoCao({ tu_ngay: tuNgay, den_ngay: denNgay, format: 'xlsx' })
+      if (blob instanceof Blob && blob.size > 0 && !blob.type.includes('json')) {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `BaoCao_Admin_${tuNgay}_${denNgay}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        return
+      }
+    } catch (e) {
+      console.warn('[ThongKe] export Excel BE:', e)
+    }
+
     const now    = new Date()
     const period = filterType.value === 'year'
       ? `Năm ${selectedYear.value}`
@@ -439,7 +935,6 @@ const handleExportExcel = async () => {
           ? `Quý ${selectedQuarterNum.value}/${selectedQuarterYear.value}`
           : `${dateFrom.value} → ${dateTo.value}`
 
-    const { tuNgay, denNgay } = buildDateRange()
     const stats  = totalStats.value
     const months = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']
 
@@ -450,8 +945,11 @@ const handleExportExcel = async () => {
       [`Thời gian xuất: ${now.toLocaleString('vi-VN')}`, '', '', ''],
       [],
       ['CHỈ SỐ TỔNG QUAN', '', 'GIÁ TRỊ', 'GHI CHÚ'],
-      ['Tổng doanh thu (VNĐ)', '', stats.tongDoanhThu, 'Chỉ tính vé hoàn thành'],
-      ['Tổng số vé giao dịch', '', stats.tongVe, ''],
+      ['Tổng doanh thu (VNĐ)', '', stats.tongDoanhThu, 'Theo thanh toán / vé đã TT'],
+      ['Tổng số vé đã bán (đã thanh toán)', '', stats.tongVeDaBan, ''],
+      ['Tỷ lệ lấp đầy ghế TB (%)', '', stats.tyLeLapDay, 'Ước từ vé & sức chứa chuyến'],
+      ['Khách hàng mới (kỳ)', '', stats.khachHangMoi],
+      ['Tổng số vé giao dịch (TT)', '', stats.tongVe, ''],
       ['Vé hoàn thành', '', stats.veHoanThanh, ''],
       ['Vé đã huỷ', '', stats.veHuy, ''],
       ['Vé đang chờ', '', stats.veCho, ''],
@@ -531,6 +1029,18 @@ const handleExportExcel = async () => {
       s4.push(['', '', 'TỔNG', tongTT, '', '', ''])
     }
 
+    const s5 = [['TUYẾN — DOANH THU CAO', '', ''], [], ['Tuyến', 'Doanh thu (VNĐ)', 'Số vé']]
+    routeTop.value.forEach((r) => s5.push([r.label, r.doanh_thu, r.so_ve]))
+    const s6 = [['TUYẾN — ÍT KHÁCH (THEO SỐ VÉ)', '', ''], [], ['Tuyến', 'Doanh thu (VNĐ)', 'Số vé']]
+    routeBottom.value.forEach((r) => s6.push([r.label, r.doanh_thu, r.so_ve]))
+    const s7 = [
+      ['PHÂN BỔ VÉ (BIỂU ĐỒ TRÒN)', '', ''],
+      [],
+      ['Đã thanh toán (không tiền mặt)', ticketVeSlice.value.daThanhToanNonCash],
+      ['Thanh toán tiền mặt', ticketVeSlice.value.tienMat],
+      ['Đã hủy', ticketVeSlice.value.daHuy],
+    ]
+
     // == Tạo file XML Spreadsheet (Excel .xls) ==
     const xlsHeader = `<?xml version="1.0" encoding="UTF-8"?>
 <?mso-application progid="Excel.Sheet"?>
@@ -574,6 +1084,9 @@ const handleExportExcel = async () => {
       + buildSheet('Doanh thu theo tháng', s2)
       + buildSheet('Doanh thu theo quý', s3)
       + buildSheet('Chi tiết giao dịch', s4)
+      + buildSheet('Tuyến doanh thu cao', s5)
+      + buildSheet('Tuyến ít khách', s6)
+      + buildSheet('Phân bổ vé', s7)
       + '</Workbook>'
 
     const blob = new Blob([xlsContent], { type: 'application/vnd.ms-excel;charset=utf-8' })
@@ -606,7 +1119,7 @@ const handleExportExcel = async () => {
         </div>
         <div>
           <h1 class="page-title">Thống Kê & Báo Cáo</h1>
-          <p class="page-sub">Phân tích doanh thu toàn hệ thống, theo nhà xe, tỉ lệ hoàn thành & huỷ đơn</p>
+          <p class="page-sub">KPI tổng quan, thống kê theo tuyến, trạng thái vé và xuất báo cáo</p>
         </div>
       </div>
       <div class="header-actions">
@@ -618,6 +1131,10 @@ const handleExportExcel = async () => {
         >
           <TrendingUp class="btn-icon" />
           So sánh năm trước
+        </button>
+        <button class="btn-export btn-export--secondary" type="button" id="btn-export-pdf" @click="handleExportPdf" :disabled="isExportingPdf">
+          <FileText class="btn-icon" />
+          {{ isExportingPdf ? 'Đang mở...' : 'Xuất PDF' }}
         </button>
         <button class="btn-export" id="btn-export-excel" @click="handleExportExcel" :disabled="isExporting">
           <Download class="btn-icon" />
@@ -637,7 +1154,7 @@ const handleExportExcel = async () => {
           :key="tab.key"
           class="filter-tab"
           :class="{ active: filterType === tab.key }"
-          @click="filterType = tab.key"
+          @click="onChangeFilterTab(tab.key)"
           :id="`filter-tab-${tab.key}`"
         >
           <Calendar class="tab-icon" />
@@ -650,19 +1167,19 @@ const handleExportExcel = async () => {
         <template v-if="filterType === 'range'">
           <div class="input-group">
             <label>Từ ngày</label>
-            <input type="date" v-model="dateFrom" class="date-input" id="input-date-from" />
+            <input type="date" v-model="dateFrom" class="date-input" id="input-date-from" @change="handleApplyFilter" />
           </div>
           <div class="input-sep">→</div>
           <div class="input-group">
             <label>Đến ngày</label>
-            <input type="date" v-model="dateTo" class="date-input" id="input-date-to" />
+            <input type="date" v-model="dateTo" class="date-input" id="input-date-to" @change="handleApplyFilter" />
           </div>
         </template>
 
         <template v-if="filterType === 'month'">
           <div class="input-group">
             <label>Chọn tháng</label>
-            <input type="month" v-model="selectedMonth" class="date-input" id="input-month" />
+            <input type="month" v-model="selectedMonth" class="date-input" id="input-month" @change="handleApplyFilter" />
           </div>
         </template>
 
@@ -670,14 +1187,14 @@ const handleExportExcel = async () => {
           <div class="input-group">
             <label><Calendar class="label-icon" /> Chọn quý</label>
             <div class="quarter-wrap">
-              <select v-model="selectedQuarterYear" class="date-input quarter-sel" id="input-quarter-year">
+              <select v-model="selectedQuarterYear" class="date-input quarter-sel" id="input-quarter-year" @change="handleApplyFilter">
                 <option value="2026">2026</option>
                 <option value="2025">2025</option>
                 <option value="2024">2024</option>
                 <option value="2023">2023</option>
               </select>
               <span class="input-sep">–</span>
-              <select v-model="selectedQuarterNum" class="date-input quarter-sel" id="input-quarter-num">
+              <select v-model="selectedQuarterNum" class="date-input quarter-sel" id="input-quarter-num" @change="handleApplyFilter">
                 <option value="1">Quý 1 (T1-T3)</option>
                 <option value="2">Quý 2 (T4-T6)</option>
                 <option value="3">Quý 3 (T7-T9)</option>
@@ -690,7 +1207,7 @@ const handleExportExcel = async () => {
         <template v-if="filterType === 'year'">
           <div class="input-group">
             <label><Calendar class="label-icon" /> Chọn năm</label>
-            <select v-model="selectedYear" class="date-input" id="input-year">
+            <select v-model="selectedYear" class="date-input" id="input-year" @change="handleApplyFilter">
               <option value="2026">Năm 2026</option>
               <option value="2025">Năm 2025</option>
               <option value="2024">Năm 2024</option>
@@ -718,60 +1235,49 @@ const handleExportExcel = async () => {
       </div>
     </div>
 
-    <!-- ═══ KPI TỔNG QUAN ═══ -->
-    <div class="kpi-grid">
+    <!-- ═══ KPI TỔNG QUAN (tiêu chí chấp nhận) ═══ -->
+    <div class="kpi-grid kpi-grid--four">
       <div class="kpi-card kpi-green">
         <div class="kpi-top">
           <div class="kpi-icon-wrap green"><DollarSign class="kpi-icon" /></div>
-          <span class="kpi-badge" :class="totalStats.tangTruongPositive ? 'badge-up' : 'badge-down'">
-            <component :is="totalStats.tangTruongPositive ? ArrowUpRight : ArrowDownRight" class="badge-icon" />
-            {{ totalStats.tangTruong }}
-          </span>
         </div>
-        <p class="kpi-label">Tổng Doanh Thu</p>
+        <p class="kpi-label">Tổng doanh thu</p>
         <h2 class="kpi-value">{{ formatMoney(totalStats.tongDoanhThu) }}</h2>
-        <p class="kpi-sub">{{ formatFull(totalStats.tongDoanhThu) }}</p>
+        <p class="kpi-sub">{{ formatFull(totalStats.tongDoanhThu) }} · tổng thanh toán thành công trong kỳ</p>
       </div>
 
       <div class="kpi-card kpi-blue">
         <div class="kpi-top">
           <div class="kpi-icon-wrap blue"><Ticket class="kpi-icon" /></div>
-          <span class="kpi-badge badge-up"><ArrowUpRight class="badge-icon" />+12.8%</span>
         </div>
-        <p class="kpi-label">Tổng Vé Bán</p>
-        <h2 class="kpi-value">{{ totalStats.tongVe.toLocaleString() }}</h2>
-        <p class="kpi-sub">Vé trong kỳ thống kê</p>
+        <p class="kpi-label">Tổng số vé đã bán</p>
+        <h2 class="kpi-value">{{ totalStats.tongVeDaBan.toLocaleString() }}</h2>
+        <p class="kpi-sub">Vé trạng thái đã thanh toán (theo dữ liệu vé)</p>
       </div>
 
       <div class="kpi-card kpi-purple">
         <div class="kpi-top">
-          <div class="kpi-icon-wrap purple"><Bus class="kpi-icon" /></div>
-          <span class="kpi-badge badge-up"><ArrowUpRight class="badge-icon" />+18.3%</span>
+          <div class="kpi-icon-wrap purple"><Percent class="kpi-icon" /></div>
         </div>
-        <p class="kpi-label">Tổng Chuyến Xe</p>
-        <h2 class="kpi-value">{{ totalStats.tongChuyenXe.toLocaleString() }}</h2>
-        <p class="kpi-sub">Chuyến đã hoàn thành</p>
+        <p class="kpi-label">Tỷ lệ lấp đầy ghế TB</p>
+        <h2 class="kpi-value">{{ totalStats.tyLeLapDay }}%</h2>
+        <p class="kpi-sub">Ước lượng theo số vé / sức chứa chuyến</p>
       </div>
 
       <div class="kpi-card kpi-orange">
         <div class="kpi-top">
           <div class="kpi-icon-wrap orange"><Users class="kpi-icon" /></div>
-          <span class="kpi-badge badge-up"><ArrowUpRight class="badge-icon" />+21.4%</span>
         </div>
-        <p class="kpi-label">Khách Hàng</p>
-        <h2 class="kpi-value">{{ totalStats.tongKhachHang.toLocaleString() }}</h2>
-        <p class="kpi-sub">Tổng khách trong kỳ</p>
+        <p class="kpi-label">Khách hàng mới</p>
+        <h2 class="kpi-value">{{ totalStats.khachHangMoi.toLocaleString() }}</h2>
+        <p class="kpi-sub">Đăng ký trong kỳ</p>
       </div>
+    </div>
 
-      <div class="kpi-card kpi-teal">
-        <div class="kpi-top">
-          <div class="kpi-icon-wrap teal"><Building2 class="kpi-icon" /></div>
-          <span class="kpi-badge badge-up"><ArrowUpRight class="badge-icon" />+2</span>
-        </div>
-        <p class="kpi-label">Nhà Xe Đối Tác</p>
-        <h2 class="kpi-value">{{ totalStats.tongNhaXe }}</h2>
-        <p class="kpi-sub">Đang hoạt động trên hệ thống</p>
-      </div>
+    <div class="kpi-secondary-bar">
+      <span><Building2 class="inline-ic" /> Nhà xe: <strong>{{ totalStats.tongNhaXe }}</strong></span>
+      <span><Bus class="inline-ic" /> Chuyến xe (hệ thống): <strong>{{ totalStats.tongChuyenXe }}</strong></span>
+      <span><Users class="inline-ic" /> Khách hàng (tổng): <strong>{{ totalStats.tongKhachHang }}</strong></span>
     </div>
 
     <!-- ═══ BIỂU ĐỒ CHÍNH ═══ -->
@@ -807,41 +1313,92 @@ const handleExportExcel = async () => {
         </div>
       </div>
 
-      <!-- Donut – tỉ lệ trạng thái vé -->
+      <!-- Donut – trạng thái vé theo tiêu chí -->
       <div class="panel donut-panel">
         <div class="panel-header">
           <h3 class="panel-title">
             <PieChart class="panel-icon" />
-            Tỉ lệ trạng thái vé
+            Trạng thái vé (tỷ lệ)
           </h3>
         </div>
         <div class="donut-wrap">
-          <Doughnut :data="ticketStatusData" :options="doughnutOptions" />
+          <Doughnut :data="ticketPieData" :options="doughnutOptions" />
         </div>
         <div class="donut-summary">
           <div class="ds-item">
             <CheckCircle class="ds-icon green" />
             <div>
-              <p class="ds-label">Hoàn thành</p>
-              <p class="ds-value green-text">{{ totalStats.tyLeHoanThanh }}%</p>
+              <p class="ds-label">Đã thanh toán (không TM)</p>
+              <p class="ds-value green-text">{{ ticketVeSlice.daThanhToanNonCash.toLocaleString() }}</p>
             </div>
-            <span class="ds-count">{{ totalStats.veHoanThanh.toLocaleString() }} vé</span>
-          </div>
-          <div class="ds-item">
-            <XCircle class="ds-icon red" />
-            <div>
-              <p class="ds-label">Đã huỷ</p>
-              <p class="ds-value red-text">{{ totalStats.tyLeHuy }}%</p>
-            </div>
-            <span class="ds-count">{{ totalStats.veHuy.toLocaleString() }} vé</span>
+            <span class="ds-count">vé</span>
           </div>
           <div class="ds-item">
             <Clock class="ds-icon yellow" />
             <div>
-              <p class="ds-label">Đang chờ</p>
-              <p class="ds-value yellow-text">{{ totalStats.tyLeCho }}%</p>
+              <p class="ds-label">Tiền mặt</p>
+              <p class="ds-value yellow-text">{{ ticketVeSlice.tienMat.toLocaleString() }}</p>
             </div>
-            <span class="ds-count">{{ totalStats.veCho.toLocaleString() }} vé</span>
+            <span class="ds-count">vé</span>
+          </div>
+          <div class="ds-item">
+            <XCircle class="ds-icon red" />
+            <div>
+              <p class="ds-label">Đã hủy</p>
+              <p class="ds-value red-text">{{ ticketVeSlice.daHuy.toLocaleString() }}</p>
+            </div>
+            <span class="ds-count">vé</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Thống kê theo tuyến đường ═══ -->
+    <div class="route-insight-grid">
+      <div class="panel route-panel route-panel--wide">
+        <div class="panel-header">
+          <h3 class="panel-title">
+            <MapPin class="panel-icon" />
+            Tuyến doanh thu cao nhất
+          </h3>
+          <span class="panel-sub">Theo vé đã thanh toán trong kỳ</span>
+        </div>
+        <div class="route-list">
+          <div v-if="routeTop.length === 0" class="empty-hint">Chưa có dữ liệu tuyến — kiểm tra API vé có kèm chuyến/tuyến.</div>
+          <div v-for="(r, idx) in routeTop" :key="'top-'+r.label" class="route-item">
+            <div class="route-rank" :class="`rank-${idx + 1}`">{{ idx + 1 }}</div>
+            <div class="route-info">
+              <p class="route-name">{{ r.label }}</p>
+              <div class="route-bar-wrap">
+                <div
+                  class="route-bar-fill"
+                  :style="{ width: (routeTop[0]?.doanh_thu ? Math.min(100, (r.doanh_thu / routeTop[0].doanh_thu) * 100) : 0) + '%', background: idx < 3 ? '#22c55e' : '#3b82f6' }"
+                />
+              </div>
+            </div>
+            <div class="route-stats">
+              <p class="route-revenue">{{ formatMoney(r.doanh_thu) }}</p>
+              <p class="route-tickets">{{ r.so_ve.toLocaleString() }} vé</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel route-panel route-panel--wide">
+        <div class="panel-header">
+          <h3 class="panel-title">
+            <MapPin class="panel-icon" />
+            Tuyến ít khách (điều chỉnh lịch)
+          </h3>
+          <span class="panel-sub">Sắp xếp theo số vé thấp trong kỳ</span>
+        </div>
+        <div class="route-list">
+          <div v-if="routeBottom.length === 0" class="empty-hint">—</div>
+          <div v-for="(r, idx) in routeBottom" :key="'low-'+r.label" class="route-item route-item--warn">
+            <div class="route-rank rank-muted">{{ idx + 1 }}</div>
+            <div class="route-info">
+              <p class="route-name">{{ r.label }}</p>
+              <p class="route-meta">{{ r.so_ve }} vé · {{ formatMoney(r.doanh_thu) }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -937,12 +1494,12 @@ const handleExportExcel = async () => {
               <svg class="rate-circle" viewBox="0 0 80 80">
                 <circle cx="40" cy="40" r="34" fill="none" stroke="#dbeafe" stroke-width="8"/>
                 <circle cx="40" cy="40" r="34" fill="none" stroke="#3b82f6" stroke-width="8"
-                  stroke-dasharray="213.6" :stroke-dashoffset="213.6 * (1 - 0.784)"
+                  stroke-dasharray="213.6" :stroke-dashoffset="213.6 * (1 - Math.min(100, totalStats.tyLeLapDay) / 100)"
                   stroke-linecap="round" transform="rotate(-90 40 40)" />
               </svg>
-              <span class="rate-pct blue-text">78.4%</span>
+              <span class="rate-pct blue-text">{{ totalStats.tyLeLapDay }}%</span>
             </div>
-            <p class="rate-desc">Bình quân / chuyến</p>
+            <p class="rate-desc">Bình quân lấp đầy / chuyến (ước lượng)</p>
           </div>
         </div>
 
@@ -959,21 +1516,21 @@ const handleExportExcel = async () => {
             <DollarSign class="ex-icon blue" />
             <div>
               <p class="ex-label">DT / Chuyến TB</p>
-              <p class="ex-val blue-text">{{ formatMoney(Math.round(totalStats.tongDoanhThu / totalStats.tongChuyenXe)) }}</p>
+              <p class="ex-val blue-text">{{ formatMoney(totalStats.tongChuyenXe ? Math.round(totalStats.tongDoanhThu / totalStats.tongChuyenXe) : 0) }}</p>
             </div>
           </div>
           <div class="ex-stat">
             <Users class="ex-icon purple" />
             <div>
               <p class="ex-label">Vé / Khách TB</p>
-              <p class="ex-val purple-text">{{ (totalStats.tongVe / totalStats.tongKhachHang).toFixed(1) }}</p>
+              <p class="ex-val purple-text">{{ totalStats.tongKhachHang ? (totalStats.tongVe / totalStats.tongKhachHang).toFixed(1) : '0' }}</p>
             </div>
           </div>
           <div class="ex-stat">
             <Ticket class="ex-icon orange" />
             <div>
               <p class="ex-label">DT / Vé TB</p>
-              <p class="ex-val orange-text">{{ formatMoney(Math.round(totalStats.tongDoanhThu / totalStats.tongVe)) }}</p>
+              <p class="ex-val orange-text">{{ formatMoney(totalStats.tongVe ? Math.round(totalStats.tongDoanhThu / totalStats.tongVe) : 0) }}</p>
             </div>
           </div>
         </div>
@@ -1217,9 +1774,30 @@ const handleExportExcel = async () => {
 
 /* ───── KPI GRID ───── */
 .kpi-grid {
-  display: grid; grid-template-columns: repeat(5, 1fr);
-  gap: 18px; margin-bottom: 24px;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 18px; margin-bottom: 16px;
 }
+.kpi-grid--four { grid-template-columns: repeat(4, 1fr); }
+.kpi-secondary-bar {
+  display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
+  padding: 12px 18px; margin-bottom: 22px;
+  background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;
+  font-size: 13px; color: #475569;
+}
+.kpi-secondary-bar strong { color: #0f172a; }
+.inline-ic { width: 15px; height: 15px; display: inline; vertical-align: -3px; margin-right: 4px; }
+
+.route-insight-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px;
+}
+.empty-hint { padding: 20px; text-align: center; color: #94a3b8; font-size: 13px; }
+.rank-muted { background: #e2e8f0 !important; color: #64748b !important; }
+.route-meta { font-size: 12px; color: #94a3b8; margin: 4px 0 0 0; }
+.route-item--warn { border-left: 3px solid #f59e0b; padding-left: 10px; }
+.btn-export--secondary {
+  background: white; color: #0f172a; border: 1px solid #e2e8f0;
+}
+.btn-export--secondary:hover { background: #f8fafc; }
 .kpi-card {
   background: white; border-radius: 18px;
   padding: 22px 20px; box-shadow: 0 2px 14px rgba(0,0,0,.05);
@@ -1490,9 +2068,10 @@ const handleExportExcel = async () => {
 
 /* ───── RESPONSIVE ───── */
 @media (max-width: 1280px) {
-  .kpi-grid           { grid-template-columns: repeat(3, 1fr); }
+  .kpi-grid           { grid-template-columns: repeat(2, 1fr); }
   .charts-main-grid   { grid-template-columns: 1fr; }
   .charts-bottom-grid { grid-template-columns: 1fr; }
+  .route-insight-grid { grid-template-columns: 1fr; }
   .donut-wrap         { height: 280px; }
 }
 @media (max-width: 900px) {
