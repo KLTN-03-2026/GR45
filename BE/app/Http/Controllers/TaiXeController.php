@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use App\Http\Requests\TaiXe\DeleteTaiXeRequest;
 
 class TaiXeController extends Controller
 {
@@ -157,9 +158,11 @@ class TaiXeController extends Controller
             $filters['ma_nha_xe'] = $user->ma_nha_xe;
         }
 
+        $drivers = $this->service->getAll($filters);
+
         return response()->json([
             'success' => true,
-            'data'    => $this->service->getAll($filters),
+            'data'    => TaiXeResource::collection($drivers)->response()->getData(true),
         ]);
     }
 
@@ -233,7 +236,23 @@ class TaiXeController extends Controller
         return response()->json(['success' => true, 'message' => $msg, 'data' => new TaiXeResource($taiXe)]);
     }
 
-    public function destroy(int $id, Request $request): JsonResponse
+    /** PATCH /admin/tai-xe/{id}/duyet — Duyệt tài xế (Admin only) */
+    public function approve(int $id): JsonResponse
+    {
+        $taiXe = $this->service->getById($id);
+        if (!$taiXe) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy tài xế.'], 404);
+        }
+
+        $taiXe = $this->service->updateStatus($id, 'hoat_dong');
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã duyệt tài xế thành công. Tài xế có thể đăng nhập.',
+            'data'    => new TaiXeResource($taiXe),
+        ]);
+    }
+
+    public function destroy(int $id, DeleteTaiXeRequest $request): JsonResponse
     {
         $user = $request->user('sanctum');
         $taiXe = $this->service->getById($id);

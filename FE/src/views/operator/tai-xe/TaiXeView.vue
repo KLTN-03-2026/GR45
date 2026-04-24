@@ -6,6 +6,7 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import BaseToast from '@/components/common/BaseToast.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 
 const toast = reactive({ visible: false, message: '', type: 'success' })
 const showToast = (message, type = 'success') => {
@@ -18,6 +19,7 @@ const showToast = (message, type = 'success') => {
 }
 
 const loading = ref(false)
+const confirmModal = reactive({ visible: false, title: '', message: '', onConfirm: null, variant: 'primary' })
 const drivers = ref([])
 const searchQuery = ref('')
 const filterStatus = ref('')
@@ -100,16 +102,34 @@ const isEditMode = ref(false)
 const currentDriverId = ref(null)
 const formLoading = ref(false)
 
+const licenseClasses = [
+  { value: 'B1', label: 'Hạng B1' },
+  { value: 'B2', label: 'Hạng B2' },
+  { value: 'C', label: 'Hạng C' },
+  { value: 'D', label: 'Hạng D' },
+  { value: 'E', label: 'Hạng E' },
+  { value: 'F', label: 'Hạng F' },
+  { value: 'FB2', label: 'Hạng FB2' },
+  { value: 'FC', label: 'Hạng FC' },
+  { value: 'FD', label: 'Hạng FD' },
+  { value: 'FE', label: 'Hạng FE' },
+]
+
 const initialFormData = () => ({
+  ho_va_ten: '',
   email: '',
   password: '',
   cccd: '',
   so_dien_thoai: '',
+  ngay_sinh: '',
+  dia_chi: '',
+  so_gplx: '',
+  hang_bang_lai: '',
+  ngay_cap_gplx: '',
+  ngay_het_han_gplx: '',
   avatar: null,
   anh_cccd_mat_truoc: null,
   anh_cccd_mat_sau: null,
-  anh_gplx: null,
-  anh_gplx_mat_sau: null,
 })
 
 const formData = reactive(initialFormData())
@@ -141,13 +161,24 @@ const openEditModal = (driver) => {
   isEditMode.value = true
   currentDriverId.value = driver.id
   Object.assign(formData, initialFormData())
+  formData.ho_va_ten = driver.ho_va_ten || driver.hoSo?.ho_va_ten || ''
   formData.email = driver.email
   formData.cccd = driver.cccd
-  formData.so_dien_thoai = driver.so_dien_thoai
+  formData.so_dien_thoai = driver.so_dien_thoai || driver.hoSo?.so_dien_thoai || ''
+
+  // Profile data
+  if (driver.hoSo) {
+    formData.ngay_sinh = driver.hoSo.ngay_sinh || ''
+    formData.dia_chi = driver.hoSo.dia_chi || ''
+    formData.so_gplx = driver.hoSo.so_gplx || ''
+    formData.hang_bang_lai = driver.hoSo.hang_bang_lai || ''
+    formData.ngay_cap_gplx = driver.hoSo.ngay_cap_gplx || ''
+    formData.ngay_het_han_gplx = driver.hoSo.ngay_het_han_gplx || ''
+  }
   
   // Set preview tu API
   for(let key in filePreviews) {
-    filePreviews[key] = driver[key] || null
+    filePreviews[key] = driver[key] || driver.hoSo?.[key] || null
   }
   
   isFormModal.value = true
@@ -158,15 +189,24 @@ const submitForm = async () => {
     formLoading.value = true
     const payload = new FormData()
 
+    payload.append('ho_va_ten', formData.ho_va_ten)
     payload.append('email', formData.email)
     payload.append('cccd', formData.cccd)
     payload.append('so_dien_thoai', formData.so_dien_thoai)
+    
+    // Add profile fields
+    payload.append('ngay_sinh', formData.ngay_sinh || '')
+    payload.append('dia_chi', formData.dia_chi || '')
+    payload.append('so_gplx', formData.so_gplx || '')
+    payload.append('hang_bang_lai', formData.hang_bang_lai || '')
+    payload.append('ngay_cap_gplx', formData.ngay_cap_gplx || '')
+    payload.append('ngay_het_han_gplx', formData.ngay_het_han_gplx || '')
     
     if (formData.password) {
       payload.append('password', formData.password)
     }
 
-    const fileFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau', 'anh_gplx', 'anh_gplx_mat_sau']
+    const fileFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau']
     fileFields.forEach(field => {
       if (formData[field] instanceof File) {
         payload.append(field, formData[field])
@@ -194,16 +234,35 @@ const submitForm = async () => {
   }
 }
 
-const requestDelete = async (id) => {
-  if (confirm('Bạn có chắc muốn xoá tài khoản này không? Hệ thống sẽ chuyển trạng thái tài khoản về "Chờ duyệt" để tiến hành xoá.')) {
-    try {
-      await operatorApi.deleteDriver(id)
-      showToast('Đã gửi yêu cầu xoá thành công!', 'success')
-      fetchDrivers(pagination.currentPage)
-    } catch (error) {
-      showToast(error.response?.data?.message || 'Lỗi khi yêu cầu xoá.', 'error')
-    }
-  }
+const openConfirm = (title, message, onConfirm, variant = 'primary') => {
+  confirmModal.title = title
+  confirmModal.message = message
+  confirmModal.onConfirm = onConfirm
+  confirmModal.variant = variant
+  confirmModal.visible = true
+}
+
+const handleConfirmAction = async () => {
+  const callback = confirmModal.onConfirm
+  confirmModal.visible = false
+  if (callback) await callback()
+}
+
+const requestDelete = (id) => {
+  openConfirm(
+    'Xác nhận xoá',
+    'Bạn có chắc muốn xoá tài khoản này không? Hệ thống sẽ chuyển trạng thái tài khoản về "Chờ duyệt" để tiến hành xoá.',
+    async () => {
+      try {
+        await operatorApi.deleteDriver(id)
+        showToast('Đã gửi yêu cầu xoá thành công!', 'success')
+        fetchDrivers(pagination.currentPage)
+      } catch (error) {
+        showToast(error.response?.data?.message || 'Lỗi khi yêu cầu xoá.', 'error')
+      }
+    },
+    'danger'
+  )
 }
 
 onMounted(() => {
@@ -272,8 +331,9 @@ onMounted(() => {
 
         <template #cell(giay_to)="{ item }">
            <div class="info-block">
-            <span class="sub-text">CCCD: <strong style="color: #334155">{{ item.cccd }}</strong></span>
-            <span class="sub-text">GPLX: <strong style="color: #334155">{{ item.hoSo?.so_gplx || '—' }}</strong></span>
+            <span class="sub-text">Bằng lái:</span>
+            <strong style="color: #0d4f35; font-size: 14px;">{{ item.hoSo?.so_gplx || '—' }}</strong>
+            <span class="sub-text">Hạng: {{ item.hoSo?.hang_bang_lai || '—' }}</span>
           </div>
         </template>
 
@@ -336,14 +396,41 @@ onMounted(() => {
         <span v-else>Tài xế mới được tạo sẽ ở trạng thái <strong>Chờ duyệt</strong> cho tới khi Admin phê duyệt. Vui lòng thêm các ảnh nhận dạng chân thực nhất.</span>
       </div>
 
+      <!-- Loading Overlay cho quá trình Upload ảnh (Đưa vào trong Modal) -->
+      <div v-if="formLoading" class="upload-overlay">
+        <div class="upload-spinner-box">
+            <svg class="spinner-main" viewBox="0 0 50 50">
+              <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+            </svg>
+            <p>Đang tải ảnh và lưu hồ sơ tài xế...</p>
+            <span class="sub-tip">Vui lòng không đóng trình duyệt lúc này</span>
+        </div>
+      </div>
+
       <form @submit.prevent="submitForm" class="driver-form">
         <!-- Thông tin cơ bản -->
-        <h3 class="section-title">Thông tin xác thực</h3>
+        <h3 class="section-title">Thông tin xác thực & Liên hệ</h3>
         <div class="form-grid">
+          <BaseInput v-model="formData.ho_va_ten" label="Họ và tên *" placeholder="Nguyễn Văn A" required />
           <BaseInput v-model="formData.email" type="email" label="Email đăng nhập *" placeholder="nhanvien@email.com" required />
           <BaseInput v-model="formData.cccd" label="Số CCCD *" placeholder="012345678912" required />
           <BaseInput v-model="formData.so_dien_thoai" label="Số điện thoại *" placeholder="0909123456" required />
           <BaseInput v-model="formData.password" type="password" :label="isEditMode ? 'Mật khẩu mới (bỏ trống nếu giữ nguyên)' : 'Mật khẩu *'" :required="!isEditMode" />
+          <BaseInput v-model="formData.ngay_sinh" type="date" label="Ngày sinh" />
+          <BaseInput v-model="formData.dia_chi" label="Địa chỉ" placeholder="Số 1, Đường X, Quận Y..." />
+        </div>
+
+        <h3 class="section-title mt-4">Thông tin giấy phép lái xe</h3>
+        <div class="form-grid">
+          <BaseInput v-model="formData.so_gplx" label="Số GPLX *" placeholder="123456789012" required />
+          <BaseSelect 
+            v-model="formData.hang_bang_lai" 
+            label="Hạng bằng lái *" 
+            :options="licenseClasses"
+            required 
+          />
+          <BaseInput v-model="formData.ngay_cap_gplx" type="date" label="Ngày cấp GPLX *" required />
+          <BaseInput v-model="formData.ngay_het_han_gplx" type="date" label="Ngày hết hạn GPLX *" required />
         </div>
 
         <h3 class="section-title mt-4">Hình ảnh hồ sơ</h3>
@@ -381,29 +468,6 @@ onMounted(() => {
             </div>
             <input type="file" ref="cccd2Input" hidden accept="image/*" @change="handleFileUpload($event, 'anh_cccd_mat_sau')" />
           </div>
-
-          <div class="file-group">
-            <label class="base-input-label">Ảnh GPLX Mặt trước <span v-if="!isEditMode">*</span></label>
-            <div class="file-upload-box" @click="$refs.gplx1Input.click()">
-              <img v-if="filePreviews.anh_gplx" :src="filePreviews.anh_gplx" alt="Preview" class="file-preview" />
-              <div v-else class="upload-placeholder">
-                 <span>Tải ảnh lên</span>
-              </div>
-            </div>
-            <input type="file" ref="gplx1Input" hidden accept="image/*" @change="handleFileUpload($event, 'anh_gplx')" />
-          </div>
-
-          <div class="file-group">
-            <label class="base-input-label">Ảnh GPLX Mặt sau <span v-if="!isEditMode">*</span></label>
-            <div class="file-upload-box" @click="$refs.gplx2Input.click()">
-              <img v-if="filePreviews.anh_gplx_mat_sau" :src="filePreviews.anh_gplx_mat_sau" alt="Preview" class="file-preview" />
-              <div v-else class="upload-placeholder">
-                 <span>Tải ảnh lên</span>
-              </div>
-            </div>
-            <input type="file" ref="gplx2Input" hidden accept="image/*" @change="handleFileUpload($event, 'anh_gplx_mat_sau')" />
-          </div>
-
         </div>
 
       </form>
@@ -413,6 +477,25 @@ onMounted(() => {
         <BaseButton variant="primary" :loading="formLoading" @click="submitForm">
           {{ isEditMode ? 'Lưu yêu cầu sửa' : 'Thêm tài xế' }}
         </BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- Custom Confirmation Modal -->
+    <BaseModal
+      v-model="confirmModal.visible"
+      :title="confirmModal.title"
+      maxWidth="450px"
+    >
+      <div class="confirm-modal-content">
+        <div class="confirm-icon" :class="confirmModal.variant">
+          <span v-if="confirmModal.variant === 'danger'">⚠️</span>
+          <span v-else>❓</span>
+        </div>
+        <p class="confirm-message">{{ confirmModal.message }}</p>
+      </div>
+      <template #footer>
+        <BaseButton variant="secondary" @click="confirmModal.visible = false">Hủy</BaseButton>
+        <BaseButton :variant="confirmModal.variant" @click="handleConfirmAction">Xác nhận</BaseButton>
       </template>
     </BaseModal>
 
@@ -677,5 +760,78 @@ onMounted(() => {
   .file-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* Upload Overlay Styles */
+.upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(2px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+}
+.upload-spinner-box {
+  background: white;
+  padding: 30px 40px;
+  border-radius: 20px;
+  color: #0f172a;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.upload-spinner-box p {
+  margin: 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+.sub-tip {
+  font-size: 12px;
+  color: #64748b;
+}
+.spinner-main {
+  animation: rotate 2s linear infinite;
+  width: 50px;
+  height: 50px;
+}
+.spinner-main .path {
+  stroke: #10b981;
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+/* Custom Confirmation Modal Styles */
+.confirm-modal-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0;
+}
+.confirm-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+.confirm-icon.primary { background: #eff6ff; color: #3b82f6; }
+.confirm-icon.danger { background: #fef2f2; color: #ef4444; }
+.confirm-message {
+  font-size: 1rem;
+  color: #1e293b;
+  font-weight: 500;
+  line-height: 1.5;
 }
 </style>

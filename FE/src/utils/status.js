@@ -19,11 +19,15 @@ export const getTicketStatus = (status) => {
 
 export const getVoucherStatus = (status) => {
   switch(status) {
-    case 'cho_duyet':   return { text: 'Chờ duyệt', class: 'status-pending' };
-    case 'hoat_dong':   return { text: 'Hoạt động', class: 'status-approved' };
-    case 'tam_ngung':   return { text: 'Tạm ngưng', class: 'status-info' };
+    case 'cho_duyet':
+    case 'pending':     return { text: 'Chờ duyệt', class: 'status-pending' };
+    case 'hoat_dong':
+    case 'active':      return { text: 'Hoạt động', class: 'status-approved' };
+    case 'tam_ngung':
+    case 'stopped':     return { text: 'Tạm ngưng', class: 'status-info' };
     case 'vo_hieu':     return { text: 'Vô hiệu', class: 'status-rejected' };
-    case 'het_han':     return { text: 'Hết hạn', class: 'status-expired' };
+    case 'het_han':
+    case 'expired':     return { text: 'Hết hiệu lực', class: 'status-expired' };
     default:            return { text: 'Không rõ', class: '' };
   }
 };
@@ -36,4 +40,3 @@ export const getStaffStatus = (status) => {
     default:           return { text: 'Không rõ', class: '' };
   }
 };
-

@@ -14,4 +14,9 @@ interface TaiXeRepositoryInterface
     public function search(string $keyword);
     public function toggleStatus(int $id);
     public function getByNhaXe(string $maNhaXe, array $filters = []);
+
+    // Các phương thức mới cho việc đăng ký từ Nhà Xe và Admin duyệt
+    public function createHoSo(array $data);
+    public function updateHoSo(int $taiXeId, array $data);
+    public function getByTrangThaiDuyet(string $trangThai, array $filters = []);
 }
