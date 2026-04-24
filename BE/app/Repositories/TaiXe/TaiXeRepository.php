@@ -3,6 +3,7 @@
 namespace App\Repositories\TaiXe;
 
 use App\Models\TaiXe;
+use App\Models\HoSoTaiXe;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 class TaiXeRepository implements TaiXeRepositoryInterface
@@ -97,4 +98,32 @@ class TaiXeRepository implements TaiXeRepositoryInterface
             ->orderByDesc('created_at')
             ->paginate($filters['per_page'] ?? 15);
     }
+
+    public function createHoSo(array $data)
+    {
+        return HoSoTaiXe::create($data);
+    }
+
+    public function updateHoSo(int $taiXeId, array $data)
+    {
+        return HoSoTaiXe::updateOrCreate(
+            ['id_tai_xe' => $taiXeId],
+            $data
+        );
+    }
+
+    public function getByTrangThaiDuyet(string $trangThai, array $filters = [])
+    {
+        $query = $this->model->query()
+            ->with(['hoSo', 'nhaXe'])
+            ->whereHas('hoSo', fn($q) => $q->where('trang_thai_duyet', $trangThai))
+            ->orderByDesc('created_at');
+
+        if (!empty($filters['ma_nha_xe'])) {
+            $query->where('ma_nha_xe', $filters['ma_nha_xe']);
+        }
+
+        return $query->paginate($filters['per_page'] ?? 15);
+    }
 }
+

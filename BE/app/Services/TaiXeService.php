@@ -177,32 +177,27 @@ class TaiXeService
             $taiXe = $this->repo->create($taiXeData);
 
             // 2. Tạo hồ sơ chi tiết (ho_so_tai_xes)
-            $hoSo = new \App\Models\HoSoTaiXe();
-            $hoSo->id_tai_xe = $taiXe->id;
-            $hoSo->ma_nha_xe = $data['ma_nha_xe'];
-            $hoSo->ho_va_ten = $data['ho_va_ten'] ?? $data['email'];
-            $hoSo->email = $data['email'];
-            $hoSo->so_dien_thoai = $data['so_dien_thoai'] ?? null;
-            $hoSo->so_cccd = $data['cccd'];
-            $hoSo->ngay_sinh = $data['ngay_sinh'] ?? null;
-            $hoSo->dia_chi = $data['dia_chi'] ?? null;
-            $hoSo->avatar = $data['avatar'] ?? null;
-            $hoSo->so_gplx = $data['so_gplx'] ?? null;
-            $hoSo->hang_bang_lai = $data['hang_bang_lai'] ?? null;
-            $hoSo->ngay_cap_gplx = $data['ngay_cap_gplx'] ?? null;
-            $hoSo->ngay_het_han_gplx = $data['ngay_het_han_gplx'] ?? null;
-            $hoSo->trang_thai_duyet = 'pending';
-            $hoSo->nguoi_tao_id = auth()->id();
+            $hoSoData = [
+                'id_tai_xe'         => $taiXe->id,
+                'ma_nha_xe'         => $data['ma_nha_xe'],
+                'ho_va_ten'         => $data['ho_va_ten'] ?? $data['email'],
+                'email'             => $data['email'],
+                'so_dien_thoai'     => $data['so_dien_thoai'] ?? null,
+                'so_cccd'           => $data['cccd'],
+                'ngay_sinh'         => $data['ngay_sinh'] ?? null,
+                'dia_chi'           => $data['dia_chi'] ?? null,
+                'avatar'            => $data['avatar'] ?? null,
+                'so_gplx'           => $data['so_gplx'] ?? null,
+                'hang_bang_lai'     => $data['hang_bang_lai'] ?? null,
+                'ngay_cap_gplx'     => $data['ngay_cap_gplx'] ?? null,
+                'ngay_het_han_gplx' => $data['ngay_het_han_gplx'] ?? null,
+                'trang_thai_duyet'  => 'pending',
+                'nguoi_tao_id'      => auth()->id(),
+                'anh_cccd_mat_truoc' => $data['anh_cccd_mat_truoc'] ?? null,
+                'anh_cccd_mat_sau'   => $data['anh_cccd_mat_sau'] ?? null,
+            ];
 
-            // Thêm các ảnh CCCD và Avatar nếu có
-            if (isset($data['avatar']))
-                $hoSo->avatar = $data['avatar'];
-            if (isset($data['anh_cccd_mat_truoc']))
-                $hoSo->anh_cccd_mat_truoc = $data['anh_cccd_mat_truoc'];
-            if (isset($data['anh_cccd_mat_sau']))
-                $hoSo->anh_cccd_mat_sau = $data['anh_cccd_mat_sau'];
-
-            $hoSo->save();
+            $this->repo->createHoSo($hoSoData);
 
             return new TaiXeResource($taiXe->load('hoSo'));
         });
@@ -255,10 +250,7 @@ class TaiXeService
                 $hoSoData['trang_thai_duyet'] = $statusMap[$data['tinh_trang']] ?? 'pending';
             }
 
-            $taiXe->hoSo()->updateOrCreate(
-                ['id_tai_xe' => $taiXe->id],
-                $hoSoData
-            );
+            $this->repo->updateHoSo($taiXe->id, $hoSoData);
 
             return $taiXe->fresh(['hoSo', 'nhaXe']);
         });
