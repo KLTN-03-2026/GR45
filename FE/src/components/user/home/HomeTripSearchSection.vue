@@ -14,10 +14,10 @@ const searchForm = reactive({
 const formErrors = reactive({});
 const provinces = ref([]);
 const recentRoutes = [
-  { fromId: 1, toId: 13, fromName: 'Hà Nội', toName: 'Hải Phòng', icon: 'local_taxi' },
-  { fromId: 1, toId: 28, fromName: 'Hà Nội', toName: 'Hồ Chí Minh', icon: 'flight_takeoff' },
-  { fromId: 21, toId: 28, fromName: 'Đà Nẵg', toName: 'Hồ Chí Minh', icon: 'directions_bus' },
-  { fromId: 21, toId: 20, fromName: 'Đà Nẵg', toName: 'Thành phố Huế', icon: 'directions_bus' },
+  { fromId: 1, toId: 13, fromName: 'Hà Nội', toName: 'Hải Phòng', icon: 'directions_bus' },
+  { fromId: 1, toId: 28, fromName: 'Hà Nội', toName: 'Hồ Chí Minh', icon: 'directions_bus' },
+  { fromId: 21, toId: 28, fromName: 'Đà Nẵng', toName: 'Hồ Chí Minh', icon: 'directions_bus' },
+  { fromId: 21, toId: 20, fromName: 'Đà Nẵng', toName: 'Thành phố Huế', icon: 'directions_bus' },
 ];
 
 const fetchProvinces = async () => {

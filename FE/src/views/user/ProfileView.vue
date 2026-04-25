@@ -46,6 +46,8 @@ let ratingPollingTimer = null;
 
 const showMyRatingDetail = ref(false);
 const selectedMyRating = ref(null);
+const showTicketModal = ref(false);
+const selectedTicket = ref(null);
 const CLIENT_TOKEN_KEY = "auth.client.token";
 
 // Password state
@@ -56,6 +58,67 @@ const passwordForm = reactive({
   mat_khau_moi_confirmation: "",
 });
 const passwordMessage = ref({ type: "", text: "" });
+
+// Tickets History Filter Logic (Client-side filtering for 100% accuracy)
+const allTickets = ref([]);
+const statusFilter = ref("all");
+const currentPage = ref(1);
+const pageSize = 10;
+
+const filterOptions = [
+  { value: "all", label: "Tất cả" },
+  { value: "dang_cho", label: "Chờ thanh toán" },
+  { value: "da_thanh_toan", label: "Đã thanh toán" },
+  { value: "hoan_thanh", label: "Đã hoàn thành" },
+  { value: "huy", label: "Đã hủy" },
+];
+
+const isPastTrip = (ticket) => {
+  const cx = ticket?.chuyen_xe;
+  if (!cx?.ngay_khoi_hanh) return false;
+  const gio = (cx.gio_khoi_hanh || "00:00").toString().substring(0, 5);
+  const dep = new Date(`${cx.ngay_khoi_hanh}T${gio}:00`);
+  return dep.getTime() < Date.now();
+};
+
+const categoryOf = (ticket) => {
+  const tt = String(ticket?.tinh_trang || "").toLowerCase();
+  if (tt === "dang_cho" || tt === "pending" || tt === "0") return "dang_cho";
+  if (tt === "huy" || tt === "da_huy" || tt === "cancelled" || tt === "2") return "huy";
+  if (tt === "da_hoan_thanh" || tt === "completed") return "hoan_thanh";
+  if (tt === "da_thanh_toan" || tt === "paid" || tt === "1") {
+    return isPastTrip(ticket) ? "hoan_thanh" : "da_thanh_toan";
+  }
+  return "unknown";
+};
+
+const getStatusInfoExtended = (ticket) => {
+  const cat = categoryOf(ticket);
+  const map = {
+    dang_cho: { label: "Chờ thanh toán", class: "bg-amber-50 text-amber-600 border-amber-200" },
+    da_thanh_toan: { label: "Đã thanh toán", class: "bg-emerald-50 text-emerald-600 border-emerald-200" },
+    hoan_thanh: { label: "Đã hoàn thành", class: "bg-sky-50 text-sky-600 border-sky-200" },
+    huy: { label: "Đã hủy", class: "bg-rose-50 text-rose-600 border-rose-200" },
+    unknown: { label: "Không xác định", class: "bg-slate-50 text-slate-500 border-slate-200" },
+  };
+  return map[cat] || map.unknown;
+};
+
+const filteredTickets = computed(() => {
+  if (statusFilter.value === "all") return allTickets.value;
+  return allTickets.value.filter((t) => categoryOf(t) === statusFilter.value);
+});
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredTickets.value.length / pageSize)));
+
+const pagedTickets = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return filteredTickets.value.slice(start, start + pageSize);
+});
+
+watch(statusFilter, () => {
+  currentPage.value = 1;
+});
 
 // Computed
 const avatarLetter = computed(() => {
@@ -70,20 +133,24 @@ const avatarLetter = computed(() => {
 const userName = computed(() => clientStore.user?.ho_va_ten || "Khách hàng");
 const userEmail = computed(() => profileForm.email || clientStore.user?.email || "");
 
-const anyProfileRatingModalOpen = computed(() => showMyRatingDetail.value);
+const anyProfileModalOpen = computed(() => showMyRatingDetail.value || showTicketModal.value);
 
-const onProfileRatingModalKeydown = (e) => {
+const onProfileModalKeydown = (e) => {
   if (e.key !== "Escape") return;
   if (showMyRatingDetail.value) {
     showMyRatingDetail.value = false;
     selectedMyRating.value = null;
   }
+  if (showTicketModal.value) {
+    showTicketModal.value = false;
+    selectedTicket.value = null;
+  }
 };
 
-watch(anyProfileRatingModalOpen, (open) => {
+watch(anyProfileModalOpen, (open) => {
   document.body.style.overflow = open ? "hidden" : "";
-  if (open) document.addEventListener("keydown", onProfileRatingModalKeydown);
-  else document.removeEventListener("keydown", onProfileRatingModalKeydown);
+  if (open) document.addEventListener("keydown", onProfileModalKeydown);
+  else document.removeEventListener("keydown", onProfileModalKeydown);
 });
 
 // Helper formats
@@ -272,21 +339,34 @@ const handleChangePassword = async () => {
   }
 };
 
-const fetchTickets = async (page = 1) => {
+const fetchTickets = async () => {
   ensureClientAuthContext();
   isLoadingTickets.value = true;
+  ticketsMessage.value = { type: "", text: "" };
   try {
-    const res = await clientApi.getTickets({ page });
-    if (res.success) {
-      tickets.value = res.data.data || [];
-      ticketsPagination.value = {
-        current_page: res.data.current_page || 1,
-        last_page: res.data.last_page || 1,
-        total: res.data.total || 0,
-      };
-    }
+    const acc = [];
+    let page = 1;
+    let lastPage = 1;
+    do {
+      const res = await clientApi.getTickets({ page, per_page: 50 });
+      if (!res?.success) break;
+      const payload = res.data;
+      acc.push(...(payload.data || []));
+      lastPage = payload.last_page || 1;
+      page += 1;
+      if (page > 20) break; // Giới hạn 1000 vé
+    } while (page <= lastPage);
+
+    // Sắp xếp theo thời gian mới nhất
+    acc.sort((a, b) => {
+      const timeA = new Date(a.thoi_gian_dat || a.created_at).getTime();
+      const timeB = new Date(b.thoi_gian_dat || b.created_at).getTime();
+      return timeB - timeA;
+    });
+    allTickets.value = acc;
   } catch (error) {
     ticketsMessage.value = { type: "error", text: "Không thể tải danh sách vé." };
+    allTickets.value = [];
   } finally {
     isLoadingTickets.value = false;
   }
@@ -323,6 +403,16 @@ const openMyRatingDetail = (rating) => {
 const closeMyRatingDetail = () => {
   showMyRatingDetail.value = false;
   selectedMyRating.value = null;
+};
+
+const openTicketDetail = (ticket) => {
+  selectedTicket.value = ticket;
+  showTicketModal.value = true;
+};
+
+const closeTicketDetail = () => {
+  showTicketModal.value = false;
+  selectedTicket.value = null;
 };
 
 const selectMenu = (main, sub) => {
@@ -368,7 +458,7 @@ onUnmounted(() => {
               <button @click="$router.push('/')"
                 class="w-full py-3 px-4 bg-white text-blue-600 hover:bg-blue-50 font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 active:scale-95">
                 <span class="material-symbols-outlined">directions_bus</span>
-                Đặt vé Smart Bus
+                Đặt vé BusSafe
               </button>
             </div>
             <nav class="p-4 flex flex-col gap-1">
@@ -565,108 +655,127 @@ onUnmounted(() => {
           </div>
 
           <!-- Tickets Content -->
-          <div v-if="activeMenu.main === 'tickets'"
-            class="bg-white p-6 sm:p-10 rounded-3xl shadow-sm border border-slate-200 animate-fade-in">
-            <div class="flex items-center justify-between mb-8">
-              <h2 class="text-xl font-bold text-slate-900">Chuyến đi của tôi</h2>
-              <button class="text-blue-600 font-semibold text-sm hover:underline">Lịch sử đặt vé</button>
+          <div v-if="activeMenu.main === 'tickets'" class="animate-fade-in space-y-8">
+            <!-- 1. Tiêu đề & Link (Tách riêng) -->
+            <div class="flex items-center justify-between px-2">
+              <h2 class="text-2xl font-black text-slate-900">Chuyến đi của tôi</h2>
+              <button class="text-blue-600 font-bold text-sm hover:underline">Lịch sử đặt vé</button>
             </div>
+
+            <!-- 2. Thanh lọc (Cân đối & Thanh thoát) -->
+            <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              <button v-for="opt in filterOptions" :key="opt.value" 
+                @click="statusFilter = opt.value"
+                :class="[
+                  'px-6 py-1.5 text-base font-bold rounded-full transition-all duration-300 whitespace-nowrap',
+                  statusFilter === opt.value
+                    ? 'bg-blue-50 text-blue-600 shadow-sm'
+                    : 'bg-slate-50 text-slate-900 hover:text-blue-600 hover:bg-blue-50'
+                ]">
+                {{ opt.label }}
+              </button>
+            </div>
+
+            <!-- 3. Danh sách vé (Từng vé là một Card riêng) -->
             <div v-if="isLoadingTickets" class="py-20 text-center">
               <span class="material-symbols-outlined animate-spin text-4xl text-blue-600">refresh</span>
-              <p class="mt-4 text-slate-500 font-medium">Đang tải danh sách vé...</p>
+              <p class="mt-4 text-slate-500 font-bold">Đang tìm vé của bạn...</p>
             </div>
-            <div v-else-if="tickets.length === 0"
-              class="py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl">
+            
+            <div v-else-if="filteredTickets.length === 0"
+              class="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100">
               <span class="material-symbols-outlined text-6xl text-slate-200">confirmation_number</span>
-              <p class="mt-4 text-slate-500 font-medium">Bạn chưa có vé nào.</p>
-              <button @click="$router.push('/')" class="mt-6 text-blue-600 font-bold hover:underline">Đặt vé
-                ngay</button>
+              <p class="mt-4 text-slate-400 font-bold">Không tìm thấy vé phù hợp.</p>
             </div>
-            <div v-else class="space-y-6">
-              <div v-if="ratingsMessage.text"
-                :class="ratingsMessage.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'"
-                class="p-4 rounded-xl text-sm font-medium border">
-                {{ ratingsMessage.text }}
-              </div>
 
-              <div class="grid grid-cols-1 gap-6">
-                <div v-for="ticket in tickets" :key="ticket.id"
-                  class="border border-slate-200 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between hover:shadow-md transition-shadow cursor-pointer bg-slate-50 group">
-                  <div class="flex-1 w-full">
-                    <div class="flex justify-between items-center mb-4">
-                      <span :class="getStatusInfo(ticket.tinh_trang).class"
-                        class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border">{{
-                          getStatusInfo(ticket.tinh_trang).label }}</span>
-                      <span class="text-slate-500 text-sm font-mono font-bold">Mã vé: {{ ticket.ma_ve }}</span>
-                    </div>
-                    <div class="flex items-center gap-6 text-slate-900">
-                      <div class="text-center min-w-[60px]">
-                        <div class="text-lg font-black">{{ ticket.chuyen_xe?.tuyen_duong?.diem_bat_dau || 'N/A' }}</div>
-                        <div class="text-xs font-semibold text-slate-500">{{
-                          ticket.chuyen_xe?.gio_khoi_hanh?.substring(0, 5) }}</div>
-                      </div>
-                      <div class="flex-1 flex flex-col items-center">
-                        <div class="text-[10px] font-bold text-blue-600 mb-1">{{
-                          formatDate(ticket.chuyen_xe?.ngay_khoi_hanh) }}</div>
-                        <div class="h-px bg-slate-300 w-full relative border-t border-dashed border-slate-400">
-                          <span
-                            class="material-symbols-outlined absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-400 bg-slate-50 px-2 group-hover:text-blue-600 transition-colors">directions_bus</span>
-                        </div>
-                        <div class="mt-1 text-[10px] text-slate-400 truncate max-w-[150px]">{{
-                          ticket.chuyen_xe?.tuyen_duong?.ten_tuyen_duong }}</div>
-                      </div>
-                      <div class="text-center min-w-[60px]">
-                        <div class="text-lg font-black">{{ ticket.chuyen_xe?.tuyen_duong?.diem_ket_thuc || 'N/A' }}
-                        </div>
-                        <div class="text-xs font-semibold text-slate-500">Đến nơi</div>
-                      </div>
-                    </div>
-                    <div class="mt-4 pt-4 border-t border-slate-200/50 flex justify-between items-center">
-                      <div class="text-xs text-slate-500">
-                        Người đặt:
-                        <span class="font-bold text-slate-700">{{ ticket.khach_hang?.ho_va_ten }}</span>
-                      </div>
-                      <div class="text-sm font-bold text-blue-700 tabular-nums">{{ formatCurrency(ticket.tong_tien) }}
-                      </div>
+            <div v-else class="space-y-6">
+              <div v-for="ticket in pagedTickets" :key="ticket.id" @click="openTicketDetail(ticket)"
+                class="group bg-white border border-slate-200 rounded-[32px] p-8 flex flex-col md:flex-row items-center justify-between hover:shadow-2xl hover:border-blue-200 transition-all duration-500 cursor-pointer relative overflow-hidden">
+                
+                <!-- Hiệu ứng trang trí góc -->
+                <div class="absolute top-0 right-0 w-24 h-24 bg-blue-50/50 rounded-bl-full -mr-12 -mt-12 transition-all group-hover:bg-blue-100/50"></div>
+
+                <div class="flex-1 w-full relative z-10">
+                  <div class="flex justify-between items-center mb-8">
+                    <span :class="getStatusInfoExtended(ticket).class"
+                      class="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border shadow-sm">{{
+                        getStatusInfoExtended(ticket).label }}</span>
+                    <div class="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                      <span class="material-symbols-outlined text-xs text-slate-400">confirmation_number</span>
+                      <span class="text-slate-900 text-sm font-mono font-bold">{{ ticket.ma_ve }}</span>
                     </div>
                   </div>
-                  <div class="w-full md:w-auto mt-6 md:mt-0 md:ml-8 flex justify-center shrink-0">
-                    <div class="bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-                      <span class="material-symbols-outlined text-5xl"
-                        :class="ticket.tinh_trang === 'da_thanh_toan' ? 'text-blue-600' : 'text-slate-300'">qr_code_2</span>
+
+                  <div class="flex items-center gap-8 text-slate-900">
+                    <!-- Điểm đi -->
+                    <div class="text-center min-w-[100px]">
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Khởi hành</div>
+                      <div class="text-2xl font-bold tracking-tight">{{ ticket.chuyen_xe?.tuyen_duong?.diem_bat_dau }}</div>
                     </div>
+
+                    <!-- Đường nối & Thông tin giữa -->
+                    <div class="flex-1 flex flex-col items-center px-4">
+                      <div class="text-sm font-bold text-slate-500 mb-2 tracking-widest uppercase">{{ formatDate(ticket.chuyen_xe?.ngay_khoi_hanh) }}</div>
+                      <div class="h-[3px] bg-slate-200 w-full rounded-full"></div>
+                      <div class="mt-3 text-sm font-bold text-slate-500 uppercase tracking-widest text-center leading-tight">
+                        {{ ticket.chuyen_xe?.tuyen_duong?.ten_tuyen_duong }}
+                      </div>
+                    </div>
+
+                    <!-- Điểm đến -->
+                    <div class="text-center min-w-[100px]">
+                      <div class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Đến tại</div>
+                      <div class="text-2xl font-bold tracking-tight">{{ ticket.chuyen_xe?.tuyen_duong?.diem_ket_thuc }}</div>
+                    </div>
+                  </div>
+
+                  <!-- Ticket Bottom: Nhà xe & Ngày giờ -->
+                  <div class="mt-8 pt-6 border-t border-slate-50 flex justify-between items-center">
+                    <div class="flex items-start gap-6">
+                      <!-- Giờ khởi hành -->
+                      <div class="flex flex-col gap-1">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest h-4 flex items-center">Giờ khởi hành</p>
+                        <p class="text-4xl font-bold text-blue-600 tracking-tighter leading-none">{{ ticket.chuyen_xe?.gio_khoi_hanh?.substring(0, 5) }}</p>
+                      </div>
+
+                      <!-- Đường kẻ dọc -->
+                      <div class="h-12 w-px bg-slate-200 mx-2 self-center"></div>
+
+                      <!-- Nhà xe -->
+                      <div class="flex flex-col gap-1">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest h-4 flex items-center">Nhà xe</p>
+                        <p class="text-sm font-bold text-slate-700 leading-none h-[40px] flex items-center">{{ ticket.chuyen_xe?.tuyen_duong?.nha_xe?.ten_nha_xe || 'BusSafe Official' }}</p>
+                      </div>
+                    </div>
+                    <div class="text-xl font-bold text-blue-700 tracking-tight">{{ formatCurrency(ticket.tong_tien) }}</div>
+                  </div>
+                </div>
+
+                <!-- QR Section -->
+                <div class="w-full md:w-auto mt-8 md:mt-0 md:ml-12 flex justify-center shrink-0 relative z-10">
+                  <div class="bg-slate-50 p-4 rounded-[24px] border border-slate-100 group-hover:bg-blue-50 transition-colors">
+                    <img v-if="ticket.tinh_trang === 'da_thanh_toan'"
+                      :src="`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${ticket.ma_ve}`"
+                      alt="QR"
+                      class="w-16 h-16 opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <span v-else class="material-symbols-outlined text-7xl text-slate-200">qr_code_2</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Pagination UI -->
-              <div v-if="ticketsPagination.last_page > 1"
-                class="flex items-center justify-between pt-6 border-t border-slate-100">
-                <div class="text-sm text-slate-500">
-                  Hiển thị trang <span class="font-bold text-slate-900">{{ ticketsPagination.current_page }}</span> / {{
-                  ticketsPagination.last_page }}
+              <!-- Pagination (Independent) -->
+              <div v-if="totalPages > 1"
+                class="flex items-center justify-between pt-12">
+                <div class="text-sm font-bold text-slate-400">
+                  Trang <span class="text-slate-900">{{ currentPage }}</span> / {{ totalPages }}
                 </div>
                 <div class="flex gap-2">
-                  <button @click="fetchTickets(ticketsPagination.current_page - 1)"
-                    :disabled="ticketsPagination.current_page === 1"
-                    class="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                  <button @click="currentPage--" :disabled="currentPage === 1"
+                    class="w-12 h-12 rounded-2xl border-2 border-slate-100 flex items-center justify-center hover:bg-white hover:border-blue-200 disabled:opacity-30 transition-all">
                     <span class="material-symbols-outlined">chevron_left</span>
                   </button>
-
-                  <div class="flex gap-1">
-                    <button v-for="page in ticketsPagination.last_page" :key="page" @click="fetchTickets(page)" :class="[
-                      'w-10 h-10 rounded-xl font-bold text-sm transition-all',
-                      ticketsPagination.current_page === page
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'hover:bg-slate-100 text-slate-600'
-                    ]">
-                      {{ page }}
-                    </button>
-                  </div>
-
-                  <button @click="fetchTickets(ticketsPagination.current_page + 1)"
-                    :disabled="ticketsPagination.current_page === ticketsPagination.last_page"
-                    class="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                  <button @click="currentPage++" :disabled="currentPage === totalPages"
+                    class="w-12 h-12 rounded-2xl border-2 border-slate-100 flex items-center justify-center hover:bg-white hover:border-blue-200 disabled:opacity-30 transition-all">
                     <span class="material-symbols-outlined">chevron_right</span>
                   </button>
                 </div>
@@ -791,6 +900,171 @@ onUnmounted(() => {
       </div>
 
       <Teleport to="body">
+        <!-- Ticket Detail Modal -->
+        <Transition name="rt-rating-modal-fade">
+          <div v-if="showTicketModal && selectedTicket" class="trip-rating-detail-overlay" role="presentation"
+            @click.self="closeTicketDetail">
+                 <div class="trip-rating-detail-modal max-w-2xl" role="dialog" aria-modal="true">
+              <div class="trip-rating-detail-header py-6 px-10">
+                <h3 class="text-2xl font-bold text-slate-800">Chi tiết vé</h3>
+                <button type="button" class="trip-rating-detail-close" aria-label="Đóng" @click="closeTicketDetail">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                      stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div class="p-10 overflow-y-auto space-y-12 bg-white">
+                <!-- PHẦN 1: THÔNG TIN VÉ -->
+                <section>
+                  <div class="flex justify-between items-center mb-6">
+                    <h4 class="text-xl font-bold text-slate-900">Thông tin vé</h4>
+                    <span :class="getStatusInfoExtended(selectedTicket).class" 
+                      class="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border shadow-sm">
+                      {{ getStatusInfoExtended(selectedTicket).label }}
+                    </span>
+                  </div>
+                  <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Mã vé</span>
+                      <span class="font-bold text-slate-900 font-mono text-xl">{{ selectedTicket.ma_ve }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Ngày giờ</span>
+                      <span class="font-bold text-slate-900 text-base">{{ formatDate(selectedTicket.chuyen_xe?.ngay_khoi_hanh) }} · {{ selectedTicket.chuyen_xe?.gio_khoi_hanh?.substring(0, 5) }}</span>
+                    </div>
+                    <div class="flex justify-between items-start">
+                      <span class="text-slate-500 font-semibold text-base">Điểm đi</span>
+                      <div class="text-right">
+                        <p class="font-bold text-slate-900 text-lg">
+                          {{ selectedTicket.chi_tiet_ves?.[0]?.tram_don?.phuong_xa?.quan_huyen?.tinh_thanh?.ten_tinh_thanh || selectedTicket.chuyen_xe?.tuyen_duong?.diem_bat_dau }}
+                          <span v-if="selectedTicket.chi_tiet_ves?.[0]?.tram_don?.ten_tram" class="text-slate-900">
+                            ({{ selectedTicket.chi_tiet_ves?.[0]?.tram_don?.ten_tram }})
+                          </span>
+                        </p>
+                        <p v-if="selectedTicket.chi_tiet_ves?.[0]?.tram_don?.dia_chi" class="text-sm text-slate-900 mt-0.5">
+                          {{ selectedTicket.chi_tiet_ves?.[0]?.tram_don?.dia_chi }}
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex justify-between items-start">
+                      <span class="text-slate-500 font-semibold text-base">Điểm trả</span>
+                      <div class="text-right">
+                        <p class="font-bold text-slate-900 text-lg">
+                          {{ selectedTicket.chi_tiet_ves?.[0]?.tram_tra?.phuong_xa?.quan_huyen?.tinh_thanh?.ten_tinh_thanh || selectedTicket.chuyen_xe?.tuyen_duong?.diem_ket_thuc }}
+                          <span v-if="selectedTicket.chi_tiet_ves?.[0]?.tram_tra?.ten_tram" class="text-slate-900">
+                            ({{ selectedTicket.chi_tiet_ves?.[0]?.tram_tra?.ten_tram }})
+                          </span>
+                        </p>
+                        <p v-if="selectedTicket.chi_tiet_ves?.[0]?.tram_tra?.dia_chi" class="text-sm text-slate-900 mt-0.5">
+                          {{ selectedTicket.chi_tiet_ves?.[0]?.tram_tra?.dia_chi }}
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Biển số xe</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.chuyen_xe?.xe?.bien_so || '---' }}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- PHẦN 2: THÔNG TIN NHÀ XE -->
+                <section>
+                  <h4 class="text-xl font-bold text-slate-900 mb-6">Thông tin nhà xe</h4>
+                  <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">SĐT Nhà xe</span>
+                      <span class="font-bold text-blue-600 text-base">{{ selectedTicket.chuyen_xe?.tuyen_duong?.nha_xe?.so_dien_thoai || '---' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">SĐT Tài xế</span>
+                      <span class="font-bold text-blue-600 text-base">{{ selectedTicket.chuyen_xe?.tai_xe?.so_dien_thoai || '---' }}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- PHẦN 3: THÔNG TIN CHUYẾN ĐI (Theo mẫu ảnh) -->
+                <section>
+                  <h4 class="text-xl font-bold text-slate-900 mb-6">Thông tin chuyến đi</h4>
+                  <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Tuyến</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.chuyen_xe?.tuyen_duong?.ten_tuyen_duong }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Nhà xe</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.chuyen_xe?.tuyen_duong?.nha_xe?.ten_nha_xe || '---' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Chuyến</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.chuyen_xe?.gio_khoi_hanh?.substring(0, 5) }} · {{ formatDate(selectedTicket.chuyen_xe?.ngay_khoi_hanh) }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Loại xe</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.chuyen_xe?.xe?.loai_xe?.ten_loai_xe || '---' }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Số lượng</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.chi_tiet_ves?.length || 1 }} vé</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Phương thức thanh toán</span>
+                      <span class="font-bold text-slate-900 text-base">
+                        {{ selectedTicket.phuong_thuc_thanh_toan === 'tien_mat' ? 'Tiền mặt' : 'Chuyển khoản (VietQR)' }}
+                      </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Mã ghế/ giường</span>
+                      <div class="flex items-center gap-1">
+                        <span class="font-bold text-slate-900 text-base">{{ selectedTicket.vi_tri_ghe || (selectedTicket.chi_tiet_ves ? selectedTicket.chi_tiet_ves.map(ct => ct.ghe?.ma_ghe).join(', ') : '---') }}</span>
+                        <span class="material-symbols-outlined text-sm text-slate-900">expand_less</span>
+                      </div>
+                    </div>
+                    <div class="flex justify-between items-center pt-6 border-t border-slate-100">
+                      <span class="text-slate-900 font-bold uppercase tracking-widest text-sm">Tổng tiền</span>
+                      <span class="text-2xl font-black text-slate-900">{{ formatCurrency(selectedTicket.tong_tien) }}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- PHẦN 4: THÔNG TIN LIÊN HỆ -->
+                <section>
+                  <h4 class="text-xl font-bold text-slate-900 mb-6">Thông tin liên hệ</h4>
+                  <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Họ tên</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.khach_hang?.ho_va_ten }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Số điện thoại</span>
+                      <span class="font-bold text-blue-600 text-base">{{ selectedTicket.khach_hang?.so_dien_thoai }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-slate-500 font-semibold text-base">Email</span>
+                      <span class="font-bold text-slate-900 text-base">{{ selectedTicket.khach_hang?.email }}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- QR CODE SECTION -->
+                <div class="pt-8 border-t border-slate-100 flex flex-col items-center">
+                  <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-4">
+                    <img v-if="selectedTicket.tinh_trang === 'da_thanh_toan'"
+                      :src="`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${selectedTicket.ma_ve}`"
+                      alt="QR Code Vé"
+                      class="w-48 h-48" />
+                    <div v-else class="w-48 h-48 flex items-center justify-center bg-slate-50 rounded-xl">
+                      <span class="material-symbols-outlined text-6xl text-slate-200">qr_code_2</span>
+                    </div>
+                  </div>
+                  <p class="text-sm font-black text-slate-900">Vui lòng quét mã khi lên xe</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+
+        <!-- Rating Detail Modal -->
         <Transition name="rt-rating-modal-fade">
           <div v-if="showMyRatingDetail && selectedMyRating" class="trip-rating-detail-overlay" role="presentation"
             @click.self="closeMyRatingDetail">
@@ -1030,12 +1304,11 @@ onUnmounted(() => {
 
 .trip-rating-detail-modal {
   width: 100%;
-  max-width: 420px;
   background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  border-radius: 40px;
+  box-shadow: 0 25px 70px rgba(15, 23, 42, 0.35);
   border: 1px solid #e2e8f0;
-  max-height: min(90vh, 680px);
+  max-height: 95vh;
   display: flex;
   flex-direction: column;
 }
@@ -1051,8 +1324,6 @@ onUnmounted(() => {
 
 .trip-rating-detail-header h3 {
   margin: 0;
-  font-size: 0.95rem;
-  font-weight: 800;
   color: #1e293b;
 }
 

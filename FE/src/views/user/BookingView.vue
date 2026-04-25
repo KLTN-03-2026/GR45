@@ -68,6 +68,11 @@ const vietQrUrl = computed(() => {
 
 // Format utils
 const formatPrice = (val) => new Intl.NumberFormat('vi-VN').format(val) + 'đ';
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
 
 // Lọc vé theo tầng
 const seatsFloor1 = computed(() =>
@@ -302,9 +307,9 @@ onMounted(() => {
         <p class="text-slate-500">{{ tripData.tuyen_duong.ten_tuyen_duong }} • Khởi hành: {{ tripData.gio_khoi_hanh }}</p>
       </div>
 
-      <div class="flex flex-col lg:flex-row gap-6">
+      <div class="flex flex-col lg:flex-row gap-8">
         <!-- Main Content Box -->
-        <div class="lg:w-2/3">
+        <div class="lg:w-[62%]">
           
           <!-- Stepper Indicator -->
           <div class="flex items-center mb-8 glass-card p-4 rounded-2xl relative z-10">
@@ -382,30 +387,47 @@ onMounted(() => {
             </div>
 
             <div class="flex justify-end mt-8">
-              <button @click="nextStep" class="btn-primary w-full sm:w-auto">
-                Tiếp tục <span class="material-symbols-outlined ml-1">arrow_forward</span>
+              <button @click="nextStep" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-10 rounded-xl transition-all duration-300 flex items-center justify-center shadow-lg shadow-blue-500/30 active:scale-95 w-full sm:w-auto">
+                Tiếp tục
               </button>
             </div>
           </div>
 
           <!-- STEP 2: ĐIỂM ĐÓN / TRẢ -->
-          <div v-if="currentStep === 2" class="glass-card rounded-2xl p-6 fade-in">
+          <div v-if="currentStep === 2" class="glass-card rounded-2xl p-5 fade-in">
             <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-slate-800">
               <span class="material-symbols-outlined text-blue-500">location_on</span> 
               Thông tin đón trả
             </h2>
 
-            <div class="grid md:grid-cols-2 gap-8">
+            <div class="grid md:grid-cols-2 gap-6">
               <!-- Điểm đón -->
               <div>
-                <h3 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Đón</h3>
+                <h4 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Đón</h4>
                 <div v-if="stopsData.tram_don.length === 0" class="text-slate-500 italic">Không có dữ liệu trạm đón.</div>
                 <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll">
                   <label v-for="stop in stopsData.tram_don" :key="'don-'+stop.id" class="radio-card">
                     <input type="radio" :value="stop.id" v-model="pickupPointId" name="pickup">
-                    <div class="card-content">
-                      <span class="font-semibold block text-slate-800 text-sm mb-1">{{ stop.ten_tram }}</span>
-                      <span class="text-xs text-slate-500 flex gap-1"><span class="material-symbols-outlined text-[14px]">map</span> {{ stop.dia_chi }}</span>
+                    <div 
+                      class="card-content flex items-start p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden"
+                      :class="pickupPointId === stop.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'"
+                    >
+                      <!-- Thanh xanh bên trái khi được chọn -->
+                      <div v-if="pickupPointId === stop.id" class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600"></div>
+
+                      <div 
+                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 mt-1"
+                        :class="pickupPointId === stop.id ? 'border-blue-600' : 'border-slate-300'"
+                      >
+                        <div 
+                          class="w-2.5 h-2.5 rounded-full transition-all"
+                          :class="pickupPointId === stop.id ? 'bg-blue-600' : 'bg-transparent'"
+                        ></div>
+                      </div>
+                      <div class="flex-1">
+                        <span class="font-bold block text-slate-900 text-base mb-1">{{ stop.ten_tram }}</span>
+                        <span class="text-sm text-slate-500 block leading-relaxed">{{ stop.dia_chi }}</span>
+                      </div>
                     </div>
                   </label>
                 </div>
@@ -413,14 +435,31 @@ onMounted(() => {
 
               <!-- Điểm trả -->
               <div>
-                <h3 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Trả</h3>
+                <h4 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Trả</h4>
                 <div v-if="stopsData.tram_tra.length === 0" class="text-slate-500 italic">Không có dữ liệu trạm trả.</div>
                 <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll">
                   <label v-for="stop in stopsData.tram_tra" :key="'tra-'+stop.id" class="radio-card">
                     <input type="radio" :value="stop.id" v-model="dropoffPointId" name="dropoff">
-                    <div class="card-content">
-                      <span class="font-semibold block text-slate-800 text-sm mb-1">{{ stop.ten_tram }}</span>
-                      <span class="text-xs text-slate-500 flex gap-1"><span class="material-symbols-outlined text-[14px]">map</span> {{ stop.dia_chi }}</span>
+                    <div 
+                      class="card-content flex items-start p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden"
+                      :class="dropoffPointId === stop.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'"
+                    >
+                      <!-- Thanh xanh bên trái khi được chọn -->
+                      <div v-if="dropoffPointId === stop.id" class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600"></div>
+
+                      <div 
+                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 mt-1"
+                        :class="dropoffPointId === stop.id ? 'border-blue-600' : 'border-slate-300'"
+                      >
+                        <div 
+                          class="w-2.5 h-2.5 rounded-full transition-all"
+                          :class="dropoffPointId === stop.id ? 'bg-blue-600' : 'bg-transparent'"
+                        ></div>
+                      </div>
+                      <div class="flex-1">
+                        <span class="font-bold block text-slate-900 text-base mb-1">{{ stop.ten_tram }}</span>
+                        <span class="text-sm text-slate-500 block leading-relaxed">{{ stop.dia_chi }}</span>
+                      </div>
                     </div>
                   </label>
                 </div>
@@ -429,95 +468,135 @@ onMounted(() => {
 
             <div class="mt-8">
               <label class="block font-semibold text-slate-700 mb-2 text-sm">Ghi chú yêu cầu (Tùy chọn)</label>
-              <textarea v-model="customerNote" rows="3" class="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 bg-slate-50 transition-colors" placeholder="Yêu cầu điểm đón khác ngoài danh sách (nhà xe sẽ liên hệ xác nhận)..."></textarea>
+              <textarea v-model="customerNote" rows="5" class="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-blue-500 bg-slate-50 transition-colors" placeholder="Yêu cầu điểm đón khác ngoài danh sách (nhà xe sẽ liên hệ xác nhận)..."></textarea>
             </div>
 
-            <div class="flex justify-between mt-8">
-              <button @click="prevStep" class="btn-outline">
-                <span class="material-symbols-outlined mr-1">arrow_back</span> Quay lại
+            <!-- Action Buttons Step 2 -->
+            <div class="flex justify-between mt-10 pt-6 border-t border-slate-100">
+              <button @click="prevStep" class="flex items-center gap-2 px-6 py-3.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95">
+                Quay lại
               </button>
-              <button @click="nextStep" class="btn-primary">
-                Tiếp tục <span class="material-symbols-outlined ml-1">arrow_forward</span>
+              <button @click="nextStep" class="flex items-center gap-2 px-10 py-3.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all active:scale-95">
+                Tiếp tục
               </button>
             </div>
           </div>
 
           <!-- STEP 3: THANH TOÁN -->
           <div v-if="currentStep === 3" class="glass-card rounded-2xl p-6 fade-in">
-            <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-slate-800">
-              <span class="material-symbols-outlined text-blue-500">payments</span> 
+            <h2 class="text-xl font-bold mb-6 pb-4 border-b border-slate-100 text-slate-800">
               Xác nhận thanh toán
             </h2>
 
             <!-- Khuyến mãi -->
-            <div class="mb-8 p-5 bg-blue-50/50 rounded-2xl border border-blue-100">
-              <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                <span class="material-symbols-outlined text-amber-500">local_offer</span> 
-                Mã giảm giá
-              </h3>
-              <div v-if="vouchers.length === 0" class="text-slate-500 text-sm">Không có mã giảm giá nào phù hợp.</div>
-              <div v-else class="grid sm:grid-cols-2 gap-3 max-h-[200px] overflow-y-auto pr-2 custom-scroll">
-                <label v-for="vc in vouchers" :key="vc.id" class="voucher-card">
-                  <input type="radio" :value="vc.id" v-model="selectedVoucherId">
-                  <div class="card-content flex items-center p-3 border rounded-xl cursor-pointer transition-all hover:bg-white bg-slate-50">
-                    <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3 shrink-0">
-                      %
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="font-bold text-slate-800 text-sm mb-0.5 truncate">{{ vc.ma_voucher }}</div>
-                      <div class="text-xs text-slate-500">{{ vc.loai_voucher === 'percent' ? `Giảm ${vc.gia_tri}%` : `Giảm ${formatPrice(vc.gia_tri)}` }}</div>
-                    </div>
-                    <div class="radio-indicator ml-2"></div>
-                  </div>
-                </label>
+            <div class="mb-10">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-slate-800">Mã giảm giá</h3>
+                <button type="button" class="text-blue-600 font-bold text-sm hover:underline">Chọn hoặc nhập mã</button>
               </div>
-              <div v-if="selectedVoucherId" class="mt-3 text-sm text-blue-600 font-medium cursor-pointer flex justify-end" @click="selectedVoucherId = null">
-                Bỏ chọn mã
+
+              <div v-if="vouchers.length === 0" class="flex items-center justify-center py-6 gap-3 text-slate-400 bg-slate-50/50 rounded-xl border-2 border-dashed border-slate-200/60">
+                <span class="material-symbols-outlined text-2xl text-slate-300">confirmation_number</span>
+                <div class="text-xs font-medium italic">Hiện chưa có mã giảm giá khả dụng</div>
+              </div>
+
+              <div v-else class="flex gap-4 overflow-x-auto pb-4 custom-scroll-h">
+                <div v-for="vc in vouchers" :key="vc.id" 
+                  class="flex-shrink-0 w-[280px] h-32 flex border rounded-xl overflow-hidden cursor-pointer transition-all relative group"
+                  :class="selectedVoucherId === vc.id ? 'border-blue-500 ring-1 ring-blue-500 shadow-md' : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'"
+                  @click="selectedVoucherId = (selectedVoucherId === vc.id ? null : vc.id)"
+                >
+                  <!-- Cánh trái vé (Logo/Icon) -->
+                  <div class="w-[85px] bg-slate-700 flex flex-col items-center justify-center p-2 text-white relative">
+                    <div class="absolute -right-1.5 top-0 bottom-0 flex flex-col justify-around py-1 z-10">
+                      <div v-for="i in 6" :key="i" class="w-3 h-3 rounded-full bg-white -mr-1.5"></div>
+                    </div>
+                    <span class="material-symbols-outlined text-3xl mb-1 opacity-80">directions_bus</span>
+                    <div class="text-[10px] font-bold uppercase tracking-tighter opacity-60">GoBus Ticket</div>
+                  </div>
+
+                  <!-- Cánh phải vé (Info) -->
+                  <div class="flex-1 bg-white p-3 flex flex-col justify-between relative">
+                    <!-- Checkmark cho mã đang chọn -->
+                    <div v-if="selectedVoucherId === vc.id" class="absolute top-2 right-2">
+                      <span class="material-symbols-outlined text-blue-600 font-bold text-xl">check_circle</span>
+                    </div>
+
+                    <div>
+                      <div class="text-lg font-black text-slate-800">Giảm {{ vc.loai_voucher === 'percent' ? vc.gia_tri + '%' : formatPrice(vc.gia_tri) }}</div>
+                      <div class="text-[11px] text-slate-500 font-medium">Đơn hàng tối thiểu từ 0đ</div>
+                    </div>
+
+                    <div class="bg-amber-50 text-[10px] text-amber-700 px-2 py-1 rounded font-bold flex items-center gap-1">
+                      <span class="material-symbols-outlined text-[12px]">info</span>
+                      Hãy chọn phương thức thanh toán
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="text-xs text-slate-500 mt-3 font-medium flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sm">info</span>
+                Bạn có thể áp dụng nhiều mã cùng lúc
               </div>
             </div>
 
             <!-- Phương thức TT -->
             <div class="mb-8">
-              <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-                <span class="material-symbols-outlined text-green-500">account_balance_wallet</span> 
+              <h3 class="text-xl font-bold text-slate-800 mb-4">
                 Phương thức thanh toán
               </h3>
               <div class="space-y-3">
-                <label v-if="tripData.thanh_toan_sau !== 0" class="radio-card block">
-                  <input type="radio" value="tien_mat" v-model="paymentMethod">
-                  <div class="card-content flex items-center">
-                    <span class="material-symbols-outlined text-emerald-500 mr-3 text-2xl">payments</span>
+                <label v-if="tripData.thanh_toan_sau !== 0" class="block cursor-pointer group">
+                  <input type="radio" value="tien_mat" v-model="paymentMethod" class="hidden">
+                  <div class="flex items-center p-4 border-2 rounded-xl transition-all relative overflow-hidden"
+                       :class="paymentMethod === 'tien_mat' ? 'bg-emerald-50/50 border-emerald-200' : 'bg-white border-slate-100 hover:border-emerald-200'">
+                    <div v-if="paymentMethod === 'tien_mat'" class="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
+                    <span class="material-symbols-outlined mr-4 text-3xl transition-colors" :class="paymentMethod === 'tien_mat' ? 'text-emerald-600' : 'text-slate-400'">payments</span>
                     <div class="flex-1">
-                      <div class="font-semibold text-slate-800">Tiền mặt tại nhà xe / Khi lên xe</div>
+                      <div class="font-bold" :class="paymentMethod === 'tien_mat' ? 'text-emerald-800' : 'text-slate-700'">Tiền mặt tại nhà xe / Khi lên xe</div>
                       <div class="text-xs text-slate-500">Thanh toán trực tiếp cho lơ xe hoặc tại quầy vé.</div>
+                    </div>
+                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-4"
+                         :class="paymentMethod === 'tien_mat' ? 'border-emerald-500' : 'border-slate-300'">
+                      <div class="w-2.5 h-2.5 rounded-full" :class="paymentMethod === 'tien_mat' ? 'bg-emerald-500' : 'bg-transparent'"></div>
                     </div>
                   </div>
                 </label>
-                <div v-else class="p-3 bg-amber-50 text-amber-700 rounded-xl text-sm flex items-center gap-2 mb-3 border border-amber-200">
+
+                <div v-else class="p-4 bg-amber-50 text-amber-700 rounded-xl text-sm flex items-center gap-3 mb-3 border border-amber-200">
                   <span class="material-symbols-outlined shrink-0 text-amber-500">info</span>
                   Chuyến xe này không hỗ trợ thanh toán bằng tiền mặt. Vui lòng chuyển khoản trước.
                 </div>
-                <!-- Online payment options will be added here later -->
-                <label class="radio-card block">
-                  <input type="radio" value="chuyen_khoan" v-model="paymentMethod">
-                  <div class="card-content flex items-center">
-                    <span class="material-symbols-outlined text-blue-500 mr-3 text-2xl">qr_code_scanner</span>
+
+                <label class="block cursor-pointer group">
+                  <input type="radio" value="chuyen_khoan" v-model="paymentMethod" class="hidden">
+                  <div class="flex items-center p-4 border-2 rounded-xl transition-all relative overflow-hidden"
+                       :class="paymentMethod === 'chuyen_khoan' ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100 hover:border-blue-200'">
+                    <div v-if="paymentMethod === 'chuyen_khoan'" class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600"></div>
+                    <span class="material-symbols-outlined mr-4 text-3xl transition-colors" :class="paymentMethod === 'chuyen_khoan' ? 'text-blue-600' : 'text-slate-400'">qr_code_scanner</span>
                     <div class="flex-1">
-                      <div class="font-semibold text-slate-800">Chuyển khoản (VietQR / SePay)</div>
+                      <div class="font-bold" :class="paymentMethod === 'chuyen_khoan' ? 'text-blue-800' : 'text-slate-700'">Chuyển khoản (VietQR / SePay)</div>
                       <div class="text-xs text-slate-500">Mở ứng dụng ngân hàng và quét mã để thanh toán tự động tiện lợi.</div>
+                    </div>
+                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-4"
+                         :class="paymentMethod === 'chuyen_khoan' ? 'border-blue-600' : 'border-slate-300'">
+                      <div class="w-2.5 h-2.5 rounded-full" :class="paymentMethod === 'chuyen_khoan' ? 'bg-blue-600' : 'bg-transparent'"></div>
                     </div>
                   </div>
                 </label>
               </div>
             </div>
 
-            <div class="flex justify-between mt-8 border-t pt-6">
-              <button @click="prevStep" class="btn-outline">
-                <span class="material-symbols-outlined mr-1">arrow_back</span> Quay lại
+            <!-- Action Buttons Step 3 -->
+            <div class="flex justify-between mt-10 pt-6 border-t border-slate-100">
+              <button @click="prevStep" class="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95">
+                Quay lại
               </button>
-              <button @click="submitBooking" :disabled="isBooking" class="btn-primary" :class="{'opacity-75 cursor-wait': isBooking}">
-                <span v-if="isBooking" class="material-symbols-outlined animate-spin mr-2">autorenew</span>
-                Xác nhận đặt vé
+              <button @click="submitBooking" :disabled="isBooking" 
+                class="flex items-center justify-center gap-2 px-10 py-3.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span v-if="isBooking" class="material-symbols-outlined animate-spin">sync</span>
+                {{ isBooking ? 'Đang xử lý...' : 'Xác nhận đặt vé' }}
               </button>
             </div>
           </div>
@@ -534,12 +613,12 @@ onMounted(() => {
             </div>
 
             <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-                 :class="bookingResult.tinh_trang === 'da_thanh_toan' ? 'bg-emerald-100' : 'bg-blue-100'">
-              <span v-if="bookingResult.tinh_trang === 'da_thanh_toan'" class="material-symbols-outlined text-emerald-500 text-5xl">check_circle</span>
+                 :class="(bookingResult.tinh_trang === 'da_thanh_toan' || paymentMethod === 'tien_mat') ? 'bg-emerald-100' : 'bg-blue-100'">
+              <span v-if="bookingResult.tinh_trang === 'da_thanh_toan' || paymentMethod === 'tien_mat'" class="material-symbols-outlined text-emerald-500 text-5xl">check_circle</span>
               <span v-else class="material-symbols-outlined text-blue-500 text-4xl animate-spin">hourglass_empty</span>
             </div>
             <h2 class="text-2xl font-bold text-slate-800 mb-2">
-              <template v-if="bookingResult.tinh_trang === 'da_thanh_toan'">Đặt vé thành công!</template>
+              <template v-if="bookingResult.tinh_trang === 'da_thanh_toan' || paymentMethod === 'tien_mat'">Đặt vé thành công!</template>
               <template v-else>Đang chờ thanh toán...</template>
             </h2>
             <p class="text-slate-500 mb-6">Cảm ơn bạn đã sử dụng dịch vụ. Mã đặt vé của bạn là:</p>
@@ -592,39 +671,49 @@ onMounted(() => {
         </div>
 
         <!-- Sidebar Summary -->
-        <div class="lg:w-1/3">
-          <div class="glass-card rounded-2xl p-5 sticky top-24">
-            <h3 class="font-bold text-lg mb-4 text-slate-800 pb-3 border-b">Thông tin đặt vé</h3>
+        <div class="lg:w-[38%]">
+          <div class="glass-card rounded-2xl p-6 h-full flex flex-col">
+            <h3 class="font-bold text-xl mb-6 text-slate-800 pb-4 border-b shrink-0">Thông tin đặt vé</h3>
             
-            <div class="space-y-4 mb-6">
+            <div class="space-y-4 mb-6 flex-1">
               <div>
-                <span class="block text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">Chuyến xe</span>
-                <span class="block text-sm font-semibold text-slate-700">{{ tripData.tuyen_duong.ten_tuyen_duong }}</span>
+                <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Nhà xe</span>
+                <span class="block text-base font-bold text-blue-600">{{ tripData.tuyen_duong.nha_xe?.ten_nha_xe || 'GoBus Partner' }}</span>
+              </div>
+
+              <div>
+                <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Chuyến xe</span>
+                <span class="block text-base font-bold text-slate-800">{{ tripData.tuyen_duong.ten_tuyen_duong }}</span>
+              </div>
+
+              <div>
+                <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Loại xe</span>
+                <span class="block text-base font-bold text-slate-700">{{ tripData.xe?.loai_xe?.ten_loai_xe || 'Xe giường nằm' }}</span>
               </div>
               
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <span class="block text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">Ngày đi</span>
-                  <span class="block text-sm font-semibold text-slate-700">{{ tripData.ngay_khoi_hanh }}</span>
+                  <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Ngày đi</span>
+                  <span class="block text-base font-bold text-slate-800">{{ formatDate(tripData.ngay_khoi_hanh) }}</span>
                 </div>
                 <div>
-                  <span class="block text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">Giờ đi</span>
-                  <span class="block text-sm font-semibold text-emerald-600">{{ tripData.gio_khoi_hanh }}</span>
+                  <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Giờ đi</span>
+                  <span class="block text-base font-bold text-emerald-600">{{ tripData.gio_khoi_hanh }}</span>
                 </div>
               </div>
 
               <div>
-                <span class="block text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">Ghế đã chọn ({{ selectedSeats.length }})</span>
-                <div class="flex flex-wrap gap-2 mt-1">
-                  <span v-for="s in selectedSeats" :key="s.id_ghe" class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded inline-block">
+                <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Ghế đã chọn ({{ selectedSeats.length }})</span>
+                <div class="flex flex-wrap gap-2.5 mt-2">
+                  <span v-for="s in selectedSeats" :key="s.id_ghe" class="bg-blue-100 text-blue-700 text-base font-bold px-4 py-2 rounded-lg inline-block">
                     {{ s.ma_ghe }}
                   </span>
-                  <span v-if="selectedSeats.length === 0" class="text-sm text-slate-400 italic">Chưa chọn ghế</span>
+                  <span v-if="selectedSeats.length === 0" class="text-base text-slate-400 italic">Chưa chọn ghế</span>
                 </div>
               </div>
             </div>
 
-            <div class="border-t border-dashed border-slate-200 pt-4 space-y-3">
+            <div class="border-t border-dashed border-slate-200 pt-4 space-y-3 mt-auto shrink-0">
               <div class="flex justify-between text-sm">
                 <span class="text-slate-500">Giá vé (x{{ selectedSeats.length }})</span>
                 <span class="font-medium text-slate-700">{{ formatPrice(baseTotalPrice) }}</span>
@@ -637,7 +726,7 @@ onMounted(() => {
               
               <div class="flex justify-between items-center mt-2 pt-3 border-t">
                 <span class="font-bold text-slate-800">Tổng thanh toán</span>
-                <span class="text-xl font-black text-blue-600">{{ formatPrice(finalPrice) }}</span>
+                <span class="text-2xl font-black text-blue-600">{{ formatPrice(finalPrice) }}</span>
               </div>
             </div>
           </div>
@@ -668,19 +757,7 @@ onMounted(() => {
   display: none;
 }
 
-.radio-card .card-content {
-  @apply block p-4 border-2 border-slate-200 rounded-xl cursor-pointer transition-all bg-white relative overflow-hidden;
-}
 
-.radio-card input[type="radio"]:checked + .card-content {
-  @apply border-blue-500 bg-blue-50 shadow-inner;
-}
-
-.radio-card input[type="radio"]:checked + .card-content::after {
-  content: "check_circle";
-  font-family: "Material Symbols Outlined";
-  @apply absolute right-4 top-1/2 -translate-y-1/2 text-blue-500 text-xl;
-}
 
 /* Voucher Card Styles */
 .voucher-card input[type="radio"] {
@@ -746,8 +823,8 @@ onMounted(() => {
 .seat-legend {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 12px;
-  font-size: 12px;
+  gap: 10px 20px;
+  font-size: 14px;
   color: #334155;
   flex: 1;
   min-width: 0;
@@ -761,9 +838,9 @@ onMounted(() => {
 }
 
 .seat-dot {
-  width: 13px;
-  height: 13px;
-  border-radius: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
   display: inline-block;
 }
 
@@ -792,17 +869,20 @@ onMounted(() => {
 }
 
 .seat-floor-title {
-  font-size: 12px;
-  color: #64748b;
-  margin: 0 0 8px;
-  font-weight: 600;
+  font-size: 14px;
+  color: #475569;
+  margin: 0 0 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .seat-row {
   display: grid;
   grid-template-columns: repeat(var(--seat-cols), minmax(0, 1fr));
-  gap: 7px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .seat-floor-block .seat-row:last-child {
@@ -811,14 +891,19 @@ onMounted(() => {
 
 .seat-tile {
   width: 100%;
-  border: 1px solid #86efac;
+  border: 2px solid #86efac;
   background: #dcfce7;
   color: #166534;
-  border-radius: 9px;
-  padding: 8px 4px;
-  font-weight: 700;
+  border-radius: 12px;
+  padding: 12px 4px;
+  font-weight: 800;
+  font-size: 17px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
 }
 
 .seat-tile:hover {
@@ -827,6 +912,7 @@ onMounted(() => {
 }
 
 .seat-tile.blocked {
+  border-width: 2px;
   border-color: #64748b;
   background: #f1f5f9;
   color: #1e293b;
@@ -837,6 +923,7 @@ onMounted(() => {
 }
 
 .seat-tile.booked {
+  border-width: 2px;
   border-color: #fb923c;
   background: #fff7ed;
   color: #c2410c;
@@ -849,17 +936,19 @@ onMounted(() => {
 }
 
 .seat-tile.editing {
+  border-width: 2px;
   border-color: #60a5fa;
   background: #dbeafe;
   color: #1d4ed8;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .seat-tile.driver {
+  border-width: 2px;
   border-color: #f59e0b;
   background: #fef3c7;
   color: #92400e;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
 }
 
 </style>
