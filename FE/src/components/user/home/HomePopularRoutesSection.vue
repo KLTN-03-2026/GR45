@@ -3,7 +3,7 @@ import { ref } from 'vue';
 
 const popularRoutes = ref([
   {
-    image: 'https://images.unsplash.com/photo-1599708153386-62bfdd3c1784?q=80&w=2070&auto=format&fit=crop',
+    image: 'https://images.unsplash.com/photo-1616484173745-07f25fd0547f?q=80&w=2070&auto=format&fit=crop',
     name: 'Sài Gòn - Đà Lạt',
     distance: '300km',
     time: '6h 30m',
@@ -17,7 +17,7 @@ const popularRoutes = ref([
     price: '280.000đ'
   },
   {
-    image: 'https://images.unsplash.com/photo-1620025740411-9f79b6d51ba4?q=80&w=2072&auto=format&fit=crop',
+    image: 'https://images.unsplash.com/photo-1593950315186-76a92975b60c?q=80&w=2070&auto=format&fit=crop',
     name: 'Đà Nẵng - Huế',
     distance: '100km',
     time: '2h 15m',

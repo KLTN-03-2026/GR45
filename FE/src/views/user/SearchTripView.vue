@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import clientApi from "@/api/clientApi";
 import { useClientStore } from "@/stores/clientStore.js";
+import CustomDatePicker from "@/components/common/CustomDatePicker.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -595,15 +596,7 @@ onBeforeUnmount(() => {
 
           <!-- Ngày khởi hành -->
           <div class="search-hero__field search-hero__field--date">
-            <span
-              class="material-symbols-outlined search-hero__field-icon search-hero__field-icon--date"
-              >calendar_month</span
-            >
-            <input
-              type="date"
-              v-model="searchForm.ngay_di"
-              class="search-hero__date-input"
-            />
+            <CustomDatePicker v-model="searchForm.ngay_di" />
           </div>
 
           <!-- Nút tìm kiếm -->
