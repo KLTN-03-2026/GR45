@@ -375,7 +375,9 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
         $totalMinutes = $durationMinutes;
         foreach ($existingTrips as $trip) {
-            $tripStart = Carbon::parse($trip->ngay_khoi_hanh . ' ' . Carbon::parse($trip->gio_khoi_hanh)->format('H:i'));
+            $tripDate = Carbon::parse($trip->ngay_khoi_hanh)->toDateString();
+            $tripTime = Carbon::parse($trip->gio_khoi_hanh)->format('H:i');
+            $tripStart = Carbon::parse($tripDate . ' ' . $tripTime);
             $tripDuration = $this->estimateDurationMinutes($trip->tuyenDuong);
             $tripEnd = (clone $tripStart)->addMinutes($tripDuration);
             $totalMinutes += $tripDuration;
