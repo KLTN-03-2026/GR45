@@ -144,188 +144,252 @@ const handleRegister = async () => {
 </script>
 
 <template>
-  <div class="register-page">
-    <div class="register-card">
-      <div class="header">
-        <h1>Tạo tài khoản khách hàng</h1>
-        <p>Điền thông tin cơ bản để bắt đầu đặt vé nhanh chóng.</p>
+  <div class="client-register-container">
+    <div class="illustration-side">
+      <div class="overlay-glass">
+        <h1>Khám Phá Hành Trình Tuyệt Vời</h1>
+        <p>Đặt vé nhanh chóng, thanh toán tiện lợi và trải nghiệm chuyến đi an toàn với hệ thống giám sát AI thông minh.</p>
       </div>
-
-      <form class="register-form" @submit.prevent="handleRegister">
-        <BaseInput
-          v-model="form.ho_va_ten"
-          label="Họ và tên *"
-          placeholder="Nguyen Van A"
-          :error="errors.ho_va_ten"
-        />
-
-        <BaseInput
-          v-model="form.email"
-          type="email"
-          label="Email"
-          placeholder="name@example.com"
-          :error="errors.email"
-        />
-
-        <div class="row">
-          <BaseInput
-            v-model="form.password"
-            type="password"
-            label="Mật khẩu *"
-            placeholder="Tối thiểu 8 ký tự"
-            :error="errors.password"
-          />
-          <BaseInput
-            v-model="form.password_confirmation"
-            type="password"
-            label="Xác nhận mật khẩu *"
-            placeholder="Nhập lại mật khẩu"
-            :error="errors.password_confirmation"
-          />
+    </div>
+    
+    <div class="form-side">
+      <div class="form-wrapper">
+        <div class="auth-header">
+          <div class="mobile-logo">BusSafe</div>
+          <h2>Tạo tài khoản</h2>
+          <p>Trở thành thành viên của BusSafe ngay hôm nay</p>
         </div>
+        
+        <form @submit.prevent="handleRegister" class="register-form">
+          <div class="scroll-area">
+            <BaseInput v-model="form.ho_va_ten" label="Họ và tên *" placeholder="Nhập họ và tên..." :error="errors.ho_va_ten" />
+            
+            <div class="flex-row">
+              <BaseInput v-model="form.so_dien_thoai" label="Số điện thoại *" placeholder="09xx xxx xxx" :error="errors.so_dien_thoai" />
+              <BaseInput v-model="form.ngay_sinh" type="date" label="Ngày sinh" :error="errors.ngay_sinh" />
+            </div>
 
-        <div class="row">
-          <BaseInput
-            v-model="form.so_dien_thoai"
-            type="text"
-            label="Số điện thoại *"
-            placeholder="VD: 0912345678"
-            :error="errors.so_dien_thoai"
-          />
-          <BaseInput
-            v-model="form.ngay_sinh"
-            type="date"
-            label="Ngày sinh"
-            :error="errors.ngay_sinh"
-          />
-        </div>
+            <BaseInput v-model="form.email" type="email" label="Email" placeholder="name@example.com" :error="errors.email" />
+            
+            <div class="flex-row">
+              <BaseInput v-model="form.password" type="password" label="Mật khẩu *" placeholder="••••••••" :error="errors.password" />
+              <BaseInput v-model="form.password_confirmation" type="password" label="Xác nhận mật khẩu *" placeholder="••••••••" :error="errors.password_confirmation" />
+            </div>
 
-        <BaseInput
-          v-model="form.dia_chi"
-          type="text"
-          label="Địa chỉ"
-          placeholder="Số nhà, đường, quận/huyện, tỉnh/thành"
-          :error="errors.dia_chi"
-        />
+            <BaseInput v-model="form.dia_chi" label="Địa chỉ" placeholder="Số nhà, tên đường, tỉnh/thành..." :error="errors.dia_chi" />
+          </div>
 
-        <p v-if="serverError" class="server-error">{{ serverError }}</p>
-        <p v-if="successMessage" class="success-msg">{{ successMessage }}</p>
-
-        <BaseButton type="submit" block :loading="loading" class="submit-btn">
-          ĐĂNG KÝ TÀI KHOẢN
-        </BaseButton>
-
-        <p class="auth-switch">
-          Đã có tài khoản?
-          <router-link to="/auth/login">Đăng nhập ngay</router-link>
-        </p>
-      </form>
+          <div v-if="serverError" class="error-msg">{{ serverError }}</div>
+          <div v-if="successMessage" class="success-msg">{{ successMessage }}</div>
+          
+          <BaseButton type="submit" block :loading="loading" class="client-btn">
+            ĐĂNG KÝ
+          </BaseButton>
+          
+          <div class="login-prompt">
+            Đã có tài khoản? <router-link to="/auth/login">Đăng nhập</router-link>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.register-page {
+.client-register-container {
   min-height: 100vh;
+  display: flex;
+  background-color: #f8fafc;
+}
+
+/* Illustration Side */
+.illustration-side {
+  flex: 1.25;
+  background: url('https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&q=80') center/cover no-repeat;
+  display: none;
+  position: relative;
+}
+
+@media (min-width: 900px) {
+  .illustration-side {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+  }
+}
+
+.overlay-glass {
+  position: relative;
+  z-index: 10;
+  max-width: 550px;
+  color: white;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-glass h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 1.5rem;
+}
+
+.overlay-glass p {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  opacity: 0.9;
+  margin-bottom: 2.5rem;
+}
+
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.badge {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 0.6rem 1.25rem;
+  border-radius: 20px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Form Side */
+.form-side {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
-  background: radial-gradient(circle at top, #f1f5f9 0%, #e2e8f0 100%);
+  background-color: #ffffff;
+  padding: 2rem 1.5rem;
 }
 
-.register-card {
+.form-wrapper {
   width: 100%;
-  max-width: 760px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 18px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-  padding: 2rem;
+  max-width: 500px;
 }
 
-.header {
-  margin-bottom: 1.75rem;
-}
-
-.header h1 {
-  margin: 0;
+.mobile-logo {
+  display: none;
   font-size: 1.75rem;
+  font-weight: 800;
+  color: #4f46e5;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+@media (max-width: 899px) {
+  .form-side {
+    background: #f8fafc;
+  }
+  .form-wrapper {
+    background: white;
+    padding: 2.5rem 2rem;
+    border-radius: 24px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+  }
+  .mobile-logo { display: block; }
+}
+
+.auth-header {
+  margin-bottom: 2rem;
+}
+.auth-header h2 {
+  font-size: 2.25rem;
+  font-weight: 800;
   color: #0f172a;
-  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem 0;
 }
-
-.header p {
-  margin: 0.5rem 0 0;
+.auth-header p {
   color: #64748b;
+  font-size: 1.05rem;
+  margin: 0;
 }
 
-.row {
+.flex-row {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 0.75rem;
+  gap: 0;
 }
 
-@media (min-width: 768px) {
-  .row {
+@media (min-width: 640px) {
+  .flex-row {
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 1.25rem;
   }
 }
 
 .register-form :deep(.base-input) {
+  font-size: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
   background: #f8fafc;
-  border-radius: 10px;
-  border-color: #dbe3ed;
+  border: 1px solid #e2e8f0;
 }
-
 .register-form :deep(.base-input:focus) {
   background: #ffffff;
-  border-color: #6366f1 !important;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.14) !important;
+  border-color: #4f46e5 !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
 }
-
-.submit-btn {
-  margin-top: 0.5rem;
-  border-radius: 12px !important;
-  padding: 0.9rem 1rem !important;
+.register-form :deep(.base-input-label) {
+  font-size: 0.9rem;
   font-weight: 600;
+  margin-bottom: 0.4rem;
 }
 
-.server-error,
-.success-msg {
-  margin: 0.5rem 0 1rem;
-  padding: 0.75rem;
-  border-radius: 10px;
-  font-size: 0.92rem;
+.client-btn {
+  background: linear-gradient(135deg, #0066ff 0%, #0052cc 100%) !important;
+  border: none !important;
+  padding: 1rem;
+  font-size: 1.1rem;
+  border-radius: 14px;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  box-shadow: 0 8px 15px -3px rgba(0, 102, 255, 0.3) !important;
+}
+.client-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 20px -3px rgba(0, 102, 255, 0.4) !important;
+  background: linear-gradient(135deg, #3385ff 0%, #0066ff 100%) !important;
 }
 
-.server-error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
-}
-
-.success-msg {
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  color: #047857;
-}
-
-.auth-switch {
+.login-prompt {
   text-align: center;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
+  font-size: 1rem;
   color: #64748b;
-  font-size: 0.95rem;
 }
-
-.auth-switch a {
-  color: #4f46e5;
-  font-weight: 600;
+.login-prompt a {
+  color: #0066ff;
+  font-weight: 700;
   text-decoration: none;
 }
-
-.auth-switch a:hover {
+.login-prompt a:hover {
   text-decoration: underline;
+}
+
+.error-msg, .success-msg {
+  padding: 0.85rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.error-msg {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #ffe4e6;
+}
+
+.success-msg {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
 }
 </style>
