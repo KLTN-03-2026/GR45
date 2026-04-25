@@ -173,7 +173,7 @@ const handleRegister = async () => {
             
             <div class="flex-row">
               <BaseInput v-model="form.password" type="password" label="Mật khẩu *" placeholder="Tối thiểu 8 kí tự" :error="errors.password" />
-              <BaseInput v-model="form.password_confirmation" type="password" label="Xác nhận mật khẩu *" placeholder="Nhập lại mật khẩu" :error="errors.password_confirmation" />
+              <BaseInput v-model="form.password_confirmation" type="password" label="Xác nhận mật khẩu *" placeholder="Nhập lại mật khâ" :error="errors.password_confirmation" />
             </div>
 
             <BaseInput v-model="form.dia_chi" label="Địa chỉ" placeholder="Số nhà, tên đường, tỉnh/thành..." :error="errors.dia_chi" />
