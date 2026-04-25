@@ -315,22 +315,38 @@ class KhachHangService
         }
 
         if (!empty($filters['diem_di'])) {
-            $query->whereHas('tuyenDuong', function ($qTuyen) use ($filters) {
-                $qTuyen->where('diem_bat_dau', 'LIKE', '%' . $filters['diem_di'] . '%')
-                    ->orWhereHas('tramDons', function ($qTram) use ($filters) {
-                        $qTram->where('ten_tram', 'LIKE', '%' . $filters['diem_di'] . '%')
-                            ->orWhere('dia_chi', 'LIKE', '%' . $filters['diem_di'] . '%');
+            $diemDiPatterns = $this->buildLocationLikePatterns((string) $filters['diem_di']);
+            $query->whereHas('tuyenDuong', function ($qTuyen) use ($diemDiPatterns) {
+                $qTuyen->where(function ($q) use ($diemDiPatterns) {
+                    foreach ($diemDiPatterns as $pattern) {
+                        $q->orWhere('diem_bat_dau', 'LIKE', '%' . $pattern . '%');
+                    }
+                })->orWhereHas('tramDons', function ($qTram) use ($diemDiPatterns) {
+                    $qTram->where(function ($q) use ($diemDiPatterns) {
+                        foreach ($diemDiPatterns as $pattern) {
+                            $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
+                              ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
+                        }
                     });
-            });
+                });
+            }); 
         }
 
         if (!empty($filters['diem_den'])) {
-            $query->whereHas('tuyenDuong', function ($qTuyen) use ($filters) {
-                $qTuyen->where('diem_ket_thuc', 'LIKE', '%' . $filters['diem_den'] . '%')
-                    ->orWhereHas('tramTras', function ($qTram) use ($filters) {
-                        $qTram->where('ten_tram', 'LIKE', '%' . $filters['diem_den'] . '%')
-                            ->orWhere('dia_chi', 'LIKE', '%' . $filters['diem_den'] . '%');
+            $diemDenPatterns = $this->buildLocationLikePatterns((string) $filters['diem_den']);
+            $query->whereHas('tuyenDuong', function ($qTuyen) use ($diemDenPatterns) {
+                $qTuyen->where(function ($q) use ($diemDenPatterns) {
+                    foreach ($diemDenPatterns as $pattern) {
+                        $q->orWhere('diem_ket_thuc', 'LIKE', '%' . $pattern . '%');
+                    }
+                })->orWhereHas('tramTras', function ($qTram) use ($diemDenPatterns) {
+                    $qTram->where(function ($q) use ($diemDenPatterns) {
+                        foreach ($diemDenPatterns as $pattern) {
+                            $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
+                              ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
+                        }
                     });
+                });
             });
         }
 
@@ -352,6 +368,25 @@ class KhachHangService
         }
 
         return $query->orderBy('gio_khoi_hanh', 'asc')->paginate($filters['per_page'] ?? 15);
+    }
+
+    /**
+     * Tạo tập pattern để tìm theo cả có dấu/không dấu cho địa danh.
+     */
+    private function buildLocationLikePatterns(string $value): array
+    {
+        $base = trim($value);
+        if ($base === '') {
+            return [];
+        }
+
+        $patterns = [
+            $base,
+            str_replace(['Đ', 'đ'], ['D', 'd'], $base),
+            str_replace(['D', 'd'], ['Đ', 'đ'], $base),
+        ];
+
+        return array_values(array_unique(array_filter($patterns)));
     }
 
     /**
@@ -411,15 +446,29 @@ class KhachHangService
             throw new \Exception('Chuyến xe không tồn tại.');
         }
 
-        $tramDons = \App\Models\TramDung::where('id_tuyen_duong', $chuyenXe->id_tuyen_duong)
-            ->whereIn('loai_tram', ['don', 'ca_hai'])
+        $allStops = \App\Models\TramDung::where('id_tuyen_duong', $chuyenXe->id_tuyen_duong)
             ->orderBy('thu_tu')
             ->get();
 
-        $tramTras = \App\Models\TramDung::where('id_tuyen_duong', $chuyenXe->id_tuyen_duong)
-            ->whereIn('loai_tram', ['tra', 'ca_hai'])
-            ->orderBy('thu_tu')
-            ->get();
+        $tramDons = $allStops->filter(function ($stop) {
+            $type = strtolower(trim((string) $stop->loai_tram));
+            return in_array($type, ['don', 'ca_hai'], true);
+        })->values();
+
+        $tramTras = $allStops->filter(function ($stop) {
+            $type = strtolower(trim((string) $stop->loai_tram));
+            return in_array($type, ['tra', 'ca_hai'], true);
+        })->values();
+
+        // Dữ liệu cũ có thể không đúng enum loai_tram -> fallback để UI vẫn hiển thị trạm.
+        if ($allStops->isNotEmpty()) {
+            if ($tramDons->isEmpty()) {
+                $tramDons = $allStops->values();
+            }
+            if ($tramTras->isEmpty()) {
+                $tramTras = $allStops->values();
+            }
+        }
 
         return [
             'tram_don' => $tramDons,

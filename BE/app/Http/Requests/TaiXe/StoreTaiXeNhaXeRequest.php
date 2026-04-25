@@ -32,7 +32,7 @@ class StoreTaiXeNhaXeRequest extends FormRequest
 
             // Driving License
             'so_gplx'           => 'required|string|max:50',
-            'hang_bang_lai'     => 'required|string|max:10',
+            'hang_bang_lai'     => 'required|string|max:10|in:B1,B2,C,D,E,FB2,FC,FD,FE',
             'ngay_cap_gplx'     => 'nullable|date',
             'ngay_het_han_gplx' => 'nullable|date',
         ];
@@ -45,6 +45,7 @@ class StoreTaiXeNhaXeRequest extends FormRequest
             'cccd.unique'               => 'Số CCCD này đã được đăng ký.',
             'anh_cccd_mat_truoc.required' => 'Thiếu ảnh mặt trước CCCD.',
             'anh_cccd_mat_sau.required'  => 'Thiếu ảnh mặt sau CCCD.',
+            'hang_bang_lai.in'           => 'Hạng bằng lái không hợp lệ.',
         ];
     }
 }

@@ -86,6 +86,7 @@ const adminApi = {
   toggleTripStatus: (id) => axiosClient.patch(`/v1/admin/chuyen-xe/${id}/trang-thai`),
   deleteTrip: (id) => axiosClient.delete(`/v1/admin/chuyen-xe/${id}`),
   getTripSeats: (id) => axiosClient.get(`/v1/admin/chuyen-xe/${id}/so-do-ghe`),
+  getTripStops: (id) => axiosClient.get(`/v1/chuyen-xe/${id}/tram-dung`),
   changeTripBus: (id, data) => axiosClient.put(`/v1/admin/chuyen-xe/${id}/doi-xe`, data),
   getTripTrackingHistory: (id, params) =>
     axiosClient.get(`/v1/admin/chuyen-xe/${id}/tracking`, { params }),

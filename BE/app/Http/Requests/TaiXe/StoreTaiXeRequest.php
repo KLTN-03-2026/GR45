@@ -49,7 +49,7 @@ class StoreTaiXeRequest extends FormRequest
             'ngay_sinh'         => 'nullable|date',
             'dia_chi'           => 'nullable|string|max:255',
             'so_gplx'           => 'required|string|max:50',
-            'hang_bang_lai'     => 'required|string|max:10',
+            'hang_bang_lai'     => 'required|string|max:10|in:B1,B2,C,D,E,FB2,FC,FD,FE',
             'ngay_cap_gplx'     => 'required|date',
             'ngay_het_han_gplx' => 'required|date',
 
@@ -81,6 +81,7 @@ class StoreTaiXeRequest extends FormRequest
 
             'so_gplx.required'           => 'Số GPLX không được để trống.',
             'hang_bang_lai.required'     => 'Hạng bằng lái không được để trống.',
+            'hang_bang_lai.in'           => 'Hạng bằng lái không hợp lệ.',
             'ngay_cap_gplx.required'     => 'Ngày cấp GPLX không được để trống.',
             'ngay_het_han_gplx.required' => 'Ngày hết hạn GPLX không được để trống.',
 

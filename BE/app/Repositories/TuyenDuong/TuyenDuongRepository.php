@@ -15,6 +15,18 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
         $this->model = $model;
     }
 
+    private function normalizeWeekdays(array $days): array
+    {
+        $normalized = array_map(function ($day) {
+            $value = (int) $day;
+            return $value === 7 ? 0 : $value;
+        }, $days);
+
+        $normalized = array_values(array_unique($normalized));
+        sort($normalized);
+        return $normalized;
+    }
+
     public function getAll(array $filters = [])
     {
         $admin = Auth::guard('sanctum')->user();
@@ -158,7 +170,7 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
                 'diem_bat_dau' => $data['diem_bat_dau'],
                 'diem_ket_thuc' => $data['diem_ket_thuc'],
                 'quang_duong' => $data['quang_duong'],
-                'cac_ngay_trong_tuan' => array_map('intval', $data['cac_ngay_trong_tuan']),
+                'cac_ngay_trong_tuan' => $this->normalizeWeekdays($data['cac_ngay_trong_tuan']),
                 'gio_khoi_hanh' => $data['gio_khoi_hanh'],
                 'gio_ket_thuc' => $data['gio_ket_thuc'],
                 'gio_du_kien' => $data['gio_du_kien'] ?? null,
@@ -239,7 +251,7 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
             if (isset($data['diem_bat_dau'])) $updateData['diem_bat_dau'] = $data['diem_bat_dau'];
             if (isset($data['diem_ket_thuc'])) $updateData['diem_ket_thuc'] = $data['diem_ket_thuc'];
             if (isset($data['quang_duong'])) $updateData['quang_duong'] = $data['quang_duong'];
-            if (isset($data['cac_ngay_trong_tuan'])) $updateData['cac_ngay_trong_tuan'] = array_map('intval', $data['cac_ngay_trong_tuan']);
+            if (isset($data['cac_ngay_trong_tuan'])) $updateData['cac_ngay_trong_tuan'] = $this->normalizeWeekdays($data['cac_ngay_trong_tuan']);
             if (isset($data['gio_khoi_hanh'])) $updateData['gio_khoi_hanh'] = $data['gio_khoi_hanh'];
             if (isset($data['gio_ket_thuc'])) $updateData['gio_ket_thuc'] = $data['gio_ket_thuc'];
             if (isset($data['gio_du_kien'])) $updateData['gio_du_kien'] = $data['gio_du_kien'];

@@ -267,9 +267,17 @@ const openSeatModal = async (trip) => {
     seatList.value = Array.isArray(rawSeats) ? rawSeats : [];
 
     // Xử lý dữ liệu trạm dừng - bóc tách đúng tầng data từ Laravel
-    const stopsData = stopRes.data || stopRes;
-    pickupStops.value = Array.isArray(stopsData.tram_don) ? stopsData.tram_don : [];
-    dropoffStops.value = Array.isArray(stopsData.tram_tra) ? stopsData.tram_tra : [];
+    const stopsPayload = stopRes?.data?.data || stopRes?.data || stopRes || {};
+    pickupStops.value = Array.isArray(stopsPayload?.tram_don)
+      ? stopsPayload.tram_don
+      : Array.isArray(stopsPayload?.data?.tram_don)
+        ? stopsPayload.data.tram_don
+        : [];
+    dropoffStops.value = Array.isArray(stopsPayload?.tram_tra)
+      ? stopsPayload.tram_tra
+      : Array.isArray(stopsPayload?.data?.tram_tra)
+        ? stopsPayload.data.tram_tra
+        : [];
     
     // Tự động chọn trạm đầu của danh sách đón và trạm cuối của danh sách trả
     if (pickupStops.value.length > 0) {
@@ -286,15 +294,34 @@ const openSeatModal = async (trip) => {
   }
 };
 
-// Nhóm ghế theo tầng, mỗi tầng chia thành các hàng 5 ghế
+const splitSeatsIntoRows = (seats, rows = 2) => {
+  const list = Array.isArray(seats) ? [...seats] : [];
+  if (!list.length) return [];
+  const safeRows = Math.min(8, Math.max(1, Number(rows) || 2));
+  const perRow = Math.ceil(list.length / safeRows);
+  const out = [];
+  for (let i = 0; i < list.length; i += perRow) {
+    out.push(list.slice(i, i + perRow));
+  }
+  return out;
+};
+
+// Nhóm ghế theo tầng
 const seatsByFloor = computed(() => {
   const result = {};
   seatList.value.forEach((g) => {
-    const tang = g.tang || 1;
+    const tang = Number(g.tang || 1);
     if (!result[tang]) result[tang] = [];
     result[tang].push(g);
   });
-  return result;
+  return Object.entries(result)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([floor, seats]) => ({
+      floor: Number(floor),
+      seats: [...seats].sort((x, y) =>
+        String(x.ma_ghe || "").localeCompare(String(y.ma_ghe || ""))
+      ),
+    }));
 });
 
 const seatStats = computed(() => {
@@ -305,7 +332,7 @@ const seatStats = computed(() => {
 
 // Toggle chọn ghế
 const toggleSeat = (seat) => {
-  if (seat.trang_thai === "da_dat") return; // không chọn ghế đã đặt
+  if (seat.trang_thai === "da_dat" || seat.trang_thai === "bao_tri_hoac_khoa") return;
   const idx = selectedSeats.value.indexOf(seat.ma_ghe);
   if (idx === -1) {
     selectedSeats.value.push(seat.ma_ghe);
@@ -972,49 +999,57 @@ onMounted(() => {
         <!-- Chú thích -->
         <div class="seat-legend">
           <span class="legend-item"
-            ><span class="seat-dot dot-empty"></span> Còn trống (bấm để
+            ><span class="seat-dot dot-active"></span> Hoạt động (bấm để
             chọn)</span
           >
           <span class="legend-item"
             ><span class="seat-dot dot-booked"></span> Đã đặt</span
           >
           <span class="legend-item"
+            ><span class="seat-dot dot-locked"></span> Khóa / bảo trì</span
+          >
+          <span class="legend-item"
             ><span class="seat-dot dot-selected"></span> Đang chọn</span
           >
         </div>
 
-        <!-- Sơ đồ từng tầng — mỗi tầng chia thành hàng 5 ghế -->
+        <!-- Sơ đồ từng tầng -->
         <div
-          v-for="(seats, tang) in seatsByFloor"
-          :key="tang"
+          v-for="floor in seatsByFloor"
+          :key="floor.floor"
           class="floor-section"
         >
-          <h4 class="floor-title">🚌 Tầng {{ tang }}</h4>
-          <div class="seat-grid-wrap">
-            <div
-              v-for="seat in seats"
-              :key="seat.id_ghe"
-              class="seat-box"
+          <h4 class="floor-title">Tầng {{ floor.floor }}</h4>
+          <div
+            v-for="(row, ri) in splitSeatsIntoRows(floor.seats, 2)"
+            :key="ri"
+            class="seat-row"
+            :style="{ '--seat-cols': Math.max(row.length, 1) }"
+          >
+            <button
+              v-for="seat in row"
+              :key="seat.id_ghe || seat.ma_ghe"
+              type="button"
+              class="seat-tile"
+              :disabled="seat.trang_thai === 'da_dat' || seat.trang_thai === 'bao_tri_hoac_khoa'"
               :class="{
-                'seat-empty':
-                  seat.trang_thai !== 'da_dat' && !isSeatSelected(seat),
-                'seat-booked': seat.trang_thai === 'da_dat',
-                'seat-selected': isSeatSelected(seat),
-                'seat-clickable': seat.trang_thai !== 'da_dat',
+                booked: seat.trang_thai === 'da_dat',
+                blocked: seat.trang_thai === 'bao_tri_hoac_khoa',
+                selected: isSeatSelected(seat),
               }"
-              :title="`${seat.ma_ghe} — ${
-                seat.trang_thai === 'da_dat'
-                  ? 'Đã đặt'
-                  : isSeatSelected(seat)
-                    ? 'Đang chọn'
-                    : 'Còn trống'
-              }`"
               @click="toggleSeat(seat)"
             >
               {{ seat.ma_ghe }}
-            </div>
+            </button>
           </div>
         </div>
+
+        <div class="booked-note">
+          <span>
+            Ghế đã chọn:
+            <strong>{{ selectedSeats.length ? selectedSeats.join(", ") : "Chưa chọn" }}</strong>
+          </span>
+            </div>
 
         <!-- Panel đặt vé (hiện khi chọn >= 1 ghế) -->
         <transition name="slide-down">
@@ -1534,18 +1569,23 @@ onMounted(() => {
   border-radius: 4px;
 }
 
-.dot-empty {
+.dot-active {
   background: #dcfce7;
   border: 1px solid #86efac;
 }
 
 .dot-booked {
-  background: #fecaca;
-  border: 1px solid #f87171;
+  background: #ffedd5;
+  border: 1px solid #ea580c;
+}
+
+.dot-locked {
+  background: #e2e8f0;
+  border: 1px solid #475569;
 }
 
 .dot-selected {
-  background: #bfdbfe;
+  background: #dbeafe;
   border: 1px solid #60a5fa;
 }
 
@@ -1554,70 +1594,61 @@ onMounted(() => {
 }
 
 .floor-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #0d4f35;
-  margin: 0 0 10px 0;
-  padding-bottom: 6px;
-  border-bottom: 2px solid #dcfce7;
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 8px;
+  font-weight: 600;
 }
 
-/* Ghế dạng grid responsive — 10 ghế/hàng */
-.seat-grid-wrap {
+.seat-row {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(var(--seat-cols), minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
 }
 
-@media (max-width: 620px) {
-  .seat-grid-wrap {
-    grid-template-columns: repeat(5, 1fr);
-  }
-}
-
-.seat-box {
-  height: 40px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  transition:
-    transform 0.15s,
-    box-shadow 0.15s;
-  user-select: none;
-}
-
-.seat-clickable {
-  cursor: pointer;
-}
-
-.seat-empty {
-  background: #dcfce7;
+.seat-tile {
+  width: 100%;
   border: 1px solid #86efac;
-  color: #16a34a;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 9px;
+  padding: 8px 4px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.seat-empty:hover {
-  transform: scale(1.08);
-  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25);
+.seat-tile:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);
 }
 
-.seat-booked {
-  background: #fecaca;
-  border: 1px solid #f87171;
-  color: #dc2626;
+.seat-tile.booked {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
   cursor: not-allowed;
-  opacity: 0.75;
 }
 
-.seat-selected {
-  background: #bfdbfe;
-  border: 2px solid #3b82f6;
+.seat-tile.blocked {
+  border-color: #64748b;
+  background: #f1f5f9;
+  color: #1e293b;
+  cursor: not-allowed;
+}
+
+.seat-tile.selected {
+  border-color: #60a5fa;
+  background: #dbeafe;
   color: #1d4ed8;
-  transform: scale(1.06);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.booked-note {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 /* Panel đặt vé */
