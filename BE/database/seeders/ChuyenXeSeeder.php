@@ -32,7 +32,7 @@ class ChuyenXeSeeder extends Seeder
                 'id_tai_xe'      => $taiXes['taixe1@nxpt.vn'] ?? 1,
                 'ngay_khoi_hanh' => '2026-03-25',
                 'gio_khoi_hanh'  => '07:00:00',
-                'thanh_toan_sau' => 0,
+                'thanh_toan_sau' => 1,
                 'tong_tien'      => 4200000.00, // 12 khách × 350k
                 'trang_thai'     => 'hoan_thanh',
                 'created_at'     => Carbon::parse('2026-03-20'),
@@ -45,7 +45,7 @@ class ChuyenXeSeeder extends Seeder
                 'id_tai_xe'      => $taiXes['taixe1@nxhl.vn'] ?? 3,
                 'ngay_khoi_hanh' => '2026-03-25',
                 'gio_khoi_hanh'  => '08:00:00',
-                'thanh_toan_sau' => 0,
+                'thanh_toan_sau' => 1,
                 'tong_tien'      => 2250000.00, // 15 khách × 150k
                 'trang_thai'     => 'hoan_thanh',
                 'created_at'     => Carbon::parse('2026-03-20'),
@@ -58,7 +58,7 @@ class ChuyenXeSeeder extends Seeder
                 'id_tai_xe'      => $taiXes['taixe1@nxtb.vn'] ?? 5,
                 'ngay_khoi_hanh' => '2026-03-25',
                 'gio_khoi_hanh'  => '20:00:00',
-                'thanh_toan_sau' => 0,
+                'thanh_toan_sau' => 1,
                 'tong_tien'      => 5000000.00, // 20 khách × 250k
                 'trang_thai'     => 'hoan_thanh',
                 'created_at'     => Carbon::parse('2026-03-20'),

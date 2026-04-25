@@ -44,7 +44,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('ve/{id}/huy', [VeController::class, 'huyVeKhachHang']);
 
         Route::get('voucher', [VoucherController::class, 'indexKhachHang']);
-        Route::get('voucher/{id}', [VoucherController::class, 'showKhachHang']);
+        Route::get('voucher/{id}', [VoucherController::class, 'showKhachHang'])->where('id', '[0-9]+');
 
         Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
 

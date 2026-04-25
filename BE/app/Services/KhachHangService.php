@@ -359,7 +359,7 @@ class KhachHangService
      */
     public function getGheChuyenXe(int $idChuyenXe)
     {
-        $chuyenXe = \App\Models\ChuyenXe::with(['tuyenDuong', 'xe'])->find($idChuyenXe);
+        $chuyenXe = \App\Models\ChuyenXe::with(['tuyenDuong', 'xe.loaiXe', 'tuyenDuong.nhaXe'])->find($idChuyenXe);
         if (!$chuyenXe) {
             throw new \Exception('Chuyến xe không tồn tại.');
         }
