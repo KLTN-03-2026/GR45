@@ -400,23 +400,23 @@ onMounted(() => {
               Thông tin đón trả
             </h2>
 
-            <div class="grid md:grid-cols-2 gap-6">
+            <div class="grid md:grid-cols-2 gap-6 items-stretch">
               <!-- Điểm đón -->
-              <div>
+              <div class="flex flex-col">
                 <h4 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Đón</h4>
                 <div v-if="stopsData.tram_don.length === 0" class="text-slate-500 italic">Không có dữ liệu trạm đón.</div>
-                <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll">
-                  <label v-for="stop in stopsData.tram_don" :key="'don-'+stop.id" class="radio-card">
+                <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll flex-1 flex flex-col">
+                  <label v-for="stop in stopsData.tram_don" :key="'don-'+stop.id" class="radio-card flex-1 flex flex-col mb-3 last:mb-0">
                     <input type="radio" :value="stop.id" v-model="pickupPointId" name="pickup">
                     <div 
-                      class="card-content flex items-start p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden"
+                      class="card-content flex items-center p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden flex-1"
                       :class="pickupPointId === stop.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'"
                     >
                       <!-- Thanh xanh bên trái khi được chọn -->
                       <div v-if="pickupPointId === stop.id" class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600"></div>
 
                       <div 
-                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 mt-1"
+                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0"
                         :class="pickupPointId === stop.id ? 'border-blue-600' : 'border-slate-300'"
                       >
                         <div 
@@ -434,21 +434,21 @@ onMounted(() => {
               </div>
 
               <!-- Điểm trả -->
-              <div>
+              <div class="flex flex-col">
                 <h4 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Trả</h4>
                 <div v-if="stopsData.tram_tra.length === 0" class="text-slate-500 italic">Không có dữ liệu trạm trả.</div>
-                <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll">
-                  <label v-for="stop in stopsData.tram_tra" :key="'tra-'+stop.id" class="radio-card">
+                <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll flex-1 flex flex-col">
+                  <label v-for="stop in stopsData.tram_tra" :key="'tra-'+stop.id" class="radio-card flex-1 flex flex-col mb-3 last:mb-0">
                     <input type="radio" :value="stop.id" v-model="dropoffPointId" name="dropoff">
                     <div 
-                      class="card-content flex items-start p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden"
+                      class="card-content flex items-center p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden flex-1"
                       :class="dropoffPointId === stop.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'"
                     >
                       <!-- Thanh xanh bên trái khi được chọn -->
                       <div v-if="dropoffPointId === stop.id" class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-600"></div>
 
                       <div 
-                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 mt-1"
+                        class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0"
                         :class="dropoffPointId === stop.id ? 'border-blue-600' : 'border-slate-300'"
                       >
                         <div 
@@ -602,7 +602,7 @@ onMounted(() => {
           </div>
 
           <!-- STEP 4: HOÀN TẤT -->
-          <div v-if="currentStep === 4 && bookingResult" class="glass-card rounded-2xl p-8 text-center fade-in max-w-2xl mx-auto relative">
+          <div v-if="currentStep === 4 && bookingResult" class="glass-card rounded-2xl p-6 text-center fade-in relative">
             <div v-if="bookingResult.tinh_trang === 'huy'" class="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 rounded-2xl flex flex-col items-center justify-center p-8 text-center">
                 <span class="material-symbols-outlined text-red-500 text-6xl mb-4">cancel</span>
                 <h3 class="text-2xl font-bold text-slate-800 mb-2">Giao dịch bị từ chối</h3>
@@ -663,7 +663,7 @@ onMounted(() => {
               </div>
             </div>
 
-            <button @click="$router.push('/')" class="btn-primary mx-auto mt-4">
+            <button @click="$router.push('/')" class="w-full sm:w-auto px-10 py-3.5 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 mx-auto mt-8 flex items-center justify-center">
               Quay về Trang Chủ
             </button>
           </div>
