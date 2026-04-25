@@ -3,12 +3,20 @@
 namespace App\Repositories\ChuyenXe;
 
 use App\Models\ChuyenXe;
+use App\Models\TaiXe;
 use App\Models\TuyenDuong;
+use App\Models\Xe;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 {
+    private const MAX_DRIVING_HOURS_PER_DAY = 10.0;
+    private const MIN_REST_MINUTES_BETWEEN_TRIPS = 30;
+
     protected $model;
 
     public function __construct(ChuyenXe $model)
@@ -169,9 +177,16 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
             }
         }
 
-        $data['trang_thai'] = $data['trang_thai'] ?? 'ChoChay';
+        $data['trang_thai'] = $this->normalizeStatus($data['trang_thai'] ?? 'hoat_dong');
+        $this->validateAssignmentRules($data);
 
-        return $this->model->create($data);
+        $trip = $this->model->create($data);
+        $this->notifyDriverScheduleChange(
+            TaiXe::with('hoSo')->find($trip->id_tai_xe),
+            $trip,
+            'new'
+        );
+        return $trip;
     }
 
     public function update(int $id, array $data)
@@ -202,7 +217,34 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
             }
         }
 
+        $oldDriverId = (int) $chuyenXe->id_tai_xe;
+        $oldDate = (string) $chuyenXe->ngay_khoi_hanh;
+        $oldTime = (string) $chuyenXe->gio_khoi_hanh;
+
+        $payload = [
+            'id_tuyen_duong' => $data['id_tuyen_duong'] ?? $chuyenXe->id_tuyen_duong,
+            'id_xe' => $data['id_xe'] ?? $chuyenXe->id_xe,
+            'id_tai_xe' => $data['id_tai_xe'] ?? $chuyenXe->id_tai_xe,
+            'ngay_khoi_hanh' => $data['ngay_khoi_hanh'] ?? $chuyenXe->ngay_khoi_hanh,
+            'gio_khoi_hanh' => $data['gio_khoi_hanh'] ?? Carbon::parse($chuyenXe->gio_khoi_hanh)->format('H:i'),
+            'trang_thai' => $this->normalizeStatus($data['trang_thai'] ?? $chuyenXe->trang_thai),
+        ];
+        $this->validateAssignmentRules($payload, $id);
+
+        $data['trang_thai'] = $payload['trang_thai'];
         $chuyenXe->update($data);
+
+        $newDriverId = (int) $chuyenXe->id_tai_xe;
+        $newDate = (string) $chuyenXe->ngay_khoi_hanh;
+        $newTime = Carbon::parse($chuyenXe->gio_khoi_hanh)->format('H:i:s');
+        $scheduleChanged = $oldDriverId !== $newDriverId || $oldDate !== $newDate || $oldTime !== $newTime;
+        if ($scheduleChanged) {
+            $this->notifyDriverScheduleChange(
+                TaiXe::with('hoSo')->find($newDriverId),
+                $chuyenXe,
+                'updated'
+            );
+        }
         return $chuyenXe;
     }
 
@@ -286,6 +328,131 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
     public function filterByDate(string $date)
     {
         return $this->model->whereDate('ngay_khoi_hanh', $date)->get();
+    }
+
+    private function normalizeStatus(?string $status): string
+    {
+        $value = strtolower((string) $status);
+        return match ($value) {
+            'chochay', 'hoat_dong' => 'hoat_dong',
+            'dangchay', 'dang_di_chuyen' => 'dang_di_chuyen',
+            'hoanthanh', 'hoan_thanh' => 'hoan_thanh',
+            'dahuy', 'huy' => 'huy',
+            default => 'hoat_dong',
+        };
+    }
+
+    private function estimateDurationMinutes(TuyenDuong $route): int
+    {
+        $distanceKm = (float) ($route->quang_duong ?? 0);
+        if ($distanceKm > 0) {
+            // Tạm ước lượng 40 km/h khi chưa có thời lượng chuẩn.
+            return (int) max(30, round(($distanceKm / 40.0) * 60));
+        }
+        return 120;
+    }
+
+    private function validateAssignmentRules(array $payload, ?int $excludeTripId = null): void
+    {
+        $driver = TaiXe::with('hoSo')->find((int) $payload['id_tai_xe']);
+        $route = TuyenDuong::find((int) $payload['id_tuyen_duong']);
+        $vehicle = Xe::with('loaiXe')->find((int) $payload['id_xe']);
+
+        if (!$driver || !$route || !$vehicle) {
+            throw new \Exception('Dữ liệu phân công không hợp lệ.');
+        }
+
+        $startAt = Carbon::parse($payload['ngay_khoi_hanh'] . ' ' . $payload['gio_khoi_hanh']);
+        $durationMinutes = $this->estimateDurationMinutes($route);
+        $endAt = (clone $startAt)->addMinutes($durationMinutes);
+
+        $existingTrips = $this->model->query()
+            ->where('id_tai_xe', $driver->id)
+            ->whereDate('ngay_khoi_hanh', $startAt->toDateString())
+            ->when($excludeTripId, fn($q) => $q->where('id', '!=', $excludeTripId))
+            ->with('tuyenDuong')
+            ->get();
+
+        $totalMinutes = $durationMinutes;
+        foreach ($existingTrips as $trip) {
+            $tripDate = Carbon::parse($trip->ngay_khoi_hanh)->toDateString();
+            $tripTime = Carbon::parse($trip->gio_khoi_hanh)->format('H:i');
+            $tripStart = Carbon::parse($tripDate . ' ' . $tripTime);
+            $tripDuration = $this->estimateDurationMinutes($trip->tuyenDuong);
+            $tripEnd = (clone $tripStart)->addMinutes($tripDuration);
+            $totalMinutes += $tripDuration;
+
+            $isOverlap = $startAt < $tripEnd && $endAt > $tripStart;
+            if ($isOverlap) {
+                throw new \Exception('Xung đột thời gian: tài xế đã được phân công chuyến khác trùng giờ.');
+            }
+
+            $gapMinutes = null;
+            if ($startAt >= $tripEnd) {
+                $gapMinutes = $tripEnd->diffInMinutes($startAt);
+            } elseif ($tripStart >= $endAt) {
+                $gapMinutes = $endAt->diffInMinutes($tripStart);
+            }
+            if ($gapMinutes !== null && $gapMinutes < self::MIN_REST_MINUTES_BETWEEN_TRIPS) {
+                throw new \Exception('Không đủ thời gian nghỉ tối thiểu giữa hai chuyến liên tiếp.');
+            }
+        }
+
+        $totalHours = $totalMinutes / 60.0;
+        if ($totalHours > self::MAX_DRIVING_HOURS_PER_DAY) {
+            throw new \Exception('Quá tải giờ lái: tổng thời gian lái trong ngày vượt ngưỡng an toàn.');
+        }
+
+        $this->validateDriverLicenseConstraint($driver, $vehicle);
+    }
+
+    private function validateDriverLicenseConstraint(TaiXe $driver, Xe $vehicle): void
+    {
+        $driverRank = $this->driverLicenseRank((string) ($driver->hoSo->hang_bang_lai ?? ''));
+        $requiredRank = $this->requiredLicenseRankForVehicle($vehicle);
+        if ($driverRank < $requiredRank) {
+            throw new \Exception('Tài xế không đủ hạng bằng lái cho dòng xe được phân công.');
+        }
+    }
+
+    private function driverLicenseRank(string $license): int
+    {
+        $value = strtoupper(trim($license));
+        if ($value === '') return 0;
+        $map = ['B1' => 1, 'B2' => 2, 'C' => 3, 'D' => 4, 'E' => 5, 'FC' => 6];
+        foreach ($map as $key => $rank) {
+            if (str_contains($value, $key)) return $rank;
+        }
+        return 0;
+    }
+
+    private function requiredLicenseRankForVehicle(Xe $vehicle): int
+    {
+        $seatCount = (int) ($vehicle->so_ghe_thuc_te ?: optional($vehicle->loaiXe)->so_ghe_mac_dinh ?: 0);
+        if ($seatCount >= 30) return 4; // D
+        if ($seatCount >= 10) return 3; // C
+        return 2; // B2
+    }
+
+    private function notifyDriverScheduleChange(?TaiXe $driver, ChuyenXe $trip, string $action): void
+    {
+        if (!$driver || !$driver->email) return;
+        $actionText = $action === 'new' ? 'lịch mới' : 'thay đổi lịch';
+        $subject = "SmartBus: Cập nhật {$actionText}";
+        $content = "Tài xế {$driver->email} có {$actionText} cho chuyến #{$trip->id} "
+            . "vào {$trip->ngay_khoi_hanh} {$trip->gio_khoi_hanh}.";
+
+        try {
+            Mail::raw($content, function ($message) use ($driver, $subject) {
+                $message->to($driver->email)->subject($subject);
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Không gửi được email thông báo lịch trình cho tài xế.', [
+                'driver_id' => $driver->id,
+                'trip_id' => $trip->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function getSeatMap(int $idChuyenXe)

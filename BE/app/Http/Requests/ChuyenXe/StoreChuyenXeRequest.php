@@ -29,7 +29,7 @@ class StoreChuyenXeRequest extends FormRequest
             'gio_khoi_hanh' => 'required|date_format:H:i',
             'thanh_toan_sau' => 'nullable|integer|in:0,1',
             'tong_tien' => 'nullable|numeric|min:0',
-            'trang_thai' => 'nullable|string|in:ChoChay,DangChay,HoanThanh,DaHuy',
+            'trang_thai' => 'nullable|string|in:ChoChay,DangChay,HoanThanh,DaHuy,hoat_dong,dang_di_chuyen,hoan_thanh,huy',
         ];
     }
 
