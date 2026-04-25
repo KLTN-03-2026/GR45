@@ -172,8 +172,8 @@ const handleRegister = async () => {
             <BaseInput v-model="form.email" type="email" label="Email" placeholder="name@example.com" :error="errors.email" />
             
             <div class="flex-row">
-              <BaseInput v-model="form.password" type="password" label="Mật khẩu *" placeholder="••••••••" :error="errors.password" />
-              <BaseInput v-model="form.password_confirmation" type="password" label="Xác nhận mật khẩu *" placeholder="••••••••" :error="errors.password_confirmation" />
+              <BaseInput v-model="form.password" type="password" label="Mật khẩu *" placeholder="Tối thiểu 8 kí tự" :error="errors.password" />
+              <BaseInput v-model="form.password_confirmation" type="password" label="Xác nhận mật khẩu *" placeholder="Nhập lại mật khẩu" :error="errors.password_confirmation" />
             </div>
 
             <BaseInput v-model="form.dia_chi" label="Địa chỉ" placeholder="Số nhà, tên đường, tỉnh/thành..." :error="errors.dia_chi" />
@@ -183,11 +183,11 @@ const handleRegister = async () => {
           <div v-if="successMessage" class="success-msg">{{ successMessage }}</div>
           
           <BaseButton type="submit" block :loading="loading" class="client-btn">
-            ĐĂNG KÝ
+            ĐĂNG KÝ TÀI KHOẢN
           </BaseButton>
           
           <div class="login-prompt">
-            Đã có tài khoản? <router-link to="/auth/login">Đăng nhập</router-link>
+            Đã có tài khoản? <router-link to="/auth/login">Đăng nhập ngay</router-link>
           </div>
         </form>
       </div>

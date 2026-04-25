@@ -174,12 +174,12 @@ const formatRatingDateTime = (iso) => {
 
 const getRankInfo = (rank) => {
   const map = {
-    'dong': { label: 'Hạng Đồng', class: 'bg-orange-100 text-orange-800 border-orange-200' },
-    'bac': { label: 'Hạng Bạc', class: 'bg-slate-200 text-slate-800 border-slate-300' },
-    'vang': { label: 'Hạng Vàng', class: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    'kim_cuong': { label: 'Hạng Kim Cương', class: 'bg-blue-100 text-blue-800 border-blue-200' },
+    'dong': { label: 'Hạng Đồng', class: 'bg-amber-50 text-amber-700 border-amber-200' },
+    'bac': { label: 'Hạng Bạc', class: 'bg-slate-100 text-slate-700 border-slate-300' },
+    'vang': { label: 'Hạng Vàng', class: 'bg-yellow-50 text-yellow-700 border-yellow-300' },
+    'kim_cuong': { label: 'Hạng Kim Cương', class: 'bg-blue-50 text-blue-700 border-blue-200' },
   };
-  return map[rank] || { label: 'Thành viên', class: 'bg-slate-100 text-slate-800 border-slate-200' };
+  return map[rank] || { label: 'Thành viên', class: 'bg-slate-50 text-slate-600 border-slate-200' };
 };
 
 const displayPoints = computed(() => {
@@ -454,7 +454,7 @@ onUnmounted(() => {
                     {{ avatarLetter }}</div>
                 </div>
                 <div class="mb-2">
-                  <span :class="displayRank.class" class="px-4 py-1.5 font-bold text-xs rounded-full border">{{ displayRank.label }}</span>
+                  <span :class="displayRank.class" class="px-6 py-2 font-bold text-sm rounded-full border shadow-sm">{{ displayRank.label }}</span>
                 </div>
               </div>
               <div>
