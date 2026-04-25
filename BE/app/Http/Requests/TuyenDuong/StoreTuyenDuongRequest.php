@@ -28,7 +28,7 @@ class StoreTuyenDuongRequest extends FormRequest
             'diem_ket_thuc' => 'required|string|max:255',
             'quang_duong' => 'required|numeric|min:1',
             'cac_ngay_trong_tuan' => 'required|array|min:1',
-            'cac_ngay_trong_tuan.*' => 'integer|between:0,6',
+            'cac_ngay_trong_tuan.*' => 'integer|between:0,7',
             'gio_khoi_hanh' => 'required|date_format:H:i',
             'gio_ket_thuc' => 'required|date_format:H:i|after:gio_khoi_hanh',
             'gio_du_kien' => 'nullable|numeric|min:0',
@@ -71,7 +71,7 @@ class StoreTuyenDuongRequest extends FormRequest
             'cac_ngay_trong_tuan.array' => 'Các ngày trong tuần phải là dạng mảng.',
             'cac_ngay_trong_tuan.min' => 'Phải có ít nhất 1 ngày trong tuần.',
             'cac_ngay_trong_tuan.*.integer' => 'Ngày trong tuần phải là số nguyên.',
-            'cac_ngay_trong_tuan.*.between' => 'Ngày trong tuần phải từ 0 đến 6 (Chủ nhật đến Thứ Bảy).',
+            'cac_ngay_trong_tuan.*.between' => 'Ngày trong tuần phải từ 0 đến 7 (0 hoặc 7 là Chủ nhật).',
 
             'gio_khoi_hanh.required' => 'Giờ khởi hành không được để trống.',
             'gio_khoi_hanh.date_format' => 'Giờ khởi hành không đúng định dạng HH:mm.',

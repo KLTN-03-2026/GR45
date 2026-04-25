@@ -226,7 +226,7 @@ class VeService
 
     public function getDanhSachVe(array $filters, string $role)
     {
-        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe'])->orderByDesc('created_at');
+        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe'])->orderByDesc('created_at');
 
         if ($role === 'khach_hang') {
             $user = auth('khach_hang')->user();

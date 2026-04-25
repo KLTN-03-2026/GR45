@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, watch, computed } from "vue";
 import operatorApi from "@/api/operatorApi";
 import BaseTable from "@/components/common/BaseTable.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
@@ -59,6 +59,7 @@ const tableColumns = [
   { key: "ma_ve", label: "Mã Vé" },
   { key: "khach", label: "Khách Hàng" },
   { key: "chuyen", label: "Chuyến Xe" },
+  { key: "ghe", label: "Ghế" },
   { key: "tong_tien", label: "Tổng Tiền" },
   { key: "loai_ve", label: "Loại Vé" },
   { key: "tinh_trang", label: "Trạng Thái" },
@@ -103,11 +104,20 @@ const fetchTickets = async (page = 1) => {
 // --- MODAL ĐẶT VÉ HỘ ---
 const isBookModal = ref(false);
 const bookLoading = ref(false);
+const tripOptions = ref([]);
+const availableSeats = ref([]);
+const pickupStops = ref([]);
+const dropoffStops = ref([]);
+const loadingBookingData = ref(false);
+const searchTrip = ref("");
+const searchPickup = ref("");
+const searchDropoff = ref("");
 const bookForm = reactive({
   id_chuyen_xe: "",
-  danh_sach_ghe: "",
+  danh_sach_ghe: [],
   id_tram_don: "",
   id_tram_tra: "",
+  ten_khach_hang: "",
   sdt_khach_hang: "",
   ghi_chu: "",
   phuong_thuc_thanh_toan: "tien_mat",
@@ -117,26 +127,208 @@ const bookForm = reactive({
 const openBookModal = () => {
   Object.assign(bookForm, {
     id_chuyen_xe: "",
-    danh_sach_ghe: "",
+    danh_sach_ghe: [],
     id_tram_don: "",
     id_tram_tra: "",
+    ten_khach_hang: "",
     sdt_khach_hang: "",
     ghi_chu: "",
     phuong_thuc_thanh_toan: "tien_mat",
     tinh_trang: "da_thanh_toan",
   });
+  searchTrip.value = "";
+  searchPickup.value = "";
+  searchDropoff.value = "";
   isBookModal.value = true;
+  loadTripsForBooking();
+};
+
+const tripLabel = (trip) => {
+  const routeName = trip?.tuyen_duong?.ten_tuyen_duong || `Chuyến #${trip.id}`;
+  return `${routeName} - ${formatDateOnly(trip.ngay_khoi_hanh)} ${formatTimeOnly(trip.gio_khoi_hanh)}`;
+};
+
+const normalizeText = (val) =>
+  String(val || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const filteredTripOptions = computed(() => {
+  const q = normalizeText(searchTrip.value);
+  if (!q) return tripOptions.value;
+  return tripOptions.value.filter((trip) =>
+    [
+      trip.id,
+      trip?.tuyen_duong?.ten_tuyen_duong,
+      trip?.tuyen_duong?.diem_bat_dau,
+      trip?.tuyen_duong?.diem_ket_thuc,
+      formatDateOnly(trip.ngay_khoi_hanh),
+      formatTimeOnly(trip.gio_khoi_hanh),
+    ].some((f) => normalizeText(f).includes(q))
+  );
+});
+
+const filteredPickupStops = computed(() => {
+  const q = normalizeText(searchPickup.value);
+  if (!q) return pickupStops.value;
+  return pickupStops.value.filter((stop) =>
+    [stop.ten_tram, stop.dia_chi].some((f) => normalizeText(f).includes(q))
+  );
+});
+
+const filteredDropoffStops = computed(() => {
+  const q = normalizeText(searchDropoff.value);
+  if (!q) return dropoffStops.value;
+  return dropoffStops.value.filter((stop) =>
+    [stop.ten_tram, stop.dia_chi].some((f) => normalizeText(f).includes(q))
+  );
+});
+
+const splitSeatsIntoRows = (seats, rows = 2) => {
+  const list = Array.isArray(seats) ? [...seats] : [];
+  if (!list.length) return [];
+  const safeRows = Math.min(8, Math.max(1, Number(rows) || 2));
+  const perRow = Math.ceil(list.length / safeRows);
+  const out = [];
+  for (let i = 0; i < list.length; i += perRow) {
+    out.push(list.slice(i, i + perRow));
+  }
+  return out;
+};
+
+const bookingSeatsByFloor = computed(() => {
+  const grouped = availableSeats.value.reduce((acc, seat) => {
+    const floor = Number(seat.tang || 1);
+    if (!acc[floor]) acc[floor] = [];
+    acc[floor].push(seat);
+    return acc;
+  }, {});
+  return Object.entries(grouped)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([floor, seats]) => ({
+      floor: Number(floor),
+      seats: [...seats].sort((x, y) =>
+        String(x.ma_ghe || "").localeCompare(String(y.ma_ghe || ""))
+      ),
+    }));
+});
+
+const isBookSeatBlocked = (seat) =>
+  seat?.trang_thai === "da_dat" || seat?.trang_thai === "bao_tri_hoac_khoa";
+
+const seatText = (item) => {
+  const seats = Array.isArray(item?.chi_tiet_ves)
+    ? item.chi_tiet_ves.map((ct) => ct?.ghe?.ma_ghe).filter(Boolean)
+    : [];
+  return seats.length ? seats.join(", ") : "—";
+};
+
+const loadTripsForBooking = async () => {
+  try {
+    loadingBookingData.value = true;
+    const res = await operatorApi.getTrips({ per_page: 100, trang_thai: "hoat_dong" });
+    if (Array.isArray(res.data?.data?.data?.data)) {
+      tripOptions.value = res.data.data.data.data;
+    } else if (Array.isArray(res.data?.data?.data)) {
+      tripOptions.value = res.data.data.data;
+    } else if (Array.isArray(res.data?.data)) {
+      tripOptions.value = res.data.data;
+    } else {
+      tripOptions.value = [];
+    }
+  } catch (e) {
+    tripOptions.value = [];
+    showToast("Không tải được danh sách chuyến xe để đặt vé hộ.", "error");
+  } finally {
+    loadingBookingData.value = false;
+  }
+};
+
+const loadTripBookingData = async (tripId) => {
+  if (!tripId) {
+    availableSeats.value = [];
+    pickupStops.value = [];
+    dropoffStops.value = [];
+    bookForm.danh_sach_ghe = [];
+    bookForm.id_tram_don = "";
+    bookForm.id_tram_tra = "";
+    return;
+  }
+
+  try {
+    loadingBookingData.value = true;
+    const [seatRes, stopRes] = await Promise.all([
+      operatorApi.getTripSeats(tripId),
+      operatorApi.getTripStops(tripId),
+    ]);
+    const seatData = seatRes.data?.data ?? seatRes.data;
+    availableSeats.value = Array.isArray(seatData) ? seatData : [];
+
+    const stopPayload = stopRes?.data?.data || stopRes?.data || {};
+    pickupStops.value = Array.isArray(stopPayload?.tram_don)
+      ? stopPayload.tram_don
+      : Array.isArray(stopPayload?.data?.tram_don)
+        ? stopPayload.data.tram_don
+        : [];
+    dropoffStops.value = Array.isArray(stopPayload?.tram_tra)
+      ? stopPayload.tram_tra
+      : Array.isArray(stopPayload?.data?.tram_tra)
+        ? stopPayload.data.tram_tra
+        : [];
+
+    bookForm.danh_sach_ghe = [];
+    bookForm.id_tram_don = pickupStops.value[0]?.id || "";
+    bookForm.id_tram_tra = dropoffStops.value[dropoffStops.value.length - 1]?.id || "";
+  } catch (e) {
+    availableSeats.value = [];
+    pickupStops.value = [];
+    dropoffStops.value = [];
+    showToast("Không tải được ghế hoặc trạm của chuyến xe.", "error");
+  } finally {
+    loadingBookingData.value = false;
+  }
+};
+
+const toggleBookSeat = (seat) => {
+  if (isBookSeatBlocked(seat)) return;
+  const code = seat.ma_ghe;
+  const idx = bookForm.danh_sach_ghe.indexOf(code);
+  if (idx >= 0) {
+    bookForm.danh_sach_ghe.splice(idx, 1);
+  } else {
+    bookForm.danh_sach_ghe.push(code);
+  }
 };
 
 const submitBook = async () => {
-  // Chuyển chuỗi ghế thành mảng (ví dụ: "A01,A02" -> ["A01","A02"])
-  const danhSach = bookForm.danh_sach_ghe
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
+  const danhSach = Array.isArray(bookForm.danh_sach_ghe)
+    ? bookForm.danh_sach_ghe.filter(Boolean)
+    : [];
+
+  if (!bookForm.id_chuyen_xe) {
+    showToast("Vui lòng chọn chuyến xe.", "error");
+    return;
+  }
 
   if (!danhSach.length) {
-    showToast("Vui lòng nhập ít nhất 1 mã ghế!", "error");
+    showToast("Vui lòng chọn ít nhất 1 ghế.", "error");
+    return;
+  }
+  if (!bookForm.id_tram_don || !bookForm.id_tram_tra) {
+    showToast("Vui lòng chọn trạm đón và trạm trả.", "error");
+    return;
+  }
+  if (Number(bookForm.id_tram_don) === Number(bookForm.id_tram_tra)) {
+    showToast("Trạm đón và trạm trả không được trùng nhau.", "error");
+    return;
+  }
+  if (!String(bookForm.ten_khach_hang || "").trim()) {
+    showToast("Vui lòng nhập tên khách hàng.", "error");
+    return;
+  }
+  if (!String(bookForm.sdt_khach_hang || "").trim()) {
+    showToast("Vui lòng nhập SĐT khách hàng.", "error");
     return;
   }
 
@@ -147,11 +339,11 @@ const submitBook = async () => {
       danh_sach_ghe: danhSach,
       id_tram_don: Number(bookForm.id_tram_don),
       id_tram_tra: Number(bookForm.id_tram_tra),
+      ten_khach_hang: String(bookForm.ten_khach_hang || "").trim(),
+      sdt_khach_hang: String(bookForm.sdt_khach_hang || "").trim(),
       phuong_thuc_thanh_toan: bookForm.phuong_thuc_thanh_toan,
       tinh_trang: bookForm.tinh_trang,
     };
-    if (bookForm.sdt_khach_hang)
-      payload.sdt_khach_hang = bookForm.sdt_khach_hang;
     if (bookForm.ghi_chu) payload.ghi_chu = bookForm.ghi_chu;
 
     await operatorApi.bookTicket(payload);
@@ -247,6 +439,13 @@ const openDetailModal = async (ticket) => {
     detailLoading.value = false;
   }
 };
+
+watch(
+  () => bookForm.id_chuyen_xe,
+  async (value) => {
+    await loadTripBookingData(Number(value));
+  }
+);
 
 onMounted(() => fetchTickets());
 </script>
@@ -351,6 +550,10 @@ onMounted(() => fetchTickets());
             >
           </div>
           <span v-else class="text-muted">#{{ item.id_chuyen_xe }}</span>
+        </template>
+
+        <template #cell(ghe)="{ item }">
+          <span class="seat-chip">{{ seatText(item) }}</span>
         </template>
 
         <template #cell(tong_tien)="{ value }">
@@ -459,6 +662,9 @@ onMounted(() => fetchTickets());
         💡 Nhà xe đặt hộ: <strong>loại vé = 2</strong>. Nếu nhập SĐT, hệ thống
         tự tìm hoặc tạo khách hàng mới.
       </div>
+      <div v-if="loadingBookingData" class="muted" style="margin-top: 8px">
+        Đang tải dữ liệu chuyến xe, ghế và trạm...
+      </div>
 
       <form
         @submit.prevent="submitBook"
@@ -470,52 +676,138 @@ onMounted(() => fetchTickets());
         </div>
 
         <div class="form-group">
-          <label class="form-label">ID Chuyến Xe *</label>
-          <input
-            type="number"
-            v-model="bookForm.id_chuyen_xe"
-            class="custom-input"
-            min="1"
-            required
-            placeholder="VD: 2"
-          />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label"
-            >Mã Ghế * <span class="hint">(cách nhau bằng dấu phẩy)</span></label
-          >
+          <label class="form-label">Chuyến Xe *</label>
           <input
             type="text"
-            v-model="bookForm.danh_sach_ghe"
+            v-model="searchTrip"
             class="custom-input"
-            required
-            placeholder="VD: A01, A02, B03"
+            placeholder="Tìm chuyến theo tên tuyến/ngày/giờ..."
+            style="margin-bottom: 0.5rem"
           />
+          <select
+            v-model="bookForm.id_chuyen_xe"
+            class="custom-select"
+            required
+          >
+            <option value="" disabled>-- Chọn chuyến xe --</option>
+            <option
+              v-for="trip in filteredTripOptions"
+              :key="trip.id"
+              :value="trip.id"
+            >
+              {{ tripLabel(trip) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="form-group full-width">
+          <label class="form-label">Ghế *</label>
+          <div v-if="!availableSeats.length" class="muted">
+            Không có dữ liệu ghế cho chuyến này.
+          </div>
+          <div v-else class="booking-seat-map-wrap">
+            <div class="booking-seat-legend">
+              <span class="legend-item"
+                ><span class="seat-dot dot-active"></span> Hoạt động</span
+              >
+              <span class="legend-item"
+                ><span class="seat-dot dot-booked"></span> Đã đặt</span
+              >
+              <span class="legend-item"
+                ><span class="seat-dot dot-locked"></span> Khóa / bảo trì</span
+              >
+              <span class="legend-item"
+                ><span class="seat-dot dot-selected"></span> Đang chọn</span
+              >
+            </div>
+            <div
+              v-for="floor in bookingSeatsByFloor"
+              :key="floor.floor"
+              class="booking-seat-floor-block"
+            >
+              <h4 class="booking-seat-floor-title">Tầng {{ floor.floor }}</h4>
+              <div
+                v-for="(row, ri) in splitSeatsIntoRows(floor.seats, 2)"
+                :key="ri"
+                class="booking-seat-row"
+                :style="{ '--seat-cols': Math.max(row.length, 1) }"
+              >
+                <button
+                  v-for="seat in row"
+                  :key="seat.id_ghe || seat.ma_ghe"
+                  type="button"
+                  class="booking-seat-tile"
+                  :disabled="isBookSeatBlocked(seat)"
+                  :class="{
+                    booked: seat.trang_thai === 'da_dat',
+                    blocked: seat.trang_thai === 'bao_tri_hoac_khoa',
+                    selected: bookForm.danh_sach_ghe.includes(seat.ma_ghe),
+                  }"
+                  @click="toggleBookSeat(seat)"
+                >
+                  {{ seat.ma_ghe }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <small class="hint"
+            >Ghế đã chọn:
+            <strong>{{
+              bookForm.danh_sach_ghe.length
+                ? bookForm.danh_sach_ghe.join(", ")
+                : "Chưa chọn"
+            }}</strong></small
+          >
         </div>
 
         <div class="form-group">
-          <label class="form-label">ID Trạm Đón *</label>
+          <label class="form-label">Trạm Đón *</label>
           <input
-            type="number"
+            type="text"
+            v-model="searchPickup"
+            class="custom-input"
+            placeholder="Tìm trạm đón theo tên/địa chỉ..."
+            style="margin-bottom: 0.5rem"
+          />
+          <select
             v-model="bookForm.id_tram_don"
-            class="custom-input"
-            min="1"
+            class="custom-select"
             required
-            placeholder="ID trạm đón khách..."
-          />
+          >
+            <option value="" disabled>-- Chọn trạm đón --</option>
+            <option
+              v-for="stop in filteredPickupStops"
+              :key="stop.id"
+              :value="stop.id"
+            >
+              {{ stop.ten_tram }} - {{ stop.dia_chi }}
+            </option>
+          </select>
         </div>
 
         <div class="form-group">
-          <label class="form-label">ID Trạm Trả *</label>
+          <label class="form-label">Trạm Trả *</label>
           <input
-            type="number"
-            v-model="bookForm.id_tram_tra"
+            type="text"
+            v-model="searchDropoff"
             class="custom-input"
-            min="1"
-            required
-            placeholder="ID trạm trả khách..."
+            placeholder="Tìm trạm trả theo tên/địa chỉ..."
+            style="margin-bottom: 0.5rem"
           />
+          <select
+            v-model="bookForm.id_tram_tra"
+            class="custom-select"
+            required
+          >
+            <option value="" disabled>-- Chọn trạm trả --</option>
+            <option
+              v-for="stop in filteredDropoffStops"
+              :key="stop.id"
+              :value="stop.id"
+            >
+              {{ stop.ten_tram }} - {{ stop.dia_chi }}
+            </option>
+          </select>
         </div>
 
         <div class="form-group full-width section-title-row">
@@ -523,15 +815,24 @@ onMounted(() => fetchTickets());
         </div>
 
         <div class="form-group">
-          <label class="form-label"
-            >SĐT Khách Hàng
-            <span class="optional">(không bắt buộc)</span></label
-          >
+          <label class="form-label">Tên Khách Hàng *</label>
+          <input
+            type="text"
+            v-model="bookForm.ten_khach_hang"
+            class="custom-input"
+            placeholder="Nhập tên khách..."
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">SĐT Khách Hàng *</label>
           <input
             type="tel"
             v-model="bookForm.sdt_khach_hang"
             class="custom-input"
-            placeholder="0901234567 – để trống = khách vãng lai"
+            placeholder="0901234567"
+            required
           />
         </div>
 
@@ -921,6 +1222,20 @@ onMounted(() => fetchTickets());
   font-size: 12px;
   color: #64748b;
 }
+.seat-chip {
+  display: inline-block;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f766e;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
 
 /* Status Badges */
 .status-badge {
@@ -1072,6 +1387,116 @@ onMounted(() => fetchTickets());
   outline: none;
   border-color: #16a34a;
   box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+.custom-select[multiple] {
+  min-height: 110px;
+}
+
+.booking-seat-map-wrap {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.booking-seat-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  color: #334155;
+  margin-bottom: 0.75rem;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seat-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.dot-active {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+}
+
+.dot-booked {
+  background: #ffedd5;
+  border: 1px solid #ea580c;
+}
+
+.dot-locked {
+  background: #e2e8f0;
+  border: 1px solid #475569;
+}
+
+.dot-selected {
+  background: #dbeafe;
+  border: 1px solid #60a5fa;
+}
+
+.booking-seat-floor-block {
+  margin-bottom: 0.75rem;
+}
+
+.booking-seat-floor-title {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.booking-seat-row {
+  display: grid;
+  grid-template-columns: repeat(var(--seat-cols), minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+}
+
+.booking-seat-tile {
+  width: 100%;
+  border: 1px solid #86efac;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 9px;
+  padding: 0.45rem 0.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.booking-seat-tile:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);
+}
+
+.booking-seat-tile.booked {
+  border-color: #fb923c;
+  background: #fff7ed;
+  color: #c2410c;
+  cursor: not-allowed;
+}
+
+.booking-seat-tile.blocked {
+  border-color: #64748b;
+  background: #f1f5f9;
+  color: #1e293b;
+  cursor: not-allowed;
+}
+
+.booking-seat-tile.selected {
+  border-color: #60a5fa;
+  background: #dbeafe;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
 }
 
 /* Cập nhật trạng thái */

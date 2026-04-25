@@ -123,6 +123,24 @@ const openCancelModal = (id) => {
   cancelModal.show = true;
 };
 
+const seatText = (ticket) => {
+  if (Array.isArray(ticket?.chi_tiet_ves)) {
+    const seatsFromDetails = ticket.chi_tiet_ves
+      .map((detail) => detail?.ghe?.ma_ghe || detail?.ma_ghe)
+      .filter(Boolean);
+    if (seatsFromDetails.length) return seatsFromDetails.join(", ");
+  }
+
+  if (Array.isArray(ticket?.danh_sach_ghe)) {
+    const list = ticket.danh_sach_ghe.filter(Boolean);
+    if (list.length) return list.join(", ");
+  }
+
+  if (ticket?.ghe?.ma_ghe) return ticket.ghe.ma_ghe;
+  if (ticket?.ma_ghe) return ticket.ma_ghe;
+  return "—";
+};
+
 const executeCancelTicket = async () => {
   try {
     cancelModal.loading = true;
@@ -225,11 +243,7 @@ onMounted(() => {
         <!-- Ghế -->
         <template #cell(ghe)="{ item }">
           <div class="fw-bold text-primary">
-            {{
-              Array.isArray(item.danh_sach_ghe)
-                ? item.danh_sach_ghe.join(", ")
-                : item.danh_sach_ghe
-            }}
+            {{ seatText(item) }}
           </div>
         </template>
 
