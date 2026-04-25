@@ -210,11 +210,11 @@ onBeforeUnmount(() => {
                 </RouterLink>
                 <RouterLink
                   @click="isProfileMenuOpen = false"
-                  to="/lich-su-dat-ve"
+                  to="/profile?tab=tickets"
                   class="client-header__dropdown-item"
                 >
                   <span class="material-symbols-outlined">history</span>
-                  Lịch sử đặt vé
+                  Vé của tôi
                 </RouterLink>
                 <div class="client-header__dropdown-divider"></div>
                 <button
@@ -304,12 +304,12 @@ onBeforeUnmount(() => {
             Thông tin cá nhân
           </RouterLink>
           <RouterLink
-            to="/lich-su-dat-ve"
+            to="/profile?tab=tickets"
             class="client-header__mobile-link"
             @click="isMobileMenuOpen = false"
           >
             <span class="material-symbols-outlined">history</span>
-            Lịch sử đặt vé
+            Vé của tôi
           </RouterLink>
           <button
             @click="handleLogout"

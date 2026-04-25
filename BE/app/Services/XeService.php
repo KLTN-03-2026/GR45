@@ -749,7 +749,7 @@ class XeService
         return Ghe::query()->where('id_xe', $vehicleId)->delete();
     }
 
-    private function autoGenerateSeatsForVehicle(int $vehicleId, LoaiXe $loaiXe): void
+    public function autoGenerateSeatsForVehicle(int $vehicleId, LoaiXe $loaiXe): void
     {
         if (Ghe::query()->where('id_xe', $vehicleId)->exists()) {
             return;

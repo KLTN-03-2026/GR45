@@ -1,188 +1,234 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import clientApi from '@/api/clientApi'
-import ClientHeader from '@/components/layout/ClientHeader.vue'
-import ClientFooter from '@/components/layout/ClientFooter.vue'
+import {
+  computed,
+  onMounted,
+  onUnmounted,
+  reactive,
+  ref,
+  watch,
+  provide,
+} from "vue";
+// provide tái sử dụng cho component con
+import { useRoute, useRouter } from "vue-router";
+import clientApi from "@/api/clientApi";
+import ClientHeader from "@/components/layout/ClientHeader.vue";
+import ClientFooter from "@/components/layout/ClientFooter.vue";
 
-const router = useRouter()
-const route = useRoute()
-const pendingRatings = ref([])
-const showRatingPopup = ref(false)
-const showDetailedRatingModal = ref(false)
-const loadingPendingRatings = ref(false)
-const submitting = ref(false)
-const hoverRating = ref(0)
-const dismissedTripId = ref(null)
-const pollingId = ref(null)
+const router = useRouter();
+const route = useRoute();
+const pendingRatings = ref([]);
+const showRatingPopup = ref(false);
+const showDetailedRatingModal = ref(false);
+const loadingPendingRatings = ref(false);
+const submitting = ref(false);
+const hoverRating = ref(0);
+const dismissedTripId = ref(null);
+const pollingId = ref(null);
 
 const draft = reactive({
   diem_so: 5,
-  noi_dung: '',
-})
+  noi_dung: "",
+});
+
 const detailedDraft = reactive({
   diem_so: 5,
   diem_dich_vu: 5,
   diem_an_toan: 5,
   diem_sach_se: 5,
   diem_thai_do: 5,
-  noi_dung: '',
-})
-const selectedTrip = ref(null)
+  noi_dung: "",
+});
+const selectedTrip = ref(null);
 
-const popupTrip = computed(() => (pendingRatings.value.length > 0 ? pendingRatings.value[0] : null))
+const popupTrip = computed(() =>
+  pendingRatings.value.length > 0 ? pendingRatings.value[0] : null,
+);
 
 const isClientLoggedIn = () => {
-  const token = localStorage.getItem('auth.client.token')
-  if (!token) return false
-  localStorage.setItem('auth.active_role', 'client')
-  return true
-}
+  const token = localStorage.getItem("auth.client.token");
+  if (!token) return false;
+  localStorage.setItem("auth.active_role", "client");
+  return true;
+};
 
 const getRatingText = (stars) => {
-  const texts = { 1: 'Rất tệ', 2: 'Tệ', 3: 'Bình thường', 4: 'Tốt', 5: 'Rất tốt' }
-  return texts[stars] || ''
-}
+  const texts = {
+    1: "Rất tệ",
+    2: "Tệ",
+    3: "Bình thường",
+    4: "Tốt",
+    5: "Rất tốt",
+  };
+  return texts[stars] || "";
+};
 
 const maVeDisplay = (trip) => {
-  const list = trip?.ma_ve_list
-  if (!Array.isArray(list) || !list.length) return null
-  if (list.length === 1) return String(list[0])
-  if (list.length === 2) return `${list[0]}, ${list[1]}`
-  return `${list[0]}, ${list[1]} +${list.length - 2}`
-}
+  const list = trip?.ma_ve_list;
+  if (!Array.isArray(list) || !list.length) return null;
+  if (list.length === 1) return String(list[0]);
+  if (list.length === 2) return `${list[0]}, ${list[1]}`;
+  return `${list[0]}, ${list[1]} +${list.length - 2}`;
+};
 
 const fetchPendingRatings = async (options = {}) => {
-  const forcePopupOnRouteChange = Boolean(options.forcePopupOnRouteChange)
-  if (!isClientLoggedIn()) return
+  const forcePopupOnRouteChange = Boolean(options.forcePopupOnRouteChange);
+  if (!isClientLoggedIn() || loadingPendingRatings.value) return;
 
-  loadingPendingRatings.value = true
+  loadingPendingRatings.value = true;
   try {
-    const res = await clientApi.getPendingRatings()
-    pendingRatings.value = Array.isArray(res?.data) ? res.data : []
+    const res = await clientApi.getPendingRatings();
+    pendingRatings.value = Array.isArray(res?.data) ? res.data : [];
 
-    const tripId = popupTrip.value?.trip_id
-    if (tripId && (forcePopupOnRouteChange || tripId !== dismissedTripId.value)) {
-      showRatingPopup.value = true
+    const tripId = popupTrip.value?.trip_id;
+    if (
+      tripId &&
+      (forcePopupOnRouteChange || tripId !== dismissedTripId.value)
+    ) {
+      showRatingPopup.value = true;
     } else if (!tripId) {
-      showRatingPopup.value = false
+      showRatingPopup.value = false;
     }
   } catch {
-    pendingRatings.value = []
+    pendingRatings.value = [];
   } finally {
-    loadingPendingRatings.value = false
+    loadingPendingRatings.value = false;
   }
-}
+};
 
 const submitQuickRating = async () => {
-  if (!popupTrip.value || submitting.value) return
+  if (!popupTrip.value || submitting.value) return;
 
-  submitting.value = true
+  submitting.value = true;
   try {
     await clientApi.submitRating({
       trip_id: popupTrip.value.trip_id,
       ma_ve_list: popupTrip.value.ma_ve_list || [],
       diem_so: Number(draft.diem_so) || 5,
-      noi_dung: draft.noi_dung || '',
-    })
+      noi_dung: draft.noi_dung || "",
+    });
 
-    dismissedTripId.value = popupTrip.value.trip_id
-    showRatingPopup.value = false
-    draft.diem_so = 5
-    draft.noi_dung = ''
-    await fetchPendingRatings()
+    dismissedTripId.value = popupTrip.value.trip_id;
+    showRatingPopup.value = false;
+    draft.diem_so = 5;
+    draft.noi_dung = "";
+    await fetchPendingRatings();
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
-}
+};
 
 const submitDetailedRating = async () => {
-  if (!selectedTrip.value || submitting.value) return
+  if (!selectedTrip.value || submitting.value) return;
 
-  submitting.value = true
+  submitting.value = true;
   try {
     await clientApi.submitRating({
       trip_id: selectedTrip.value.trip_id,
       ma_ve_list: selectedTrip.value.ma_ve_list || [],
       diem_so: Number(detailedDraft.diem_so) || 5,
-      diem_dich_vu: Number(detailedDraft.diem_dich_vu) || Number(detailedDraft.diem_so) || 5,
-      diem_an_toan: Number(detailedDraft.diem_an_toan) || Number(detailedDraft.diem_so) || 5,
-      diem_sach_se: Number(detailedDraft.diem_sach_se) || Number(detailedDraft.diem_so) || 5,
-      diem_thai_do: Number(detailedDraft.diem_thai_do) || Number(detailedDraft.diem_so) || 5,
-      noi_dung: detailedDraft.noi_dung || '',
-    })
+      diem_dich_vu:
+        Number(detailedDraft.diem_dich_vu) ||
+        Number(detailedDraft.diem_so) ||
+        5,
+      diem_an_toan:
+        Number(detailedDraft.diem_an_toan) ||
+        Number(detailedDraft.diem_so) ||
+        5,
+      diem_sach_se:
+        Number(detailedDraft.diem_sach_se) ||
+        Number(detailedDraft.diem_so) ||
+        5,
+      diem_thai_do:
+        Number(detailedDraft.diem_thai_do) ||
+        Number(detailedDraft.diem_so) ||
+        5,
+      noi_dung: detailedDraft.noi_dung || "",
+    });
 
-    dismissedTripId.value = selectedTrip.value.trip_id
-    showDetailedRatingModal.value = false
-    selectedTrip.value = null
-    await fetchPendingRatings()
+    dismissedTripId.value = selectedTrip.value.trip_id;
+    showDetailedRatingModal.value = false;
+    selectedTrip.value = null;
+    await fetchPendingRatings();
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
-}
+};
 
 const handleClosePopup = () => {
   if (popupTrip.value?.trip_id) {
-    dismissedTripId.value = popupTrip.value.trip_id
+    dismissedTripId.value = popupTrip.value.trip_id;
   }
-  showRatingPopup.value = false
-}
+  showRatingPopup.value = false;
+};
 
 const goToDetailedRating = () => {
-  if (!popupTrip.value) return
-  selectedTrip.value = { ...popupTrip.value }
-  detailedDraft.diem_so = Number(draft.diem_so) || 5
-  detailedDraft.diem_dich_vu = Number(draft.diem_so) || 5
-  detailedDraft.diem_an_toan = Number(draft.diem_so) || 5
-  detailedDraft.diem_sach_se = Number(draft.diem_so) || 5
-  detailedDraft.diem_thai_do = Number(draft.diem_so) || 5
-  detailedDraft.noi_dung = draft.noi_dung || ''
-  showRatingPopup.value = false
-  showDetailedRatingModal.value = true
-}
+  if (!popupTrip.value) return;
+  openDetailedRatingFromChild(popupTrip.value);
+};
+
+const openDetailedRatingFromChild = (tripData) => {
+  selectedTrip.value = { ...tripData };
+  detailedDraft.diem_so = Number(draft.diem_so) || 5;
+  detailedDraft.diem_dich_vu = Number(draft.diem_so) || 5;
+  detailedDraft.diem_an_toan = Number(draft.diem_so) || 5;
+  detailedDraft.diem_sach_se = Number(draft.diem_so) || 5;
+  detailedDraft.diem_thai_do = Number(draft.diem_so) || 5;
+  detailedDraft.noi_dung = draft.noi_dung || "";
+  showRatingPopup.value = false;
+  showDetailedRatingModal.value = true;
+};
+
+provide("openDetailedRating", openDetailedRatingFromChild);
 
 const anyRatingModalOpen = computed(
   () => showRatingPopup.value || showDetailedRatingModal.value,
-)
+);
 
 const onPendingModalKeydown = (e) => {
-  if (e.key !== 'Escape') return
+  if (e.key !== "Escape") return;
   if (showDetailedRatingModal.value) {
-    showDetailedRatingModal.value = false
-    return
+    showDetailedRatingModal.value = false;
+    return;
   }
   if (showRatingPopup.value) {
-    handleClosePopup()
+    handleClosePopup();
   }
-}
+};
 
 watch(anyRatingModalOpen, (open) => {
-  document.body.style.overflow = open ? 'hidden' : ''
-  if (open) document.addEventListener('keydown', onPendingModalKeydown)
-  else document.removeEventListener('keydown', onPendingModalKeydown)
-})
+  document.body.style.overflow = open ? "hidden" : "";
+  if (open) document.addEventListener("keydown", onPendingModalKeydown);
+  else document.removeEventListener("keydown", onPendingModalKeydown);
+});
 
 watch(
-  () => route.fullPath,
-  () => {
-    if (showDetailedRatingModal.value) return
-    fetchPendingRatings({ forcePopupOnRouteChange: true })
+  // () => route.fullPath,
+  // () => {
+  //   if (showDetailedRatingModal.value) return;
+  //   fetchPendingRatings({ forcePopupOnRouteChange: true });
+  // },
+  () => route.path,
+  (newPath) => {
+    if (newPath === "/profile" || newPath === "/lich-su-dat-ve") {
+      if (showDetailedRatingModal.value) return;
+      fetchPendingRatings({ forcePopupOnRouteChange: true });
+    }
   },
-)
+);
 
 onMounted(() => {
-  fetchPendingRatings()
-  pollingId.value = window.setInterval(fetchPendingRatings, 15000)
-})
+  fetchPendingRatings();
+  // pollingId.value = window.setInterval(fetchPendingRatings, 15000);
+});
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', onPendingModalKeydown)
-  document.body.style.overflow = ''
+  document.removeEventListener("keydown", onPendingModalKeydown);
+  document.body.style.overflow = "";
   if (pollingId.value) {
-    clearInterval(pollingId.value)
-    pollingId.value = null
+    clearInterval(pollingId.value);
+    pollingId.value = null;
   }
-})
+});
 </script>
 
 <template>
@@ -208,9 +254,22 @@ onUnmounted(() => {
             aria-labelledby="pending-rating-quick-title"
           >
             <div class="trip-rating-detail-header">
-              <h3 id="pending-rating-quick-title">Đánh giá chuyến đi của bạn</h3>
-              <button type="button" class="trip-rating-detail-close" aria-label="Đóng" @click="handleClosePopup">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <h3 id="pending-rating-quick-title">
+                Đánh giá chuyến đi của bạn
+              </h3>
+              <button
+                type="button"
+                class="trip-rating-detail-close"
+                aria-label="Đóng"
+                @click="handleClosePopup"
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <path
                     d="M18 6L6 18M6 6L18 18"
                     stroke="currentColor"
@@ -222,10 +281,16 @@ onUnmounted(() => {
               </button>
             </div>
             <div class="trip-rating-detail-body">
-              <div v-if="loadingPendingRatings" class="trip-rating-detail-loading">Đang tải...</div>
+              <div
+                v-if="loadingPendingRatings"
+                class="trip-rating-detail-loading"
+              >
+                Đang tải...
+              </div>
               <template v-else-if="popupTrip">
                 <p class="trip-rating-detail-hint">
-                  Bạn có một chuyến đi đã hoàn thành nhưng chưa được đánh giá. Hãy chia sẻ trải nghiệm của bạn!
+                  Bạn có một chuyến đi đã hoàn thành nhưng chưa được đánh giá.
+                  Hãy chia sẻ trải nghiệm của bạn!
                 </p>
 
                 <div class="trip-rating-detail-trip">
@@ -234,26 +299,48 @@ onUnmounted(() => {
                     {{ popupTrip.diem_bat_dau }} → {{ popupTrip.diem_ket_thuc }}
                   </div>
                   <div class="trip-rating-detail-trip-meta">
-                    <span v-if="popupTrip.ten_tuyen_duong">{{ popupTrip.ten_tuyen_duong }}</span>
+                    <span v-if="popupTrip.ten_tuyen_duong">{{
+                      popupTrip.ten_tuyen_duong
+                    }}</span>
                     <span v-else>Chuyến #{{ popupTrip.trip_id }}</span>
-                    <span v-if="popupTrip.ten_nha_xe"> · {{ popupTrip.ten_nha_xe }}</span>
+                    <span v-if="popupTrip.ten_nha_xe">
+                      · {{ popupTrip.ten_nha_xe }}</span
+                    >
                   </div>
                   <div class="trip-rating-detail-trip-meta">
                     <span>Ngày: {{ popupTrip.ngay_khoi_hanh }}</span>
                     <span> · Giờ: {{ popupTrip.gio_khoi_hanh }}</span>
-                    <span v-if="popupTrip.bien_so"> · BKS: {{ popupTrip.bien_so }}</span>
+                    <span v-if="popupTrip.bien_so">
+                      · BKS: {{ popupTrip.bien_so }}</span
+                    >
                   </div>
                   <div
-                    v-if="popupTrip.ten_xe || popupTrip.quang_duong != null || popupTrip.trang_thai_chuyen"
+                    v-if="
+                      popupTrip.ten_xe ||
+                      popupTrip.quang_duong != null ||
+                      popupTrip.trang_thai_chuyen
+                    "
                     class="trip-rating-detail-trip-meta"
                   >
-                    <span v-if="popupTrip.ten_xe">Xe: {{ popupTrip.ten_xe }}</span>
-                    <span v-if="popupTrip.quang_duong != null && popupTrip.quang_duong !== ''">
-                      <template v-if="popupTrip.ten_xe"> · </template>{{ popupTrip.quang_duong }} km
+                    <span v-if="popupTrip.ten_xe"
+                      >Xe: {{ popupTrip.ten_xe }}</span
+                    >
+                    <span
+                      v-if="
+                        popupTrip.quang_duong != null &&
+                        popupTrip.quang_duong !== ''
+                      "
+                    >
+                      <template v-if="popupTrip.ten_xe"> · </template
+                      >{{ popupTrip.quang_duong }} km
                     </span>
                     <span v-if="popupTrip.trang_thai_chuyen">
                       <template
-                        v-if="popupTrip.ten_xe || (popupTrip.quang_duong != null && popupTrip.quang_duong !== '')"
+                        v-if="
+                          popupTrip.ten_xe ||
+                          (popupTrip.quang_duong != null &&
+                            popupTrip.quang_duong !== '')
+                        "
                       >
                         ·
                       </template>
@@ -264,7 +351,9 @@ onUnmounted(() => {
                     <span>{{ popupTrip.ticket_count }} vé</span>
                     <span v-if="maVeDisplay(popupTrip)">
                       · Mã vé:
-                      <strong class="trip-rating-detail-mono">{{ maVeDisplay(popupTrip) }}</strong>
+                      <strong class="trip-rating-detail-mono">{{
+                        maVeDisplay(popupTrip)
+                      }}</strong>
                     </span>
                     <span> · ID chuyến: #{{ popupTrip.trip_id }}</span>
                   </div>
@@ -272,13 +361,18 @@ onUnmounted(() => {
 
                 <div class="pending-rating-field">
                   <label class="pending-rating-label">Đánh giá nhanh *</label>
-                  <div class="trip-rating-detail-stars-row pending-rating-stars">
+                  <div
+                    class="trip-rating-detail-stars-row pending-rating-stars"
+                  >
                     <button
                       v-for="star in 5"
                       :key="`layout-star-${star}`"
                       type="button"
                       class="trip-rating-detail-star pending-rating-star-btn"
-                      :class="{ 'trip-rating-detail-star--on': (hoverRating || draft.diem_so) >= star }"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          (hoverRating || draft.diem_so) >= star,
+                      }"
                       @click="draft.diem_so = star"
                       @mouseenter="hoverRating = star"
                       @mouseleave="hoverRating = 0"
@@ -286,11 +380,15 @@ onUnmounted(() => {
                       ★
                     </button>
                   </div>
-                  <div class="pending-rating-caption">{{ getRatingText(draft.diem_so) }}</div>
+                  <div class="pending-rating-caption">
+                    {{ getRatingText(draft.diem_so) }}
+                  </div>
                 </div>
 
                 <div class="pending-rating-field">
-                  <label class="pending-rating-label">Nhận xét (tùy chọn)</label>
+                  <label class="pending-rating-label"
+                    >Nhận xét (tùy chọn)</label
+                  >
                   <textarea
                     v-model="draft.noi_dung"
                     rows="3"
@@ -301,11 +399,22 @@ onUnmounted(() => {
                 </div>
               </template>
             </div>
-            <div v-if="popupTrip && !loadingPendingRatings" class="trip-rating-detail-footer">
-              <button type="button" class="trip-rating-detail-btn trip-rating-detail-btn--ghost" @click="handleClosePopup">
+            <div
+              v-if="popupTrip && !loadingPendingRatings"
+              class="trip-rating-detail-footer"
+            >
+              <button
+                type="button"
+                class="trip-rating-detail-btn trip-rating-detail-btn--ghost"
+                @click="handleClosePopup"
+              >
                 Để sau
               </button>
-              <button type="button" class="trip-rating-detail-btn trip-rating-detail-btn--secondary" @click="goToDetailedRating">
+              <button
+                type="button"
+                class="trip-rating-detail-btn trip-rating-detail-btn--secondary"
+                @click="goToDetailedRating"
+              >
                 Đánh giá chi tiết
               </button>
               <button
@@ -314,7 +423,7 @@ onUnmounted(() => {
                 :disabled="submitting || !popupTrip"
                 @click="submitQuickRating"
               >
-                {{ submitting ? 'Đang gửi...' : 'Gửi đánh giá' }}
+                {{ submitting ? "Đang gửi..." : "Gửi đánh giá" }}
               </button>
             </div>
           </div>
@@ -337,14 +446,22 @@ onUnmounted(() => {
             aria-labelledby="pending-rating-detail-title"
           >
             <div class="trip-rating-detail-header">
-              <h3 id="pending-rating-detail-title">Đánh giá chi tiết chuyến đi</h3>
+              <h3 id="pending-rating-detail-title">
+                Đánh giá chi tiết chuyến đi
+              </h3>
               <button
                 type="button"
                 class="trip-rating-detail-close"
                 aria-label="Đóng"
                 @click="showDetailedRatingModal = false"
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
                   <path
                     d="M18 6L6 18M6 6L18 18"
                     stroke="currentColor"
@@ -359,31 +476,51 @@ onUnmounted(() => {
               <div class="trip-rating-detail-trip">
                 <div class="trip-rating-detail-trip-title">Chuyến xe</div>
                 <div class="trip-rating-detail-trip-route">
-                  {{ selectedTrip.diem_bat_dau }} → {{ selectedTrip.diem_ket_thuc }}
+                  {{ selectedTrip.diem_bat_dau }} →
+                  {{ selectedTrip.diem_ket_thuc }}
                 </div>
                 <div class="trip-rating-detail-trip-meta">
-                  <span v-if="selectedTrip.ten_tuyen_duong">{{ selectedTrip.ten_tuyen_duong }}</span>
+                  <span v-if="selectedTrip.ten_tuyen_duong">{{
+                    selectedTrip.ten_tuyen_duong
+                  }}</span>
                   <span v-else>Chuyến #{{ selectedTrip.trip_id }}</span>
-                  <span v-if="selectedTrip.ten_nha_xe"> · {{ selectedTrip.ten_nha_xe }}</span>
+                  <span v-if="selectedTrip.ten_nha_xe">
+                    · {{ selectedTrip.ten_nha_xe }}</span
+                  >
                 </div>
                 <div class="trip-rating-detail-trip-meta">
                   <span>Ngày: {{ selectedTrip.ngay_khoi_hanh }}</span>
                   <span> · Giờ: {{ selectedTrip.gio_khoi_hanh }}</span>
-                  <span v-if="selectedTrip.bien_so"> · BKS: {{ selectedTrip.bien_so }}</span>
+                  <span v-if="selectedTrip.bien_so">
+                    · BKS: {{ selectedTrip.bien_so }}</span
+                  >
                 </div>
                 <div
-                  v-if="selectedTrip.ten_xe || selectedTrip.quang_duong != null || selectedTrip.trang_thai_chuyen"
+                  v-if="
+                    selectedTrip.ten_xe ||
+                    selectedTrip.quang_duong != null ||
+                    selectedTrip.trang_thai_chuyen
+                  "
                   class="trip-rating-detail-trip-meta"
                 >
-                  <span v-if="selectedTrip.ten_xe">Xe: {{ selectedTrip.ten_xe }}</span>
-                  <span v-if="selectedTrip.quang_duong != null && selectedTrip.quang_duong !== ''">
-                    <template v-if="selectedTrip.ten_xe"> · </template>{{ selectedTrip.quang_duong }} km
+                  <span v-if="selectedTrip.ten_xe"
+                    >Xe: {{ selectedTrip.ten_xe }}</span
+                  >
+                  <span
+                    v-if="
+                      selectedTrip.quang_duong != null &&
+                      selectedTrip.quang_duong !== ''
+                    "
+                  >
+                    <template v-if="selectedTrip.ten_xe"> · </template
+                    >{{ selectedTrip.quang_duong }} km
                   </span>
                   <span v-if="selectedTrip.trang_thai_chuyen">
                     <template
                       v-if="
                         selectedTrip.ten_xe ||
-                        (selectedTrip.quang_duong != null && selectedTrip.quang_duong !== '')
+                        (selectedTrip.quang_duong != null &&
+                          selectedTrip.quang_duong !== '')
                       "
                     >
                       ·
@@ -395,43 +532,88 @@ onUnmounted(() => {
                   <span>{{ selectedTrip.ticket_count }} vé</span>
                   <span v-if="maVeDisplay(selectedTrip)">
                     · Mã vé:
-                    <strong class="trip-rating-detail-mono">{{ maVeDisplay(selectedTrip) }}</strong>
+                    <strong class="trip-rating-detail-mono">{{
+                      maVeDisplay(selectedTrip)
+                    }}</strong>
                   </span>
                   <span> · ID chuyến: #{{ selectedTrip.trip_id }}</span>
                 </div>
               </div>
 
               <div class="pending-rating-grid">
-                <label class="rating-label">Đánh giá tổng thể
+                <label class="rating-label"
+                  >Đánh giá tổng thể
                   <select v-model="detailedDraft.diem_so" class="rating-select">
-                    <option :value="5">5 sao</option><option :value="4">4 sao</option><option :value="3">3 sao</option><option :value="2">2 sao</option><option :value="1">1 sao</option>
+                    <option :value="5">5 sao</option>
+                    <option :value="4">4 sao</option>
+                    <option :value="3">3 sao</option>
+                    <option :value="2">2 sao</option>
+                    <option :value="1">1 sao</option>
                   </select>
                 </label>
-                <label class="rating-label">Chất lượng dịch vụ
-                  <select v-model="detailedDraft.diem_dich_vu" class="rating-select">
-                    <option :value="5">5 sao</option><option :value="4">4 sao</option><option :value="3">3 sao</option><option :value="2">2 sao</option><option :value="1">1 sao</option>
+                <label class="rating-label"
+                  >Chất lượng dịch vụ
+                  <select
+                    v-model="detailedDraft.diem_dich_vu"
+                    class="rating-select"
+                  >
+                    <option :value="5">5 sao</option>
+                    <option :value="4">4 sao</option>
+                    <option :value="3">3 sao</option>
+                    <option :value="2">2 sao</option>
+                    <option :value="1">1 sao</option>
                   </select>
                 </label>
-                <label class="rating-label">Độ an toàn
-                  <select v-model="detailedDraft.diem_an_toan" class="rating-select">
-                    <option :value="5">5 sao</option><option :value="4">4 sao</option><option :value="3">3 sao</option><option :value="2">2 sao</option><option :value="1">1 sao</option>
+                <label class="rating-label"
+                  >Độ an toàn
+                  <select
+                    v-model="detailedDraft.diem_an_toan"
+                    class="rating-select"
+                  >
+                    <option :value="5">5 sao</option>
+                    <option :value="4">4 sao</option>
+                    <option :value="3">3 sao</option>
+                    <option :value="2">2 sao</option>
+                    <option :value="1">1 sao</option>
                   </select>
                 </label>
-                <label class="rating-label">Độ sạch sẽ
-                  <select v-model="detailedDraft.diem_sach_se" class="rating-select">
-                    <option :value="5">5 sao</option><option :value="4">4 sao</option><option :value="3">3 sao</option><option :value="2">2 sao</option><option :value="1">1 sao</option>
+                <label class="rating-label"
+                  >Độ sạch sẽ
+                  <select
+                    v-model="detailedDraft.diem_sach_se"
+                    class="rating-select"
+                  >
+                    <option :value="5">5 sao</option>
+                    <option :value="4">4 sao</option>
+                    <option :value="3">3 sao</option>
+                    <option :value="2">2 sao</option>
+                    <option :value="1">1 sao</option>
                   </select>
                 </label>
               </div>
 
-              <label class="rating-label">Thái độ phục vụ
-                <select v-model="detailedDraft.diem_thai_do" class="rating-select">
-                  <option :value="5">5 sao</option><option :value="4">4 sao</option><option :value="3">3 sao</option><option :value="2">2 sao</option><option :value="1">1 sao</option>
+              <label class="rating-label"
+                >Thái độ phục vụ
+                <select
+                  v-model="detailedDraft.diem_thai_do"
+                  class="rating-select"
+                >
+                  <option :value="5">5 sao</option>
+                  <option :value="4">4 sao</option>
+                  <option :value="3">3 sao</option>
+                  <option :value="2">2 sao</option>
+                  <option :value="1">1 sao</option>
                 </select>
               </label>
 
-              <label class="pending-rating-label pending-rating-label--block">Nhận xét
-                <textarea v-model="detailedDraft.noi_dung" rows="3" class="trip-rating-detail-textarea" maxlength="500" />
+              <label class="pending-rating-label pending-rating-label--block"
+                >Nhận xét
+                <textarea
+                  v-model="detailedDraft.noi_dung"
+                  rows="3"
+                  class="trip-rating-detail-textarea"
+                  maxlength="500"
+                />
               </label>
             </div>
             <div class="trip-rating-detail-footer">
@@ -448,7 +630,7 @@ onUnmounted(() => {
                 :disabled="submitting || !selectedTrip"
                 @click="submitDetailedRating"
               >
-                {{ submitting ? 'Đang gửi...' : 'Gửi đánh giá' }}
+                {{ submitting ? "Đang gửi..." : "Gửi đánh giá" }}
               </button>
             </div>
           </div>
