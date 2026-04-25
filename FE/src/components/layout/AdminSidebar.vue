@@ -112,7 +112,6 @@ const menuList = [
     name: 'Đánh giá chuyến xe',
     path: '/admin/danh-gia',
     icon: Star,
-    permissionHints: ['danh-gia', 'rating'],
   },
   
   // Dropdown quản lý user
