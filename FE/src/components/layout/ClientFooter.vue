@@ -8,7 +8,7 @@
         <!-- Brand & About -->
         <div class="space-y-4">
           <div class="text-2xl font-extrabold tracking-tight text-blue-900">
-            VigilantFleet
+            BusSafe
           </div>
           <p class="text-sm text-gray-600 leading-relaxed">
             Hệ thống đặt vé xe trực tuyến hàng đầu, mang đến trải nghiệm hành trình an toàn, tiện lợi và đáng tin cậy.
@@ -62,7 +62,7 @@
             </li>
             <li class="flex items-center gap-3">
               <span class="material-symbols-outlined text-gray-400 text-[20px]">mail</span>
-              <a href="mailto:hotro@vigilantfleet.vn" class="hover:text-blue-600 transition-colors">hotro@vigilantfleet.vn</a>
+              <a href="mailto:hotro@bussafe.vn" class="hover:text-blue-600 transition-colors">hotro@bussafe.vn</a>
             </li>
           </ul>
         </div>
@@ -70,7 +70,7 @@
 
       <div class="mt-12 pt-8 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <p class="text-sm text-gray-500">
-          © 2024 VigilantFleet. Bản quyền thuộc về Công ty TNHH Vigilant.
+          © 2024 BusSafe. Bản quyền thuộc về Công ty TNHH BusSafe.
         </p>
         <div class="flex items-center gap-4">
           <span class="text-sm text-gray-500">Thanh toán an toàn qua</span>

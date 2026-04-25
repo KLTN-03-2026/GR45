@@ -2,7 +2,7 @@
 import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useClientStore } from "@/stores/clientStore.js";
-import clientApi from "@/api/clientApi.js";
+import authApi from "@/api/authApi.js";
 
 const router = useRouter();
 const route = useRoute();
@@ -108,7 +108,7 @@ onBeforeUnmount(() => {
         <span class="client-header__logo-icon material-symbols-outlined"
           >directions_bus</span
         >
-        <span class="client-header__logo-text">Vigilant Fleet</span>
+        <span class="client-header__logo-text">BusSafe</span>
       </div>
 
       <!-- Menu desktop -->
@@ -406,8 +406,8 @@ onBeforeUnmount(() => {
   gap: 0.35rem;
   padding: 0.5rem 0.85rem;
   border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: #475569;
   text-decoration: none;
   transition: all 0.25s ease;
@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
 }
 
 .client-header__nav-icon {
-  font-size: 18px;
+  font-size: 20px;
   opacity: 0.7;
 }
 
@@ -458,12 +458,13 @@ onBeforeUnmount(() => {
 /* ─── Nút Đăng nhập / Đăng ký ─────────────────────────── */
 .client-header__btn-login {
   display: none;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 2rem;
   border: none;
   background: none;
   color: #1e40af;
-  font-weight: 700;
-  font-size: 0.875rem;
+  font-weight: 800;
+  font-size: 1.1rem;
+  min-width: 130px;
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -482,12 +483,13 @@ onBeforeUnmount(() => {
 
 .client-header__btn-register {
   display: none;
-  padding: 0.55rem 1.25rem;
-  border: none;
+  padding: 0.65rem 2.25rem;
   background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   color: #fff;
-  font-weight: 700;
-  font-size: 0.875rem;
+  border: none;
+  font-weight: 800;
+  font-size: 1.1rem;
+  min-width: 140px;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.25s ease;
@@ -750,7 +752,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 0.85rem;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #475569;
   text-decoration: none;
