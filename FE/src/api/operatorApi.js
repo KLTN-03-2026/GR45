@@ -7,26 +7,34 @@ const operatorApi = {
 
   // --- THỐNG KÊ NHÀ XE ---
   getStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke', { params }),
-  getStatisticsTickets: (params) => axiosClient.get('/v1/nha-xe/thong-ke/ves', { params }),
-  exportStatisticsExcel: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export/excel', { params, responseType: 'blob' }),
-  exportStatisticsPdf: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export/pdf', { params, responseType: 'blob' }),
+  getStatisticsByRoute: (params) => axiosClient.get('/v1/nha-xe/thong-ke/theo-tuyen', { params }),
+  getStatisticsTicketStatus: (params) => axiosClient.get('/v1/nha-xe/thong-ke/trang-thai-ve', { params }),
+  getStatisticsTickets: (params) => axiosClient.get('/v1/nha-xe/ve', { params }),
+  exportStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params, responseType: 'blob' }),
+  exportStatisticsExcel: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params: { ...params, loai: 'dashboard' }, responseType: 'blob' }),
+  exportStatisticsPdf: (params) => axiosClient.get('/v1/nha-xe/thong-ke/export', { params: { ...params, loai: 'dashboard' }, responseType: 'blob' }),
 
   // --- XE / PHƯƠNG TIỆN ---
   getVehicles: (params) => axiosClient.get('/v1/nha-xe/xe', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}`),
   createVehicle: (data) => axiosClient.post('/v1/nha-xe/xe', data),
   updateVehicle: (id, data) => axiosClient.put(`/v1/nha-xe/xe/${id}`, data),
+  deleteVehicle: (id) => axiosClient.delete(`/v1/nha-xe/xe/${id}`),
   updateVehicleDocument: (id, formData) => axiosClient.post(`/v1/nha-xe/xe/${id}/ho-so`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
 
   // Sơ đồ ghế xe
   getVehicleSeats: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}/ghe`),
+  createVehicleSeat: (id, data) => axiosClient.post(`/v1/nha-xe/xe/${id}/ghe`, data),
+  updateVehicleSeat: (id, gheId, data) => axiosClient.put(`/v1/nha-xe/xe/${id}/ghe/${gheId}`, data),
+  deleteVehicleSeat: (id, gheId) => axiosClient.delete(`/v1/nha-xe/xe/${id}/ghe/${gheId}`),
   updateSeatStatus: (id, gheId, data) => axiosClient.patch(`/v1/nha-xe/xe/${id}/ghe/${gheId}/trang-thai`, data),
 
   // Danh mục hỗ trợ
   getLoaiXe: () => axiosClient.get('/v1/nha-xe/loai-xe'),
   getLoaiGhe: () => axiosClient.get('/v1/nha-xe/loai-ghe'),
+  getSeatTypes: () => axiosClient.get('/v1/nha-xe/loai-ghe'),
 
   // --- TUYẾN ĐƯỜNG ---
   getRoutes: (params) => axiosClient.get('/v1/nha-xe/tuyen-duong', { params }),

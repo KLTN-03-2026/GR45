@@ -15,6 +15,21 @@ class UpdateTaiXeRequest extends FormRequest
     }
 
     /**
+     * Auto-inject ma_nha_xe from the authenticated NhaXe user
+     * so validation passes without the FE needing to send it.
+     */
+    protected function prepareForValidation(): void
+    {
+        $user = $this->user('sanctum');
+
+        if ($user instanceof \App\Models\NhaXe) {
+            $this->merge([
+                'ma_nha_xe' => $user->ma_nha_xe,
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -32,11 +47,9 @@ class UpdateTaiXeRequest extends FormRequest
             'tinh_trang' => 'nullable|string|in:hoat_dong,khoa,cho_duyet',
 
             // Files validate (khi update, file có thể không cần thiết phải gửi lại nếu đã có)
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'avatar'             => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'anh_cccd_mat_truoc' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-            'anh_cccd_mat_sau' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-            'anh_gplx' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-            'anh_gplx_mat_sau' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'anh_cccd_mat_sau'   => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
         ];
     }
 
@@ -53,7 +66,7 @@ class UpdateTaiXeRequest extends FormRequest
             'password.min' => 'Mật khẩu phải từ 6 ký tự trở lên.',
             'ma_nha_xe.required' => 'Mã nhà xe không được để trống.',
             'ma_nha_xe.exists' => 'Mã nhà xe không tồn tại.',
-            
+
             '*.image' => 'File tải lên phải là hình ảnh.',
             '*.mimes' => 'Hình ảnh phải có định dạng jpeg, png, jpg.',
             '*.max' => 'Hình ảnh không được vượt quá 5MB.',

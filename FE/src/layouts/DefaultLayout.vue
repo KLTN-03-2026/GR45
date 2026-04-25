@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import clientApi from '@/api/clientApi'
 import ClientHeader from '@/components/layout/ClientHeader.vue'
 import ClientFooter from '@/components/layout/ClientFooter.vue'
 
 const router = useRouter()
+const route = useRoute()
 const pendingRatings = ref([])
 const showRatingPopup = ref(false)
 const showDetailedRatingModal = ref(false)
@@ -51,7 +52,8 @@ const maVeDisplay = (trip) => {
   return `${list[0]}, ${list[1]} +${list.length - 2}`
 }
 
-const fetchPendingRatings = async () => {
+const fetchPendingRatings = async (options = {}) => {
+  const forcePopupOnRouteChange = Boolean(options.forcePopupOnRouteChange)
   if (!isClientLoggedIn()) return
 
   loadingPendingRatings.value = true
@@ -60,7 +62,7 @@ const fetchPendingRatings = async () => {
     pendingRatings.value = Array.isArray(res?.data) ? res.data : []
 
     const tripId = popupTrip.value?.trip_id
-    if (tripId && tripId !== dismissedTripId.value) {
+    if (tripId && (forcePopupOnRouteChange || tripId !== dismissedTripId.value)) {
       showRatingPopup.value = true
     } else if (!tripId) {
       showRatingPopup.value = false
@@ -159,6 +161,14 @@ watch(anyRatingModalOpen, (open) => {
   if (open) document.addEventListener('keydown', onPendingModalKeydown)
   else document.removeEventListener('keydown', onPendingModalKeydown)
 })
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (showDetailedRatingModal.value) return
+    fetchPendingRatings({ forcePopupOnRouteChange: true })
+  },
+)
 
 onMounted(() => {
   fetchPendingRatings()

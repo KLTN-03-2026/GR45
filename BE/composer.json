@@ -14,6 +14,7 @@
         "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0",
         "maatwebsite/excel": "^3.1",
+        "openspout/openspout": "^4.2",
         "pusher/pusher-php-server": "^7.2",
         "spatie/laravel-permission": "^6.25"
     },

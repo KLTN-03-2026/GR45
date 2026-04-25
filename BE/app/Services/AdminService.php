@@ -63,4 +63,9 @@ class AdminService
     {
         return $this->adminRepo->toggleStatus($id);
     }
+
+    public function doiMatKhau(\App\Models\Admin $admin, array $data): void
+    {
+        $this->adminRepo->doiMatKhau($admin, $data);
+    }
 }

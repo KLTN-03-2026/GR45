@@ -23,6 +23,10 @@ export const useClientStore = defineStore('client', () => {
   const loading = ref(false);
   const error   = ref(null);
   const isTokenVerified = ref(false);
+  
+  // Auth Modal global state
+  const isAuthModalOpen = ref(false);
+  const authMode = ref('login'); // 'login' or 'register'
 
   // ─── Getters ─────────────────────────────────────────────
   const isLoggedIn = computed(() => !!token.value);
@@ -61,6 +65,15 @@ export const useClientStore = defineStore('client', () => {
     }
   }
 
+  function openAuthModal(initialMode = 'login') {
+    authMode.value = initialMode;
+    isAuthModalOpen.value = true;
+  }
+
+  function closeAuthModal() {
+    isAuthModalOpen.value = false;
+  }
+
   // Đăng xuất Khách Hàng
   function logout() {
     token.value = null;
@@ -79,5 +92,9 @@ export const useClientStore = defineStore('client', () => {
     }
   }
 
-  return { token, user, loading, error, isTokenVerified, isLoggedIn, login, logout, updateUser };
+  return { 
+    token, user, loading, error, isTokenVerified, isLoggedIn, 
+    isAuthModalOpen, authMode,
+    login, logout, updateUser, openAuthModal, closeAuthModal 
+  };
 });

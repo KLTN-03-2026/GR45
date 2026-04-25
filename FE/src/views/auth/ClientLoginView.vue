@@ -25,11 +25,11 @@ const handleLogin = async () => {
       <div class="overlay-glass">
         <h1>Khám Phá Hành Trình Tuyệt Vời</h1>
         <p>Đặt vé nhanh chóng, thanh toán tiện lợi và trải nghiệm chuyến đi an toàn với hệ thống giám sát AI thông minh.</p>
-        <div class="features">
-          <span class="badge">🚌 Mạng lưới toàn quốc</span>
-          <span class="badge">🛡️ Trí tuệ nhân tạo AI</span>
-          <span class="badge">💳 Thanh toán 1 chạm</span>
-        </div>
+        <!-- <div class="features">
+          <span class="badge">Mạng lưới toàn quốc</span>
+          <span class="badge">Trí tuệ nhân tạo AI</span>
+          <span class="badge">Thanh toán 1 chạm</span>
+        </div> -->
       </div>
     </div>
     
@@ -49,7 +49,7 @@ const handleLogin = async () => {
             <label class="remember-me">
               <input type="checkbox" /> Ghi nhớ
             </label>
-            <a href="#" class="forgot-link">Quên mật khẩu?</a>
+            <router-link :to="{ name: 'forgot-password' }" class="forgot-link">Quên mật khẩu?</router-link>
           </div>
           
           <div v-if="clientStore.error" class="error-msg">{{ clientStore.error }}</div>
@@ -80,13 +80,6 @@ const handleLogin = async () => {
   background: url('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80') center/cover no-repeat;
   display: none;
   position: relative;
-}
-
-.illustration-side::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.85) 0%, rgba(30, 27, 75, 0.95) 100%);
 }
 
 @media (min-width: 900px) {
@@ -155,7 +148,7 @@ const handleLogin = async () => {
   display: none;
   font-size: 1.75rem;
   font-weight: 800;
-  color: #4f46e5;
+  color: #0066ff;
   margin-bottom: 2rem;
   text-align: center;
 }
@@ -197,8 +190,8 @@ const handleLogin = async () => {
 }
 .login-form :deep(.base-input:focus) {
   background: #ffffff;
-  border-color: #4f46e5 !important;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
+  border-color: #0066ff !important;
+  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.15) !important;
 }
 .login-form :deep(.base-input-label) {
   font-size: 0.95rem;
@@ -223,25 +216,25 @@ const handleLogin = async () => {
 }
 .forgot-link {
   font-size: 0.95rem;
-  color: #4f46e5;
+  color: #0066ff;
   font-weight: 600;
   text-decoration: none;
 }
 .forgot-link:hover { text-decoration: underline; }
 
 .client-btn {
-  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+  background: linear-gradient(135deg, #0066ff 0%, #0052cc 100%) !important;
   border: none !important;
   padding: 1.125rem;
   font-size: 1.1rem;
   border-radius: 14px;
   font-weight: 700;
-  box-shadow: 0 8px 15px -3px rgba(79, 70, 229, 0.3) !important;
+  box-shadow: 0 8px 15px -3px rgba(0, 102, 255, 0.3) !important;
 }
 .client-btn:hover {
-  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%) !important;
+  background: linear-gradient(135deg, #3385ff 0%, #0066ff 100%) !important;
   transform: translateY(-2px);
-  box-shadow: 0 12px 20px -3px rgba(79, 70, 229, 0.4) !important;
+  box-shadow: 0 12px 20px -3px rgba(0, 102, 255, 0.4) !important;
 }
 .client-btn:active {
   transform: scale(0.98);
@@ -254,7 +247,7 @@ const handleLogin = async () => {
   color: #64748b;
 }
 .register-prompt a {
-  color: #4f46e5;
+  color: #0066ff;
   font-weight: 700;
   text-decoration: none;
 }

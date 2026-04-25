@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\StoreAdminRequest;
 use App\Http\Requests\Admin\UpdateAdminRequest;
 use App\Http\Requests\Admin\LoginAdminRequest;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class AdminController extends Controller
 {
@@ -15,6 +16,20 @@ class AdminController extends Controller
     public function __construct(AdminService $adminService)
     {
         $this->adminService = $adminService;
+    }
+
+    public function index(Request $request)
+    {
+        try {
+            $filters = $request->only(['search', 'tinh_trang', 'id_chuc_vu', 'per_page']);
+            $admins = $this->adminService->getAll($filters);
+            return response()->json([
+                'success' => true,
+                'data' => $admins
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
     }
 
     public function login(LoginAdminRequest $request)
@@ -58,6 +73,23 @@ class AdminController extends Controller
         try {
             $admin = $this->adminService->me();
             return response()->json(['success' => true, 'data' => $admin]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    public function doiMatKhau(Request $request)
+    {
+        try {
+            $admin = auth('admin')->user();
+            if (!$admin instanceof \App\Models\Admin) {
+                return response()->json(['success' => false, 'message' => 'Không có quyền truy cập.'], 401);
+            }
+
+            $this->adminService->doiMatKhau($admin, $request->all());
+            return response()->json(['success' => true, 'message' => 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.']);
+        } catch (ValidationException $e) {
+            return response()->json(['success' => false, 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $e->errors()], 422);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }

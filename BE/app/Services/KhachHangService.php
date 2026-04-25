@@ -5,12 +5,17 @@ namespace App\Services;
 use App\Http\Resources\KhachHangResource;
 use App\Models\KhachHang;
 use App\Repositories\KhachHang\KhachHangRepositoryInterface;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class KhachHangService
 {
+    private const ACCOUNT_ACTIVATION_TABLE = 'kich_hoat_tai_khoan_tokens';
+
     public function __construct(
         protected KhachHangRepositoryInterface $repo
     ) {}
@@ -45,6 +50,12 @@ class KhachHangService
             ]);
         }
 
+        if ($khachHang->tinh_trang === 'chua_xac_nhan') {
+            throw ValidationException::withMessages([
+                'email' => 'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để kích hoạt tài khoản.',
+            ]);
+        }
+
         if ($khachHang->tinh_trang !== 'hoat_dong') {
             throw ValidationException::withMessages([
                 'email' => 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.',
@@ -70,19 +81,33 @@ class KhachHangService
      */
     public function register(array $data): array
     {
+        $data['ho_va_ten'] = trim((string) ($data['ho_va_ten'] ?? ''));
+        $email = trim((string) ($data['email'] ?? ''));
+        $data['email'] = $email !== '' ? strtolower($email) : null;
+        $data['so_dien_thoai'] = trim((string) ($data['so_dien_thoai'] ?? ''));
+
         $validator = Validator::make($data, [
             'ho_va_ten'     => 'required|string|max:100',
-            'email'         => 'required|email|unique:khach_hangs,email',
-            'password'      => 'required|string|min:6|confirmed',
-            'so_dien_thoai' => 'nullable|string|max:15',
+            'email'         => 'nullable|email|unique:khach_hangs,email',
+            'password'      => 'required|string|min:8|confirmed',
+            'so_dien_thoai' => [
+                'required',
+                'string',
+                'regex:/^(0|\\+84)[0-9]{9,10}$/',
+                'unique:khach_hangs,so_dien_thoai',
+            ],
             'dia_chi'       => 'nullable|string|max:255',
             'ngay_sinh'     => 'nullable|date',
         ], [
-            'ho_va_ten.required' => 'Ho va ten khong duoc de trong.',
-            'email.required'     => 'Email khong duoc de trong.',
-            'email.unique'       => 'Email da duoc su dung.',
-            'password.min'       => 'Mat khau phai co it nhat 6 ky tu.',
-            'password.confirmed' => 'Xac nhan mat khau khong khop.',
+            'ho_va_ten.required' => 'Họ và tên không được để trống.',
+            'email.email'        => 'Email không đúng định dạng.',
+            'email.unique'       => 'Email đã được sử dụng.',
+            'password.required'  => 'Mật khẩu không được để trống.',
+            'password.min'       => 'Mật khẩu phải có ít nhất 8 ký tự.',
+            'password.confirmed' => 'Xác nhận mật khẩu không khớp.',
+            'so_dien_thoai.required' => 'Số điện thoại không được để trống.',
+            'so_dien_thoai.regex'    => 'Số điện thoại không đúng định dạng.',
+            'so_dien_thoai.unique'   => 'Số điện thoại đã tồn tại, vui lòng đăng nhập hoặc dùng số khác.',
         ]);
 
         if ($validator->fails()) {
@@ -93,13 +118,18 @@ class KhachHangService
             'ho_va_ten'     => $data['ho_va_ten'],
             'email'         => $data['email'],
             'password'      => Hash::make($data['password']),
-            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
+            'so_dien_thoai' => $data['so_dien_thoai'],
             'dia_chi'       => $data['dia_chi'] ?? null,
             'ngay_sinh'     => $data['ngay_sinh'] ?? null,
-            'tinh_trang'    => 'hoat_dong',
+            'tinh_trang'    => $data['email'] ? 'chua_xac_nhan' : 'hoat_dong',
         ]);
 
-        $token = $khachHang->createToken('khach-hang-token')->plainTextToken;
+        $token = null;
+        if ($khachHang->tinh_trang === 'hoat_dong') {
+            $token = $khachHang->createToken('khach-hang-token')->plainTextToken;
+        } else {
+            $this->sendActivationEmail($khachHang);
+        }
 
         return [
             'khach_hang' => new KhachHangResource($khachHang),
@@ -227,6 +257,40 @@ class KhachHangService
         return $this->repo->search($keyword);
     }
 
+    public function kichHoatTaiKhoan(string $email, string $token): void
+    {
+        $normalizedEmail = strtolower(trim($email));
+        $token = trim($token);
+
+        $record = DB::table(self::ACCOUNT_ACTIVATION_TABLE)
+            ->where('email', $normalizedEmail)
+            ->where('token', $token)
+            ->whereNull('used_at')
+            ->first();
+
+        if (!$record || now()->gt($record->expired_at)) {
+            throw ValidationException::withMessages([
+                'token' => 'Liên kết kích hoạt không hợp lệ hoặc đã hết hạn.',
+            ]);
+        }
+
+        $khachHang = $this->repo->findByEmail($normalizedEmail);
+        if (!$khachHang) {
+            throw ValidationException::withMessages([
+                'email' => 'Tài khoản không tồn tại.',
+            ]);
+        }
+
+        $this->repo->update($khachHang->id, ['tinh_trang' => 'hoat_dong']);
+
+        DB::table(self::ACCOUNT_ACTIVATION_TABLE)
+            ->where('id', $record->id)
+            ->update([
+                'used_at' => now(),
+                'updated_at' => now(),
+            ]);
+    }
+
     // ── KHACH HANG CHUYEN XE ──────────────────────────────────────────
 
     /**
@@ -313,12 +377,21 @@ class KhachHangService
         })->pluck('id_ghe')->toArray();
 
         $soDoGhe = $danhSachGhe->map(function ($ghe) use ($gheDaDatIds) {
+            $trangThai = 'trong';
+            if (in_array($ghe->id, $gheDaDatIds, true)) {
+                $trangThai = 'da_dat';
+            } elseif ($ghe->trang_thai === 'bao_tri_hoac_khoa') {
+                $trangThai = 'bao_tri_hoac_khoa';
+            } elseif ($ghe->trang_thai === 'an_ghe') {
+                $trangThai = 'an_ghe';
+            }
+
             return [
                 'id_ghe'     => $ghe->id,
                 'ma_ghe'     => $ghe->ma_ghe,
                 'tang'       => $ghe->tang,
-                'loai_ghe'   => $ghe->loai_ghe_id, // can map extra info if needed
-                'trang_thai' => in_array($ghe->id, $gheDaDatIds) ? 'da_dat' : 'trong',
+                'loai_ghe'   => $ghe->id_loai_ghe,
+                'trang_thai' => $trangThai,
             ];
         });
 
@@ -373,5 +446,45 @@ class KhachHangService
         }
 
         return $query->get();
+    }
+
+    private function sendActivationEmail(KhachHang $khachHang): void
+    {
+        if (empty($khachHang->email)) {
+            return;
+        }
+
+        $email = strtolower(trim((string) $khachHang->email));
+        $token = Str::random(64);
+        $expiredAt = now()->addMinutes(60);
+
+        DB::table(self::ACCOUNT_ACTIVATION_TABLE)
+            ->where('email', $email)
+            ->whereNull('used_at')
+            ->delete();
+
+        DB::table(self::ACCOUNT_ACTIVATION_TABLE)->insert([
+            'email' => $email,
+            'token' => $token,
+            'expired_at' => $expiredAt,
+            'used_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:5173'), '/');
+        $activationLink = $frontendUrl . '/auth/activate-account?token=' . urlencode($token)
+            . '&email=' . urlencode($email);
+
+        Mail::send(
+            'emails.activate-account',
+            [
+                'activationLink' => $activationLink,
+                'expiresMinutes' => 60,
+            ],
+            function ($message) use ($email) {
+                $message->to($email)->subject('GoBus — Kích hoạt tài khoản');
+            }
+        );
     }
 }

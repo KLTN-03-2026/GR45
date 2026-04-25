@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import clientApi from '@/api/clientApi.js';
+import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
 
 const router = useRouter();
 const searchForm = reactive({
@@ -13,10 +14,10 @@ const searchForm = reactive({
 const formErrors = reactive({});
 const provinces = ref([]);
 const recentRoutes = [
-  { fromId: 1, toId: 13, fromName: 'Hà Nội', toName: 'Hải Phòng', icon: 'local_taxi' },
-  { fromId: 1, toId: 28, fromName: 'Hà Nội', toName: 'Hồ Chí Minh', icon: 'flight_takeoff' },
-  { fromId: 21, toId: 28, fromName: 'Đà Nẵg', toName: 'Hồ Chí Minh', icon: 'directions_bus' },
-  { fromId: 21, toId: 20, fromName: 'Đà Nẵg', toName: 'Thành phố Huế', icon: 'directions_bus' },
+  { fromId: 1, toId: 13, fromName: 'Hà Nội', toName: 'Hải Phòng', icon: 'directions_bus' },
+  { fromId: 1, toId: 28, fromName: 'Hà Nội', toName: 'Hồ Chí Minh', icon: 'directions_bus' },
+  { fromId: 21, toId: 28, fromName: 'Đà Nẵng', toName: 'Hồ Chí Minh', icon: 'directions_bus' },
+  { fromId: 21, toId: 20, fromName: 'Đà Nẵng', toName: 'Thành phố Huế', icon: 'directions_bus' },
 ];
 
 const fetchProvinces = async () => {
@@ -118,7 +119,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="relative -mt-24 z-10 px-4 md:px-0" id="tim-chuyen">
-    <div class="max-w-5xl mx-auto">
+    <div class="max-w-7xl mx-auto px-6">
       <div class="bg-white rounded-3xl shadow-xl shadow-blue-900/10 p-6 md:p-8 border border-slate-100">
         <!-- Main Form Grid -->
         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
@@ -129,7 +130,7 @@ onBeforeUnmount(() => {
               <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary z-10 pointer-events-none">location_on</span>
               <div 
                 @click="isOpenFrom = !isOpenFrom; isOpenTo = false"
-                class="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-2xl flex items-center justify-between cursor-pointer font-medium hover:border-slate-300 transition-all select-none"
+                class="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 text-slate-700 text-base rounded-2xl flex items-center justify-between cursor-pointer font-bold hover:border-slate-300 transition-all select-none"
                 :class="{'border-red-500': formErrors.tinh_thanh_di_id, 'ring-2 ring-primary/20 border-primary bg-white shadow-sm': isOpenFrom}"
               >
                 <span class="truncate pr-2" :class="!searchForm.tinh_thanh_di_id ? 'text-slate-500' : 'text-slate-800'">
@@ -148,7 +149,7 @@ onBeforeUnmount(() => {
                     <button 
                       v-for="province in provinces" :key="province.id"
                       @click.prevent="searchForm.tinh_thanh_di_id = province.id; isOpenFrom = false"
-                      class="w-full text-left px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 text-sm group/item"
+                      class="w-full text-left px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 text-base group/item"
                       :class="{'bg-blue-50/50': searchForm.tinh_thanh_di_id === province.id}"
                     >
                       <span class="material-symbols-outlined text-[18px]" :class="searchForm.tinh_thanh_di_id === province.id ? 'text-primary' : 'text-slate-300 group-hover/item:text-slate-400'">
@@ -183,7 +184,7 @@ onBeforeUnmount(() => {
                <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-orange-500 z-10 pointer-events-none">location_on</span>
               <div 
                 @click="isOpenTo = !isOpenTo; isOpenFrom = false"
-                class="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-2xl flex items-center justify-between cursor-pointer font-medium hover:border-slate-300 transition-all select-none"
+                class="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 text-slate-700 text-base rounded-2xl flex items-center justify-between cursor-pointer font-bold hover:border-slate-300 transition-all select-none"
                 :class="{'border-red-500': formErrors.tinh_thanh_den_id, 'ring-2 ring-orange-500/20 border-orange-500 bg-white shadow-sm': isOpenTo}"
               >
                 <span class="truncate pr-2" :class="!searchForm.tinh_thanh_den_id ? 'text-slate-500' : 'text-slate-800'">
@@ -202,7 +203,7 @@ onBeforeUnmount(() => {
                     <button 
                       v-for="province in provinces" :key="province.id"
                       @click.prevent="searchForm.tinh_thanh_den_id = province.id; isOpenTo = false"
-                      class="w-full text-left px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 text-sm group/item"
+                      class="w-full text-left px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 text-base group/item"
                       :class="{'bg-orange-50/50': searchForm.tinh_thanh_den_id === province.id}"
                     >
                       <span class="material-symbols-outlined text-[18px]" :class="searchForm.tinh_thanh_den_id === province.id ? 'text-orange-500' : 'text-slate-300 group-hover/item:text-slate-400'">
@@ -222,15 +223,9 @@ onBeforeUnmount(() => {
 
           <!-- Ngày Đi -->
           <div class="md:col-span-3">
-            <div class="relative group">
-              <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 group-focus-within:text-emerald-700 transition-colors">calendar_month</span>
-              <input 
-                type="date" 
-                v-model="searchForm.ngay_di" 
-                class="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-2xl outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 focus:bg-white transition-all cursor-pointer font-medium hover:border-slate-300"
-                :class="{'border-red-500': formErrors.ngay_di}"
-              >
-            </div>
+            <CustomDatePicker 
+              v-model="searchForm.ngay_di"
+            />
             <p v-if="formErrors.ngay_di" class="text-red-500 text-xs mt-1 font-medium italic absolute">{{ formErrors.ngay_di }}</p>
           </div>
 
@@ -238,7 +233,7 @@ onBeforeUnmount(() => {
           <div class="md:col-span-2 flex items-end">
             <button 
               @click="submitSearch"
-              class="w-full h-14 bg-primary hover:bg-blue-700 text-white font-bold text-sm lg:text-base rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] outline-none hover:-translate-y-0.5"
+              class="w-full h-14 bg-primary hover:bg-blue-700 text-white font-bold text-base rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] outline-none hover:-translate-y-0.5"
             >
               <span class="material-symbols-outlined text-[20px]">search</span>
               <span>Tìm Chuyến</span>
@@ -246,14 +241,14 @@ onBeforeUnmount(() => {
           </div>
         </div>
         
-        <!-- Quick Links (Tùy chọn) -->
-         <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between flex-wrap gap-4">
-            <div class="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-wider">
-               <span class="material-symbols-outlined text-[16px]">schedule</span> Tuyến gần đây:
+         <!-- Quick Links (Tùy chọn) -->
+         <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-start gap-6">
+            <div class="flex items-center gap-2 text-slate-500 text-sm font-bold uppercase tracking-wider flex-shrink-0">
+               <span class="material-symbols-outlined text-[20px]">history</span> Tuyến gần đây:
             </div>
-             <div class="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide flex-1">
-                 <button v-for="(route, i) in recentRoutes" :key="i" @click="selectRecentRoute(route)" class="whitespace-nowrap flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-primary border border-slate-100 transition-colors text-sm font-medium">
-                     <span class="material-symbols-outlined text-[16px]">{{ route.icon }}</span> {{ route.fromName }} - {{ route.toName }}
+             <div class="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide flex-1">
+                 <button v-for="(route, i) in recentRoutes" :key="i" @click="selectRecentRoute(route)" class="whitespace-nowrap flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-primary border border-slate-100 transition-all text-base font-semibold hover:shadow-sm">
+                     <span class="material-symbols-outlined text-[18px] opacity-70">{{ route.icon }}</span> {{ route.fromName }} - {{ route.toName }}
                  </button>
              </div>
          </div>

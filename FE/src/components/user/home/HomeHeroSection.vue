@@ -13,7 +13,7 @@
         Hành trình đẳng cấp
       </span>
       <h1 class="text-5xl md:text-7xl font-extrabold text-white mb-6 tracking-tight drop-shadow-2xl">
-        <span class="block">Vigilant Fleet</span>
+        <span class="block">BusSafe</span>
         <span class="block text-3xl md:text-5xl mt-2 text-blue-200">Đồng Hành Cùng Bạn</span>
       </h1>
       <p class="text-lg md:text-xl text-slate-200 max-w-2xl font-medium drop-shadow-md">
