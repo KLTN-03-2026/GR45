@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
     Route::post('quen-mat-khau', [KhachHangController::class, 'requestPasswordReset']);
     Route::post('dat-lai-mat-khau', [KhachHangController::class, 'resetPassword']);
     
+    Route::get('voucher/public',           [KhachHangController::class, 'getVoucherCongKhai']);
     Route::middleware('auth.khach-hang')->group(function () {
         Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
         Route::post('dang-xuat',    [KhachHangController::class, 'logout']);
@@ -63,7 +64,6 @@ Route::prefix('v1')->group(function () {
     Route::get('chuyen-xe/{id}/ghe',       [KhachHangController::class, 'getGheChuyenXe']);
     Route::get('chuyen-xe/{id}/tram-dung', [KhachHangController::class, 'getTramDungChuyenXe']);
     Route::get('chuyen-xe/{id}/danh-gia', [RatingController::class, 'listRatingsByTrip']);
-    Route::get('voucher/public',           [KhachHangController::class, 'getVoucherCongKhai']);
     Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
 
     // quản lý tài xế (DRIVER APP)
