@@ -18,6 +18,7 @@ class ViNhaXe extends Model
     protected $table = 'vi_nha_xes';
 
     protected $fillable = [
+        'ma_vi_nha_xe',
         'ma_nha_xe',
         'so_du',
         'tong_nap',
