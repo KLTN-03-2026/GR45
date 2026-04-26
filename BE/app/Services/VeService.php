@@ -226,7 +226,7 @@ class VeService
 
     public function getDanhSachVe(array $filters, string $role)
     {
-        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe'])->orderByDesc('created_at');
+        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.tinhThanh', 'chiTietVes.tramTra.phuongXa.tinhThanh'])->orderByDesc('created_at');
 
         if ($role === 'khach_hang') {
             $user = auth('khach_hang')->user();
@@ -259,7 +259,7 @@ class VeService
 
     public function getChiTietVe($id, string $role)
     {
-        $ve = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon', 'chiTietVes.tramTra'])->findOrFail($id);
+        $ve = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.tinhThanh', 'chiTietVes.tramTra.phuongXa.tinhThanh'])->findOrFail($id);
 
         if ($role === 'khach_hang') {
             $user = auth('khach_hang')->user();
