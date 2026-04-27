@@ -273,6 +273,11 @@ Route::prefix('v1')->group(function () {
             // Đánh giá
             Route::get('ratings', [RatingController::class, 'getAdminRatings']);
 
+            // Thanh toán và thống kê
+            Route::get('thanh-toan/thong-ke', [ThanhToanController::class, 'thongKe']);
+            Route::get('thanh-toan', [ThanhToanController::class, 'index']);
+            Route::get('thanh-toan/{id}', [ThanhToanController::class, 'show']);
+
             // Auto generate
             Route::post('xe/auto-generate-seats', [AdminController::class, 'generateSeatsForVehicles'])->middleware('permission:auto-generate-ghe-xe');
         });
