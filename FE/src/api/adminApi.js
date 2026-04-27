@@ -91,6 +91,8 @@ const adminApi = {
   getTripTrackingHistory: (id, params) =>
     axiosClient.get(`/v1/admin/chuyen-xe/${id}/tracking`, { params }),
   getTripTrackingLive: (id) => axiosClient.get(`/v1/admin/chuyen-xe/${id}/tracking/live`),
+  getActiveTrips: () => axiosClient.get('/v1/admin/chuyen-xe/dang-chay'),
+  getCompletedTrips: (params) => axiosClient.get('/v1/admin/chuyen-xe/da-hoan-thanh', { params }),
 
   // --- QUẢN LÝ VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\TrackingUpdatedEvent;
 use App\Jobs\StoreTrackingPointJob;
 use App\Services\ChuyenXeService;
 use App\Services\TrackingHanhTrinhService;
@@ -225,6 +226,9 @@ class ChuyenXeController extends Controller
 
                 StoreTrackingPointJob::dispatch($payload)->onQueue('tracking');
 
+                // Broadcast realtime qua Pusher
+                broadcast(new TrackingUpdatedEvent($chuyenXe->id, $payload));
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Da nhan du lieu tracking, he thong se xu ly qua hang doi.',
@@ -248,6 +252,9 @@ class ChuyenXeController extends Controller
                     ],
                 ]);
             }
+
+            // Broadcast realtime qua Pusher
+            broadcast(new TrackingUpdatedEvent($chuyenXe->id, $payload));
 
             return response()->json([
                 'success' => true,
@@ -314,6 +321,52 @@ class ChuyenXeController extends Controller
                 'success' => true,
                 'data' => $data,
             ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+    }
+
+    /**
+     * Danh sách chuyến xe đang chạy kèm vị trí cuối cho Live Tracking dashboard.
+     */
+    public function getActiveTrips(Request $request)
+    {
+        try {
+            $user = auth('sanctum')->user();
+            if (!$user) {
+                throw new \Exception('Ban chua dang nhap.');
+            }
+
+            $maNhaXe = null;
+            if (isset($user->ma_nha_xe)) {
+                $maNhaXe = $user->ma_nha_xe;
+            }
+
+            $data = $this->trackingService->getActiveTripsWithLastPosition($maNhaXe);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+    }
+
+    /**
+     * Danh sách chuyến xe đã hoàn thành có dữ liệu tracking (cho Lịch sử hành trình).
+     */
+    public function getCompletedTrips(Request $request)
+    {
+        try {
+            $user = auth('sanctum')->user();
+            if (!$user) {
+                throw new \Exception('Ban chua dang nhap.');
+            }
+
+            $maNhaXe = null;
+            if (isset($user->ma_nha_xe)) {
+                $maNhaXe = $user->ma_nha_xe;
+            }
+
+            $data = $this->trackingService->getCompletedTripsWithTracking($maNhaXe, $request->all());
+            return response()->json(['success' => true, 'data' => $data]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
         }
