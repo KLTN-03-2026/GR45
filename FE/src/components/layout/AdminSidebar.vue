@@ -85,11 +85,15 @@ const menuList = [
   },
   {
     id: 'tracking',
-    name: 'Live tracking',
-    path: '/admin/tracking',
+    name: 'Giám sát xe',
     icon: Map,
     permissionSlugs: ['xem-tracking-chuyen-xe', 'xem-chuyen-xe'],
     permissionHints: ['tracking'],
+    children: [
+      { name: '📡 Live Tracking', path: '/admin/live-tracking', icon: Map },
+      { name: '📋 Lịch sử hành trình', path: '/admin/lich-su-hanh-trinh', icon: Map },
+    ],
+    paths: ['/admin/live-tracking', '/admin/lich-su-hanh-trinh'],
   },
   {
     id: 've',

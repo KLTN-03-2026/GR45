@@ -13,7 +13,7 @@ use Carbon\Carbon;
 
 class TrackingHanhTrinhService
 {
-    private const MIN_INTERVAL_SECONDS = 120; // tôi thiểu 2 phút giữa các điểm ghi, trừ khi có thay đổi trạng thái hoặc di chuyển xa
+    private const MIN_INTERVAL_SECONDS = 30; // tối thiểu 30 giây giữa các điểm ghi, trừ khi có thay đổi trạng thái hoặc di chuyển xa
     private const MIN_DISTANCE_METERS = 30;   // cho phép lưu điểm mới nếu di chuyển ít nhất 30 mét so với điểm cuối cùng, trừ khi có thay đổi trạng thái hoặc đang chuyển từ chạy sang dừng hoặc ngược lại
     private const FORCE_DISTANCE_METERS = 200; // dù có thay đổi trạng thái hay không, nếu di chuyển hơn 200 mét so với điểm cuối cùng thì vẫn lưu (tránh trường hợp xe chạy nhanh mà chỉ lưu được vài điểm do chu kỳ tối thiểu 2 phút)
     private const STOP_SPEED_THRESHOLD = 3.0;  // <= 3 km/h xem nhu dung
@@ -263,6 +263,130 @@ class TrackingHanhTrinhService
         }
 
         return $this->buildLivePayload($chuyenXe, 'relative');
+    }
+
+    /**
+     * Lấy danh sách chuyến xe đang chạy kèm vị trí tracking mới nhất.
+     * Dùng cho Live Tracking dashboard.
+     */
+    public function getActiveTripsWithLastPosition(?string $maNhaXe = null): array
+    {
+        $query = ChuyenXe::query()
+            ->with(['xe', 'taiXe', 'tuyenDuong'])
+            ->where('trang_thai', 'dang_di_chuyen');
+
+        if ($maNhaXe) {
+            $query->whereHas('tuyenDuong', function ($q) use ($maNhaXe) {
+                $q->where('ma_nha_xe', $maNhaXe);
+            });
+        }
+
+        $trips = $query->orderByDesc('ngay_khoi_hanh')->get();
+
+        return $trips->map(function (ChuyenXe $trip) {
+            $lastTracking = TrackingHanhTrinh::query()
+                ->where('id_chuyen_xe', $trip->id)
+                ->orderByDesc('thoi_diem_ghi')
+                ->first();
+
+            $isLive = false;
+            $lastUpdateSeconds = null;
+            if ($lastTracking && $lastTracking->thoi_diem_ghi) {
+                $lastUpdateSeconds = $lastTracking->thoi_diem_ghi->diffInSeconds(now());
+                $isLive = $lastTracking->thoi_diem_ghi->gte(now()->subMinutes(5));
+            }
+
+            return [
+                'id' => $trip->id,
+                'trang_thai' => $trip->trang_thai,
+                'ngay_khoi_hanh' => $trip->ngay_khoi_hanh,
+                'gio_khoi_hanh' => $trip->gio_khoi_hanh,
+                'xe' => $trip->xe ? [
+                    'id' => $trip->xe->id,
+                    'bien_so' => $trip->xe->bien_so,
+                ] : null,
+                'tai_xe' => $trip->taiXe ? [
+                    'id' => $trip->taiXe->id,
+                    'ho_ten' => $trip->taiXe->ho_ten,
+                ] : null,
+                'tuyen_duong' => $trip->tuyenDuong ? [
+                    'id' => $trip->tuyenDuong->id,
+                    'ten_tuyen_duong' => $trip->tuyenDuong->ten_tuyen_duong,
+                    'diem_bat_dau' => $trip->tuyenDuong->diem_bat_dau,
+                    'diem_ket_thuc' => $trip->tuyenDuong->diem_ket_thuc,
+                ] : null,
+                'last_tracking' => $lastTracking ? [
+                    'vi_do' => $lastTracking->vi_do,
+                    'kinh_do' => $lastTracking->kinh_do,
+                    'van_toc' => $lastTracking->van_toc,
+                    'huong_di' => $lastTracking->huong_di,
+                    'thoi_diem_ghi' => $lastTracking->thoi_diem_ghi,
+                ] : null,
+                'is_live' => $isLive,
+                'last_update_seconds' => $lastUpdateSeconds,
+            ];
+        })->values()->toArray();
+    }
+
+    /**
+     * Lấy danh sách chuyến xe đã hoàn thành có dữ liệu tracking.
+     * Dùng cho trang Lịch sử hành trình.
+     */
+    public function getCompletedTripsWithTracking(?string $maNhaXe = null, array $filters = []): array
+    {
+        $query = ChuyenXe::query()
+            ->with(['xe', 'taiXe', 'tuyenDuong'])
+            ->where('trang_thai', 'hoan_thanh')
+            ->whereHas('trackings');
+
+        if ($maNhaXe) {
+            $query->whereHas('tuyenDuong', function ($q) use ($maNhaXe) {
+                $q->where('ma_nha_xe', $maNhaXe);
+            });
+        }
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('id', 'like', "%{$search}%")
+                    ->orWhereHas('tuyenDuong', function ($q2) use ($search) {
+                        $q2->where('ten_tuyen_duong', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('xe', function ($q2) use ($search) {
+                        $q2->where('bien_so', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $perPage = (int) ($filters['per_page'] ?? 20);
+        $paginated = $query->orderByDesc('ngay_khoi_hanh')->paginate($perPage);
+
+        return [
+            'data' => $paginated->map(function (ChuyenXe $trip) {
+                $trackingCount = TrackingHanhTrinh::where('id_chuyen_xe', $trip->id)->count();
+                return [
+                    'id' => $trip->id,
+                    'trang_thai' => $trip->trang_thai,
+                    'ngay_khoi_hanh' => $trip->ngay_khoi_hanh,
+                    'gio_khoi_hanh' => $trip->gio_khoi_hanh,
+                    'xe' => $trip->xe ? ['id' => $trip->xe->id, 'bien_so' => $trip->xe->bien_so] : null,
+                    'tai_xe' => $trip->taiXe ? ['id' => $trip->taiXe->id, 'ho_ten' => $trip->taiXe->ho_ten] : null,
+                    'tuyen_duong' => $trip->tuyenDuong ? [
+                        'id' => $trip->tuyenDuong->id,
+                        'ten_tuyen_duong' => $trip->tuyenDuong->ten_tuyen_duong,
+                        'diem_bat_dau' => $trip->tuyenDuong->diem_bat_dau,
+                        'diem_ket_thuc' => $trip->tuyenDuong->diem_ket_thuc,
+                    ] : null,
+                    'tracking_count' => $trackingCount,
+                ];
+            })->values(),
+            'meta' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'total' => $paginated->total(),
+                'per_page' => $paginated->perPage(),
+            ],
+        ];
     }
 
     public function pruneOlderThanDays(int $days = 30, int $chunkSize = 5000): int

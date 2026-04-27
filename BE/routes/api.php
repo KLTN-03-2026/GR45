@@ -118,6 +118,8 @@ Route::prefix('v1')->group(function () {
             Route::delete('tuyen-duong/{id}', [TuyenDuongController::class, 'destroy']);
 
             Route::get('chuyen-xe', [ChuyenXeController::class, 'index']);
+            Route::get('chuyen-xe/dang-chay', [ChuyenXeController::class, 'getActiveTrips']);
+            Route::get('chuyen-xe/da-hoan-thanh', [ChuyenXeController::class, 'getCompletedTrips']);
             Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show']);
             Route::post('chuyen-xe', [ChuyenXeController::class, 'store']);
             Route::put('chuyen-xe/{id}', [ChuyenXeController::class, 'update']);
@@ -236,6 +238,8 @@ Route::prefix('v1')->group(function () {
             // Chuyến xe
             Route::post('chuyen-xe/auto-generate', [ChuyenXeController::class, 'autoGenerate'])->middleware('permission:auto-generate-chuyen-xe');
             Route::get('chuyen-xe', [ChuyenXeController::class, 'index'])->middleware('permission:xem-chuyen-xe');
+            Route::get('chuyen-xe/dang-chay', [ChuyenXeController::class, 'getActiveTrips'])->middleware('permission:xem-tracking-chuyen-xe');
+            Route::get('chuyen-xe/da-hoan-thanh', [ChuyenXeController::class, 'getCompletedTrips'])->middleware('permission:xem-tracking-chuyen-xe');
             Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show'])->middleware('permission:xem-chuyen-xe');
             Route::post('chuyen-xe', [ChuyenXeController::class, 'store'])->middleware('permission:them-chuyen-xe');
             Route::put('chuyen-xe/{id}', [ChuyenXeController::class, 'update'])->middleware('permission:sua-chuyen-xe');

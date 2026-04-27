@@ -64,9 +64,13 @@ const menuList = [
   },
   {
     id: 'tracking',
-    name: 'Live tracking',
-    path: '/nha-xe/tracking',
-    icon: Map
+    name: 'Giám sát xe',
+    icon: Map,
+    children: [
+      { name: '📡 Live Tracking', path: '/nha-xe/live-tracking', icon: Map },
+      { name: '📋 Lịch sử hành trình', path: '/nha-xe/lich-su-hanh-trinh', icon: Map },
+    ],
+    paths: ['/nha-xe/live-tracking', '/nha-xe/lich-su-hanh-trinh'],
   },
   {
     id: 've',

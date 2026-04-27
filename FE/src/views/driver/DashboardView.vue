@@ -325,6 +325,8 @@ const postLiveTracking = async () => {
       vi_do: currentPosition.value.lat,
       kinh_do: currentPosition.value.lng,
       van_toc: currentTrip.value.van_toc,
+      huong_di: currentPosition.value.heading || 0,
+      do_chinh_xac_gps: currentPosition.value.accuracy || 0,
     });
   } catch (e) {
     console.error("Lỗi gửi tracking", e);
@@ -707,8 +709,8 @@ onMounted(() => {
           hasRealGps.value = true;
           gpsError.value = null;
           gpsRetryCount = 0; // reset khi thành công
-          const { latitude, longitude, speed } = position.coords;
-          currentPosition.value = { lat: latitude, lng: longitude };
+          const { latitude, longitude, speed, heading, accuracy } = position.coords;
+          currentPosition.value = { lat: latitude, lng: longitude, heading: heading || 0, accuracy: accuracy || 0 };
           currentTrip.value.van_toc = speed ? Math.round(speed * 3.6) : 0;
           drowsinessAgent?.setPosition(latitude, longitude);
           if (busMarker) busMarker.setLngLat([longitude, latitude]);
@@ -763,7 +765,7 @@ onMounted(() => {
   } else {
     gpsError.value = "Trình duyệt không hỗ trợ GPS";
   }
-  trackingInterval = setInterval(postLiveTracking, 120000);
+  trackingInterval = setInterval(postLiveTracking, 30000); // Gửi tracking mỗi 30 giây
   postLiveTracking();
 });
 

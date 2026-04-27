@@ -88,8 +88,13 @@ const router = createRouter({
           component: () => import('../views/admin/chuyen-xe/ChuyenXeView.vue'),
         },
         {
-          path: 'tracking',
-          name: 'admin-tracking',
+          path: 'live-tracking',
+          name: 'admin-live-tracking',
+          component: () => import('../views/admin/tracking/LiveTrackingView.vue'),
+        },
+        {
+          path: 'lich-su-hanh-trinh',
+          name: 'admin-lich-su-hanh-trinh',
           component: () => import('../views/admin/tracking/TrackingView.vue'),
         },
         {
@@ -201,8 +206,13 @@ const router = createRouter({
           component: () => import('../views/operator/chuyen-xe/ChuyenXeView.vue'),
         },
         {
-          path: 'tracking',
-          name: 'operator-tracking',
+          path: 'live-tracking',
+          name: 'operator-live-tracking',
+          component: () => import('../views/operator/tracking/LiveTrackingView.vue'),
+        },
+        {
+          path: 'lich-su-hanh-trinh',
+          name: 'operator-lich-su-hanh-trinh',
           component: () => import('../views/operator/tracking/TrackingView.vue'),
         },
         {

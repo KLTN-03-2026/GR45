@@ -1752,26 +1752,17 @@ onUnmounted(() => {
 
                 <!-- QR CODE SECTION -->
                 <div
+                  v-if="selectedTicket.tinh_trang === 'da_thanh_toan'"
                   class="pt-8 border-t border-slate-100 flex flex-col items-center"
                 >
                   <div
                     class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-4"
                   >
                     <img
-                      v-if="selectedTicket.tinh_trang === 'da_thanh_toan'"
                       :src="`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${selectedTicket.ma_ve}`"
                       alt="QR Code Vé"
                       class="w-48 h-48"
                     />
-                    <div
-                      v-else
-                      class="w-48 h-48 flex items-center justify-center bg-slate-50 rounded-xl"
-                    >
-                      <span
-                        class="material-symbols-outlined text-6xl text-slate-200"
-                        >qr_code_2</span
-                      >
-                    </div>
                   </div>
                   <p class="text-sm font-black text-slate-900">
                     Vui lòng quét mã khi lên xe
@@ -2092,150 +2083,124 @@ onUnmounted(() => {
 }
 
 /* —— Popup đánh giá / chi tiết —— */
-.rt-rating-modal-fade-enter-active {
-  transition: opacity 0.25s ease;
-}
-
-.rt-rating-modal-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.rt-rating-modal-fade-enter-from,
-.rt-rating-modal-fade-leave-to {
-  opacity: 0;
-}
-
 .trip-rating-detail-overlay {
   position: fixed;
   inset: 0;
   z-index: 10050;
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.5rem;
 }
 
+/* MODAL */
 .trip-rating-detail-modal {
   width: 100%;
-  background: #fff;
-  border-radius: 40px;
-  box-shadow: 0 25px 70px rgba(15, 23, 42, 0.35);
-  border: 1px solid #e2e8f0;
-  max-height: 95vh;
+  max-width: 560px;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  animation: modalFadeIn 0.25s ease;
 }
 
+/* HEADER */
 .trip-rating-detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid #e2e8f0;
-  flex-shrink: 0;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .trip-rating-detail-header h3 {
   margin: 0;
-  color: #1e293b;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
+/* CLOSE BTN */
 .trip-rating-detail-close {
   border: none;
-  background: transparent;
+  background: #f1f5f9;
   cursor: pointer;
   color: #64748b;
-  padding: 0.2rem;
-  line-height: 0;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 0.4rem;
+  border-radius: 10px;
+  transition: all 0.2s ease;
 }
 
 .trip-rating-detail-close:hover {
-  background: #f1f5f9;
-  color: #1e293b;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
+/* BODY */
 .trip-rating-detail-body {
-  padding: 0.9rem 1rem 1rem;
+  padding: 1.2rem;
   overflow-y: auto;
 }
 
+/* TRIP BOX */
 .trip-rating-detail-trip {
-  margin-bottom: 0.85rem;
-  padding: 0.65rem 0.75rem;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 0.78rem;
-  color: #334155;
+  margin-bottom: 1rem;
+  padding: 0.9rem;
+  background: #f8fafc;
+  border-radius: 14px;
+  font-size: 0.82rem;
 }
 
 .trip-rating-detail-trip-title {
   font-size: 0.65rem;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #64748b;
-  margin-bottom: 0.35rem;
+  color: #94a3b8;
+  margin-bottom: 0.4rem;
 }
 
 .trip-rating-detail-trip-route {
-  font-weight: 800;
-  color: #1e40af;
-  font-size: 0.82rem;
-  margin-bottom: 0.25rem;
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
 }
 
 .trip-rating-detail-trip-meta {
-  line-height: 1.45;
-  color: #475569;
-}
-
-.trip-rating-detail-mono {
-  font-family: ui-monospace, monospace;
-  font-weight: 600;
-}
-
-.trip-rating-detail-sent {
-  margin-top: 0.5rem;
-  font-size: 0.72rem;
   color: #64748b;
+  line-height: 1.5;
 }
 
+/* TOP */
 .trip-rating-detail-top {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.35rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.8rem;
 }
 
 .trip-rating-detail-name {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  color: #1e293b;
+  color: #0f172a;
+  margin-bottom: 0.2rem;
 }
 
+/* STARS */
 .trip-rating-detail-stars-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.08rem 0.15rem;
+  gap: 0.15rem;
 }
 
 .trip-rating-detail-star {
-  font-size: 0.95rem;
-  line-height: 1;
-  color: #cbd5e1;
-  letter-spacing: -0.05em;
+  font-size: 1rem;
+  color: #e2e8f0;
 }
 
 .trip-rating-detail-star--sm {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .trip-rating-detail-star--on {
@@ -2244,60 +2209,81 @@ onUnmounted(() => {
 
 .trip-rating-detail-score {
   font-size: 0.8rem;
-  font-weight: 800;
-  color: #d97706;
-  margin-left: 0.3rem;
+  font-weight: 700;
+  color: #f59e0b;
+  margin-left: 0.4rem;
 }
 
+/* GRID */
 .trip-rating-detail-grid {
-  margin-top: 0.65rem;
+  margin-top: 0.8rem;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.5rem 0.65rem;
-  font-size: 0.78rem;
-  color: #475569;
+  gap: 0.7rem;
 }
 
+/* METRIC CARD */
 .trip-rating-detail-metric {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+  padding: 0.6rem;
+  border-radius: 10px;
+  background: #f8fafc;
 }
 
 .trip-rating-detail-metric-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 0.2rem;
 }
 
 .trip-rating-detail-metric-stars {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.06rem 0.12rem;
+  gap: 0.1rem;
 }
 
 .trip-rating-detail-metric-stars strong {
-  margin-left: 0.25rem;
+  margin-left: 0.3rem;
   font-size: 0.78rem;
   color: #334155;
 }
 
+/* NOTE */
 .trip-rating-detail-note {
-  margin-top: 0.65rem;
-  margin-bottom: 0;
-  border: 1px solid #e2e8f0;
+  margin-top: 0.9rem;
+  border-radius: 12px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
   background: #f8fafc;
-  border-radius: 10px;
-  padding: 0.55rem 0.65rem;
-  font-size: 0.8rem;
   color: #334155;
-  white-space: pre-wrap;
+  line-height: 1.6;
 }
 
+/* SENT TIME */
+.trip-rating-detail-sent {
+  margin-top: 0.6rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+/* ANIMATION */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* MOBILE */
 @media (max-width: 520px) {
+  .trip-rating-detail-modal {
+    border-radius: 16px;
+  }
+
   .trip-rating-detail-grid {
     grid-template-columns: 1fr;
   }

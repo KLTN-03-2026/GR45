@@ -62,6 +62,8 @@ const operatorApi = {
   getTripTrackingHistory: (id, params) =>
     axiosClient.get(`/v1/nha-xe/chuyen-xe/${id}/tracking`, { params }),
   getTripTrackingLive: (id) => axiosClient.get(`/v1/nha-xe/chuyen-xe/${id}/tracking/live`),
+  getActiveTrips: () => axiosClient.get('/v1/nha-xe/chuyen-xe/dang-chay'),
+  getCompletedTrips: (params) => axiosClient.get('/v1/nha-xe/chuyen-xe/da-hoan-thanh', { params }),
   getTripStops: (id) => axiosClient.get(`/v1/chuyen-xe/${id}/tram-dung`),
 
   // --- VOUCHER ---
