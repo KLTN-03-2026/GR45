@@ -140,7 +140,6 @@ export const useAdminStore = defineStore('admin', () => {
     isTokenVerified.value = false;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    localStorage.removeItem('auth.active_role');
     localStorage.removeItem(IS_MASTER_KEY);
     localStorage.removeItem(CHUC_VU_KEY);
     localStorage.removeItem(PERMISSIONS_KEY);

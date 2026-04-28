@@ -93,6 +93,23 @@ class XeController extends Controller
         }
     }
 
+    public function indexPublic(Request $request): JsonResponse
+    {
+        try {
+            $data = $this->xeService->getAllPublic($request->all());
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
     public function show($id): JsonResponse
     {
         try {

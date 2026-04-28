@@ -2102,8 +2102,11 @@ onUnmounted(() => {
   background: #ffffff;
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-  overflow: hidden;
+
   display: flex;
+  overflow: scroll;
+  max-height: 85vh;
+
   flex-direction: column;
   animation: modalFadeIn 0.25s ease;
 }

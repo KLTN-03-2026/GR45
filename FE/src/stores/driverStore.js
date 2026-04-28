@@ -68,7 +68,6 @@ export const useDriverStore = defineStore('driver', () => {
     isTokenVerified.value = false;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    localStorage.removeItem('auth.active_role');
   }
 
   return { token, user, loading, error, isTokenVerified, isLoggedIn, login, logout };

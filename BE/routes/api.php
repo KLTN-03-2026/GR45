@@ -23,6 +23,10 @@ use App\Http\Controllers\RatingController;
 use App\Http\Controllers\BaoCaoController;
 
 Route::prefix('v1')->group(function () {
+    //API public
+    Route::get('tuyen-duong/public', [TuyenDuongController::class, 'indexPublic']);
+    Route::get('xe/public', [XeController::class, 'indexPublic']);
+    Route::get('tai-xe/public', [TaiXeController::class, 'indexPublic']);
 
     // API dành cho khách hàng
     Route::post('dang-nhap',  [KhachHangController::class, 'login']);
@@ -30,7 +34,7 @@ Route::prefix('v1')->group(function () {
     Route::post('kich-hoat-tai-khoan', [KhachHangController::class, 'kichHoatTaiKhoan']);
     Route::post('quen-mat-khau', [KhachHangController::class, 'requestPasswordReset']);
     Route::post('dat-lai-mat-khau', [KhachHangController::class, 'resetPassword']);
-    
+
     Route::get('voucher/public',           [KhachHangController::class, 'getVoucherCongKhai']);
     Route::middleware('auth.khach-hang')->group(function () {
         Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
@@ -81,7 +85,7 @@ Route::prefix('v1')->group(function () {
             Route::get('chuyen-xe/lich-trinh-ca-nhan', [ChuyenXeController::class, 'getLichTrinhCaNhan']);
             Route::get('stats',         [TaiXeController::class, 'stats']);
             Route::get('upcoming-trips', [TaiXeController::class, 'upcomingTrips']);
-            
+
             Route::get('chuyen-xe/{id}/lich-trinh', [ChuyenXeController::class, 'getLichTrinh']);
             Route::post('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'postTracking']);
             Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);

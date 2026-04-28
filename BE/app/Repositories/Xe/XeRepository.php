@@ -40,6 +40,31 @@ class XeRepository implements XeRepositoryInterface
         return $query->orderByDesc('created_at')->paginate($filters['per_page'] ?? 15);
     }
 
+    public function getAllPublic(array $filters = [])
+    {
+        $query = $this->model->query()->with(['nhaXe', 'loaiXe', 'taiXeChinh']);
+
+        if (!empty($filters['search'])) {
+            $kw = $filters['search'];
+            $query->where(function ($q) use ($kw) {
+                $q->where('bien_so', 'like', "%$kw%")
+                  ->orWhere('ten_xe', 'like', "%$kw%");
+            });
+        }
+
+        if (!empty($filters['trang_thai'])) {
+            $query->where('trang_thai', $filters['trang_thai']);
+        } elseif (empty($filters['include_hidden'])) {
+            $query->where('trang_thai', '!=', 'ngung_su_dung');
+        }
+
+        if (!empty($filters['ma_nha_xe'])) {
+            $query->where('ma_nha_xe', $filters['ma_nha_xe']);
+        }
+
+        return $query->orderByDesc('created_at')->paginate($filters['per_page'] ?? 15);
+    }
+
     public function getById(int $id)
     {
         return $this->model->with(['nhaXe', 'loaiXe', 'taiXeChinh', 'hoSoXe'])->find($id);
@@ -71,12 +96,12 @@ class XeRepository implements XeRepositoryInterface
     {
         return DB::transaction(function () use ($data) {
             $xe = $this->model->create($data);
-            
+
             // Tạm thời tạo hồ sơ xe trống nếu chưa có logic hồ sơ cụ thể
             if ($xe) {
                 HoSoXe::create(['id_xe' => $xe->id]);
             }
-            
+
             return $xe;
         });
     }
