@@ -165,7 +165,7 @@ const filteredTripOptions = computed(() => {
       trip?.tuyen_duong?.diem_ket_thuc,
       formatDateOnly(trip.ngay_khoi_hanh),
       formatTimeOnly(trip.gio_khoi_hanh),
-    ].some((f) => normalizeText(f).includes(q))
+    ].some((f) => normalizeText(f).includes(q)),
   );
 });
 
@@ -173,7 +173,7 @@ const filteredPickupStops = computed(() => {
   const q = normalizeText(searchPickup.value);
   if (!q) return pickupStops.value;
   return pickupStops.value.filter((stop) =>
-    [stop.ten_tram, stop.dia_chi].some((f) => normalizeText(f).includes(q))
+    [stop.ten_tram, stop.dia_chi].some((f) => normalizeText(f).includes(q)),
   );
 });
 
@@ -181,7 +181,7 @@ const filteredDropoffStops = computed(() => {
   const q = normalizeText(searchDropoff.value);
   if (!q) return dropoffStops.value;
   return dropoffStops.value.filter((stop) =>
-    [stop.ten_tram, stop.dia_chi].some((f) => normalizeText(f).includes(q))
+    [stop.ten_tram, stop.dia_chi].some((f) => normalizeText(f).includes(q)),
   );
 });
 
@@ -209,7 +209,7 @@ const bookingSeatsByFloor = computed(() => {
     .map(([floor, seats]) => ({
       floor: Number(floor),
       seats: [...seats].sort((x, y) =>
-        String(x.ma_ghe || "").localeCompare(String(y.ma_ghe || ""))
+        String(x.ma_ghe || "").localeCompare(String(y.ma_ghe || "")),
       ),
     }));
 });
@@ -227,7 +227,10 @@ const seatText = (item) => {
 const loadTripsForBooking = async () => {
   try {
     loadingBookingData.value = true;
-    const res = await operatorApi.getTrips({ per_page: 100, trang_thai: "hoat_dong" });
+    const res = await operatorApi.getTrips({
+      per_page: 100,
+      trang_thai: "hoat_dong",
+    });
     if (Array.isArray(res.data?.data?.data?.data)) {
       tripOptions.value = res.data.data.data.data;
     } else if (Array.isArray(res.data?.data?.data)) {
@@ -279,7 +282,8 @@ const loadTripBookingData = async (tripId) => {
 
     bookForm.danh_sach_ghe = [];
     bookForm.id_tram_don = pickupStops.value[0]?.id || "";
-    bookForm.id_tram_tra = dropoffStops.value[dropoffStops.value.length - 1]?.id || "";
+    bookForm.id_tram_tra =
+      dropoffStops.value[dropoffStops.value.length - 1]?.id || "";
   } catch (e) {
     availableSeats.value = [];
     pickupStops.value = [];
@@ -444,7 +448,7 @@ watch(
   () => bookForm.id_chuyen_xe,
   async (value) => {
     await loadTripBookingData(Number(value));
-  }
+  },
 );
 
 onMounted(() => fetchTickets());
@@ -525,8 +529,8 @@ onMounted(() => fetchTickets());
     <!-- Bảng -->
     <div class="table-card">
       <BaseTable :columns="tableColumns" :data="tickets" :loading="loading">
-        <template #cell(ma_ve)="{ value }">
-          <span class="code-badge">{{ value }}</span>
+        <template #cell(ma_ve)="{ item }">
+          <span class="code-badge">{{ item.ma_ve }}</span>
         </template>
 
         <template #cell(khach)="{ item }">
@@ -769,11 +773,7 @@ onMounted(() => fetchTickets());
             placeholder="Tìm trạm đón theo tên/địa chỉ..."
             style="margin-bottom: 0.5rem"
           />
-          <select
-            v-model="bookForm.id_tram_don"
-            class="custom-select"
-            required
-          >
+          <select v-model="bookForm.id_tram_don" class="custom-select" required>
             <option value="" disabled>-- Chọn trạm đón --</option>
             <option
               v-for="stop in filteredPickupStops"
@@ -794,11 +794,7 @@ onMounted(() => fetchTickets());
             placeholder="Tìm trạm trả theo tên/địa chỉ..."
             style="margin-bottom: 0.5rem"
           />
-          <select
-            v-model="bookForm.id_tram_tra"
-            class="custom-select"
-            required
-          >
+          <select v-model="bookForm.id_tram_tra" class="custom-select" required>
             <option value="" disabled>-- Chọn trạm trả --</option>
             <option
               v-for="stop in filteredDropoffStops"
