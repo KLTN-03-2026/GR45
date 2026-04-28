@@ -245,9 +245,8 @@ class TrackingHanhTrinhService
     {
         $chuyenXe = $this->findTripOrFail($idChuyenXe);
 
-        $hasAccess = Ve::query()
+        $query = Ve::query()
             ->where('id_chuyen_xe', $idChuyenXe)
-            ->where('ma_ve', trim($maVe))
             ->where('tinh_trang', '!=', 'huy')
             ->where(function ($q) use ($soDienThoai) {
                 $q->whereHas('khachHang', function ($kh) use ($soDienThoai) {
@@ -255,10 +254,14 @@ class TrackingHanhTrinhService
                 })->orWhereHas('nguoiDat', function ($nguoiDat) use ($soDienThoai) {
                     $nguoiDat->where('so_dien_thoai', trim($soDienThoai));
                 });
-            })
-            ->exists();
+            });
 
-        if (!$hasAccess) {
+        // Nếu có mã vé, thêm điều kiện lọc chặt hơn
+        if (!empty(trim($maVe))) {
+            $query->where('ma_ve', trim($maVe));
+        }
+
+        if (!$query->exists()) {
             throw new \Exception('Khong co quyen xem live tracking cho chuyen xe nay.');
         }
 
@@ -387,6 +390,82 @@ class TrackingHanhTrinhService
                 'per_page' => $paginated->perPage(),
             ],
         ];
+    }
+
+    /**
+     * Tra cứu chuyến xe đang chạy theo SĐT khách hàng.
+     * Luồng: khach_hangs(sdt) -> ves(tinh_trang != huy) -> chuyen_xes(dang_di_chuyen)
+     */
+    public function lookupActiveTripsByPhone(string $soDienThoai): array
+    {
+        $soDienThoai = trim($soDienThoai);
+        if (empty($soDienThoai)) {
+            throw new \Exception('So dien thoai khong duoc de trong.');
+        }
+
+        // Tìm các vé chưa hủy có khách hàng với SĐT khớp, thuộc chuyến xe đang chạy
+        $ves = Ve::query()
+            ->where('tinh_trang', '!=', 'huy')
+            ->where(function ($q) use ($soDienThoai) {
+                $q->whereHas('khachHang', function ($kh) use ($soDienThoai) {
+                    $kh->where('so_dien_thoai', $soDienThoai);
+                })->orWhereHas('nguoiDat', function ($nd) use ($soDienThoai) {
+                    $nd->where('so_dien_thoai', $soDienThoai);
+                });
+            })
+            ->whereHas('chuyenXe', function ($cx) {
+                $cx->where('trang_thai', 'dang_di_chuyen');
+            })
+            ->with(['chuyenXe.tuyenDuong.nhaXe', 'chuyenXe.xe', 'chuyenXe.taiXe'])
+            ->get();
+
+        // Gom nhóm theo chuyến xe (để tránh trùng lặp nếu khách có nhiều vé cùng chuyến)
+        $tripsMap = [];
+        foreach ($ves as $ve) {
+            $cx = $ve->chuyenXe;
+            if (!$cx || isset($tripsMap[$cx->id])) continue;
+
+            $lastTracking = TrackingHanhTrinh::query()
+                ->where('id_chuyen_xe', $cx->id)
+                ->orderByDesc('thoi_diem_ghi')
+                ->first();
+
+            $isLive = false;
+            $lastUpdateSeconds = null;
+            if ($lastTracking && $lastTracking->thoi_diem_ghi) {
+                $lastUpdateSeconds = $lastTracking->thoi_diem_ghi->diffInSeconds(now());
+                $isLive = $lastTracking->thoi_diem_ghi->gte(now()->subMinutes(5));
+            }
+
+            $tripsMap[$cx->id] = [
+                'id' => $cx->id,
+                'trang_thai' => $cx->trang_thai,
+                'ngay_khoi_hanh' => $cx->ngay_khoi_hanh,
+                'gio_khoi_hanh' => $cx->gio_khoi_hanh,
+                'tuyen_duong' => $cx->tuyenDuong ? [
+                    'id' => $cx->tuyenDuong->id,
+                    'ten_tuyen_duong' => $cx->tuyenDuong->ten_tuyen_duong,
+                    'diem_bat_dau' => $cx->tuyenDuong->diem_bat_dau,
+                    'diem_ket_thuc' => $cx->tuyenDuong->diem_ket_thuc,
+                ] : null,
+                'nha_xe' => ($cx->tuyenDuong && $cx->tuyenDuong->nhaXe) ? [
+                    'ten_nha_xe' => $cx->tuyenDuong->nhaXe->ten_nha_xe,
+                ] : null,
+                'xe' => $cx->xe ? [
+                    'id' => $cx->xe->id,
+                    'bien_so' => $cx->xe->bien_so,
+                    'ten_xe' => $cx->xe->ten_xe,
+                ] : null,
+                'tai_xe' => $cx->taiXe ? [
+                    'id' => $cx->taiXe->id,
+                    'ho_ten' => $cx->taiXe->ho_va_ten ?? $cx->taiXe->ho_ten,
+                ] : null,
+                'is_live' => $isLive,
+                'last_update_seconds' => $lastUpdateSeconds,
+            ];
+        }
+
+        return array_values($tripsMap);
     }
 
     public function pruneOlderThanDays(int $days = 30, int $chunkSize = 5000): int

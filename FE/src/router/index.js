@@ -56,6 +56,16 @@ const router = createRouter({
           beforeEnter: checkClientLogin,
         },
         {
+          path: 'theo-doi-chuyen-xe',
+          name: 'tracking-relative',
+          component: () => import('../views/user/TrackingView.vue'),
+        },
+        {
+          path: 'hop-tac',
+          name: 'partner',
+          component: () => import('../views/user/PartnerView.vue'),
+        },
+        {
           path: 've-cua-toi',
           redirect: { name: 'client-ticket-history' },
         },
@@ -313,6 +323,11 @@ const router = createRouter({
           path: 'operator-login',
           name: 'operator-login',
           component: () => import('../views/auth/OperatorLoginView.vue'),
+        },
+        {
+          path: 'operator-register',
+          name: 'operator-register',
+          component: () => import('../views/auth/OperatorRegister.vue'),
         },
         {
           path: 'driver-login',

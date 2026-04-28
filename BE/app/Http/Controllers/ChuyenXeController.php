@@ -306,13 +306,13 @@ class ChuyenXeController extends Controller
                 $data = $this->trackingService->getLiveTrackingForUser((int) $id, $user);
             } else {
                 $request->validate([
-                    'ma_ve' => 'required|string',
+                    'ma_ve' => 'nullable|string',
                     'so_dien_thoai' => 'required|string|max:20',
                 ]);
 
                 $data = $this->trackingService->getLiveTrackingForRelative(
                     (int) $id,
-                    (string) $request->ma_ve,
+                    (string) ($request->ma_ve ?? ''),
                     (string) $request->so_dien_thoai
                 );
             }
@@ -369,6 +369,30 @@ class ChuyenXeController extends Controller
             return response()->json(['success' => true, 'data' => $data]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+    }
+
+    /**
+     * Tra cứu chuyến xe đang chạy theo SĐT khách hàng.
+     * Dùng cho người thân theo dõi hành trình.
+     */
+    public function lookupTripsByPhone(Request $request)
+    {
+        try {
+            $request->validate([
+                'so_dien_thoai' => 'required|string|max:20',
+            ]);
+
+            $data = $this->trackingService->lookupActiveTripsByPhone(
+                trim($request->so_dien_thoai)
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
 }
