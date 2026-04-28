@@ -37,7 +37,7 @@ class BaoCaoThongKeService
             ])
             ->whereBetween('thoi_gian_dat', [$tu, $den])
             ->when($maNhaXe, function ($q) use ($maNhaXe) {
-                $q->whereHas('chuyenXe.tuyenDuong', fn ($qq) => $qq->where('ma_nha_xe', $maNhaXe));
+                $q->whereHas('chuyenXe.tuyenDuong', fn($qq) => $qq->where('ma_nha_xe', $maNhaXe));
             });
     }
 
@@ -55,7 +55,7 @@ class BaoCaoThongKeService
 
         $groupedByMonth = $tickets->groupBy(function ($ve) {
             return optional($ve->thoi_gian_dat)->format('Y-m');
-        })->filter(fn ($group, $key) => ! empty($key));
+        })->filter(fn($group, $key) => !empty($key));
 
         $theoThoiGian = $groupedByMonth->map(function (Collection $group, string $key) {
             $first = $group->first();
@@ -64,7 +64,7 @@ class BaoCaoThongKeService
                 'ngay' => optional($first->thoi_gian_dat)->toDateString(),
                 'label' => Carbon::parse($key . '-01')->translatedFormat('m/Y'),
                 'so_ve' => $group->count(),
-                'doanh_thu' => (float) $group->sum(fn ($ve) => (float) ($ve->tong_tien ?? 0)),
+                'doanh_thu' => (float) $group->sum(fn($ve) => (float) ($ve->tong_tien ?? 0)),
             ];
         })->values()->sortBy('period')->values();
 
@@ -82,7 +82,7 @@ class BaoCaoThongKeService
                     'diem_bat_dau' => $route?->diem_bat_dau,
                     'diem_ket_thuc' => $route?->diem_ket_thuc,
                     'so_ve' => $group->count(),
-                    'doanh_thu' => (float) $group->sum(fn ($ve) => (float) ($ve->tong_tien ?? 0)),
+                    'doanh_thu' => (float) $group->sum(fn($ve) => (float) ($ve->tong_tien ?? 0)),
                 ];
             })
             ->values()
@@ -97,7 +97,7 @@ class BaoCaoThongKeService
                     'id_chuyen_xe' => $first->id_chuyen_xe,
                     'ten_tuyen_duong' => $first?->chuyenXe?->tuyenDuong?->ten_tuyen_duong,
                     'so_ve' => $group->count(),
-                    'tong_doanh_thu' => (float) $group->sum(fn ($ve) => (float) ($ve->tong_tien ?? 0)),
+                    'tong_doanh_thu' => (float) $group->sum(fn($ve) => (float) ($ve->tong_tien ?? 0)),
                 ];
             })
             ->values()
@@ -113,7 +113,7 @@ class BaoCaoThongKeService
                     'id_khach_hang' => $first->id_khach_hang,
                     'ten_khach_hang' => $first?->khachHang?->ho_va_ten ?? $first?->nguoiDat?->ho_va_ten ?? 'Khách hàng',
                     'so_ve' => $group->count(),
-                    'tong_doanh_thu' => (float) $group->sum(fn ($ve) => (float) ($ve->tong_tien ?? 0)),
+                    'tong_doanh_thu' => (float) $group->sum(fn($ve) => (float) ($ve->tong_tien ?? 0)),
                 ];
             })
             ->values()
@@ -151,7 +151,7 @@ class BaoCaoThongKeService
                     'diem_bat_dau' => $route?->diem_bat_dau,
                     'diem_ket_thuc' => $route?->diem_ket_thuc,
                     'so_ve' => $group->count(),
-                    'doanh_thu' => (float) $group->sum(fn ($ve) => (float) ($ve->tong_tien ?? 0)),
+                    'doanh_thu' => (float) $group->sum(fn($ve) => (float) ($ve->tong_tien ?? 0)),
                 ];
             })
             ->values()
@@ -164,8 +164,8 @@ class BaoCaoThongKeService
     {
         $tickets = $this->baseTicketQuery($maNhaXe, $tuNgay, $denNgay)->get();
 
-        $completed = $tickets->filter(fn ($ve) => in_array($ve->tinh_trang, ['hoan_thanh', 'confirmed', 1, '1'], true))->count();
-        $cancelled = $tickets->filter(fn ($ve) => in_array($ve->tinh_trang, ['da_huy', 'cancelled', 0, '0'], true))->count();
+        $completed = $tickets->filter(fn($ve) => in_array($ve->tinh_trang, ['hoan_thanh', 'confirmed', 1, '1'], true))->count();
+        $cancelled = $tickets->filter(fn($ve) => in_array($ve->tinh_trang, ['da_huy', 'cancelled', 0, '0'], true))->count();
         $pending = max($tickets->count() - $completed - $cancelled, 0);
 
         return [

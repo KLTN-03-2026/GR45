@@ -28,25 +28,25 @@ ChartJS.register(
 // ─── Bộ lọc thời gian ───────────────────────────────────────────────
 const filterType = ref('year') // 'range' | 'month' | 'quarter' | 'year'
 const y0 = String(new Date().getFullYear())
-const dateFrom   = ref(`${y0}-01-01`)
-const dateTo     = ref(`${y0}-12-31`)
-const selectedMonth       = ref(`${y0}-01`)
+const dateFrom = ref(`${y0}-01-01`)
+const dateTo = ref(`${y0}-12-31`)
+const selectedMonth = ref(`${y0}-01`)
 const selectedQuarterYear = ref(y0)    // năm quý
-const selectedQuarterNum  = ref('1')       // số quý 1-4
-const selectedYear        = ref(y0)
+const selectedQuarterNum = ref('1')       // số quý 1-4
+const selectedYear = ref(y0)
 const compareMode = ref(false)
 
 const filterTabs = [
-  { key: 'range',   label: 'Khoảng ngày' },
-  { key: 'month',   label: 'Theo tháng' },
+  { key: 'range', label: 'Khoảng ngày' },
+  { key: 'month', label: 'Theo tháng' },
   { key: 'quarter', label: 'Theo quý' },
-  { key: 'year',    label: 'Theo năm' },
+  { key: 'year', label: 'Theo năm' },
 ]
 
 // ─── Dữ liệu chart (doanh thu/vé theo tháng, nhà xe – lấy từ API) ──
 const monthlyRevenue = ref(Array(12).fill(0))
 const monthlyTickets = ref(Array(12).fill(0))
-const revenueByBus   = ref([])
+const revenueByBus = ref([])
 
 // KPI tổng quan – sẽ được cập nhật từ API
 const totalStats = ref({
@@ -162,7 +162,7 @@ const fetchBaoCaoAdmin = async (tuNgay, denNgay, gen) => {
       }
       if (Array.isArray(d.theo_nha_xe) && d.theo_nha_xe.length) {
         const maxDT = Math.max(...d.theo_nha_xe.map((x) => Number(x.doanh_thu ?? 0)), 1)
-        revenueByBus.value = d.theo_nha_xe.slice(0, 7).map((x) => ({
+        revenueByBus.value = d.theo_nha_xe.slice(0, 10).map((x) => ({
           name: x.ten_nha_xe ?? x.name ?? 'N/A',
           revenue: Number(x.doanh_thu ?? 0),
           tickets: Number(x.so_ve ?? 0),
@@ -213,12 +213,12 @@ const buildDateRange = () => {
   if (filterType.value === 'range') return { tuNgay: dateFrom.value, denNgay: dateTo.value }
   if (filterType.value === 'month') {
     const [y, m] = selectedMonth.value.split('-').map(Number)
-    return { tuNgay: `${y}-${String(m).padStart(2,'0')}-01`, denNgay: `${y}-${String(m).padStart(2,'0')}-${new Date(y, m, 0).getDate()}` }
+    return { tuNgay: `${y}-${String(m).padStart(2, '0')}-01`, denNgay: `${y}-${String(m).padStart(2, '0')}-${new Date(y, m, 0).getDate()}` }
   }
   if (filterType.value === 'quarter') {
     const y = Number(selectedQuarterYear.value), q = Number(selectedQuarterNum.value)
-    const sm = (q-1)*3+1, em = q*3
-    return { tuNgay: `${y}-${String(sm).padStart(2,'0')}-01`, denNgay: `${y}-${String(em).padStart(2,'0')}-${new Date(y, em, 0).getDate()}` }
+    const sm = (q - 1) * 3 + 1, em = q * 3
+    return { tuNgay: `${y}-${String(sm).padStart(2, '0')}-01`, denNgay: `${y}-${String(em).padStart(2, '0')}-${new Date(y, em, 0).getDate()}` }
   }
   return { tuNgay: `${selectedYear.value}-01-01`, denNgay: `${selectedYear.value}-12-31` }
 }
@@ -387,9 +387,9 @@ const fetchStats = async (tuNgay, denNgay, gen) => {
       0
     )
     const tc = Number(pl?.trang_thai?.thanh_cong ?? pl?.so_thanh_cong ?? 0)
-    const tb = Number(pl?.trang_thai?.that_bai   ?? pl?.so_that_bai   ?? 0)
-    const cho= Number(pl?.trang_thai?.cho_xu_ly  ?? pl?.so_cho_xu_ly  ?? 0)
-    const tot= tc + tb + cho || Number(pl?.so_giao_dich ?? pl?.total_count ?? 0)
+    const tb = Number(pl?.trang_thai?.that_bai ?? pl?.so_that_bai ?? 0)
+    const cho = Number(pl?.trang_thai?.cho_xu_ly ?? pl?.so_cho_xu_ly ?? 0)
+    const tot = tc + tb + cho || Number(pl?.so_giao_dich ?? pl?.total_count ?? 0)
 
     const preferBaoCao = baoCaoSetsPrimaryKpi.value
 
@@ -419,7 +419,7 @@ const fetchStats = async (tuNgay, denNgay, gen) => {
         }
         if (Array.isArray(pl?.theo_nha_xe) && pl.theo_nha_xe.length) {
           const maxDT = Math.max(...pl.theo_nha_xe.map(x => Number(x.doanh_thu ?? 0)), 1)
-          revenueByBus.value = pl.theo_nha_xe.slice(0, 7).map(x => ({ name: x.ten_nha_xe ?? x.name ?? 'N/A', revenue: Number(x.doanh_thu ?? 0), tickets: Number(x.so_ve ?? 0), pct: Math.round((Number(x.doanh_thu ?? 0) / maxDT) * 100) }))
+          revenueByBus.value = pl.theo_nha_xe.slice(0, 10).map(x => ({ name: x.ten_nha_xe ?? x.name ?? 'N/A', revenue: Number(x.doanh_thu ?? 0), tickets: Number(x.so_ve ?? 0), pct: Math.round((Number(x.doanh_thu ?? 0) / maxDT) * 100) }))
         }
         if (Array.isArray(pl?.theo_tuyen) && pl.theo_tuyen.length) {
           const mapped = pl.theo_tuyen.map((x) => ({
@@ -468,7 +468,7 @@ const fetchStatsFromList = async (tuNgay, denNgay, gen) => {
   if (baoCaoSetsPrimaryKpi.value) return
   try {
     // Lấy toàn bộ danh sách (BE có thể không filter theo ngày)
-    const res  = await adminApi.getPayments({ per_page: 2000, page: 1 })
+    const res = await adminApi.getPayments({ per_page: 2000, page: 1 })
     if (gen !== undefined && gen !== thongKeLoadGen.value) return
     const list = extractPaginatedRows(res)
     if (!list.length) return
@@ -480,13 +480,13 @@ const fetchStatsFromList = async (tuNgay, denNgay, gen) => {
     )
 
     // ── Lọc client-side theo khoảng ngày đang chọn ───────────────────────
-    const fromMs = tuNgay  ? new Date(tuNgay).getTime()              : null
-    const toMs   = denNgay ? new Date(denNgay + 'T23:59:59').getTime() : null
+    const fromMs = tuNgay ? new Date(tuNgay).getTime() : null
+    const toMs = denNgay ? new Date(denNgay + 'T23:59:59').getTime() : null
     const filteredList = list.filter(pm => {
       const d = getDate(pm)
       if (isNaN(d)) return false                         // bỏ record không có ngày
       if (fromMs && d.getTime() < fromMs) return false
-      if (toMs   && d.getTime() > toMs)   return false
+      if (toMs && d.getTime() > toMs) return false
       return true
     })
     console.log('[ThongKe-fallback] sau khi loc theo ngay:', filteredList.length, 'ban ghi (', tuNgay, '->', denNgay, ')')
@@ -513,13 +513,13 @@ const fetchStatsFromList = async (tuNgay, denNgay, gen) => {
     totalStats.value = {
       ...totalStats.value,
       tongDoanhThu,
-      tongVe:        tot,
-      veHoanThanh:   thanhCongList.length,
-      veHuy:         thatBaiList.length,
-      veCho:         choList.length,
+      tongVe: tot,
+      veHoanThanh: thanhCongList.length,
+      veHuy: thatBaiList.length,
+      veCho: choList.length,
       tyLeHoanThanh: tot > 0 ? +((thanhCongList.length / tot) * 100).toFixed(1) : 0,
-      tyLeHuy:       tot > 0 ? +((thatBaiList.length   / tot) * 100).toFixed(1) : 0,
-      tyLeCho:       tot > 0 ? +((choList.length        / tot) * 100).toFixed(1) : 0,
+      tyLeHuy: tot > 0 ? +((thatBaiList.length / tot) * 100).toFixed(1) : 0,
+      tyLeCho: tot > 0 ? +((choList.length / tot) * 100).toFixed(1) : 0,
     }
 
     // ── Chart: doanh thu + số vé theo tháng ──────────────────────────────
@@ -546,27 +546,27 @@ const fetchChuyenXe = async () => {
 }
 
 // ─── Dữ liệu thanh toán từ API ─────────────────────────────────────
-const payments      = ref([])       // danh sách thanh toán trang hiện tại
-const paymentsMeta  = ref(null)     // meta phân trang { current_page, last_page, total, per_page }
+const payments = ref([])       // danh sách thanh toán trang hiện tại
+const paymentsMeta = ref(null)     // meta phân trang { current_page, last_page, total, per_page }
 const paymentsError = ref(null)     // lỗi nếu có
 const paymentsLoading = ref(false)
 
 // Bộ lọc cho bảng thanh toán (độc lập với bộ lọc biểu đồ)
 const pmFilter = ref({
-  search:      '',
-  trang_thai:  '',   // '' = tất cả | 1 = thành công | 0 = thất bại | 2 = hoàn tiền
+  search: '',
+  trang_thai: '',   // '' = tất cả | 1 = thành công | 0 = thất bại | 2 = hoàn tiền
   phuong_thuc: '',   // '' = tất cả | 1 = VNPay | 2 = Momo | 3 = tiền mặt ...
-  tu_ngay:     '',
-  den_ngay:    '',
-  page:        1,
-  per_page:    15,
+  tu_ngay: '',
+  den_ngay: '',
+  page: 1,
+  per_page: 15,
 })
 
 // Nhãn trạng thái thanh toán
 const pmTrangThaiLabel = (tt) => {
   if (tt == 1 || tt === 'thanh_cong') return { text: 'Thành công', cls: 'badge-green' }
-  if (tt == 0 || tt === 'that_bai')   return { text: 'Thất bại',   cls: 'badge-red' }
-  if (tt == 2 || tt === 'hoan_tien')  return { text: 'Hoàn tiền',  cls: 'badge-yellow' }
+  if (tt == 0 || tt === 'that_bai') return { text: 'Thất bại', cls: 'badge-red' }
+  if (tt == 2 || tt === 'hoan_tien') return { text: 'Hoàn tiền', cls: 'badge-yellow' }
   return { text: tt ?? 'N/A', cls: '' }
 }
 
@@ -574,9 +574,9 @@ const pmTrangThaiLabel = (tt) => {
 const pmPhuongThucLabel = (pt) => {
   if (!pt) return 'Khác'
   const v = String(pt).toLowerCase()
-  if (v === 'momo'    || v === '2') return 'MoMo'
-  if (v === 'vnpay'   || v === '1') return 'VNPay'
-  if (v === 'tien_mat'|| v === '3') return 'Tiền mặt'
+  if (v === 'momo' || v === '2') return 'MoMo'
+  if (v === 'vnpay' || v === '1') return 'VNPay'
+  if (v === 'tien_mat' || v === '3') return 'Tiền mặt'
   if (v === 'zalopay' || v === '4') return 'ZaloPay'
   return pt
 }
@@ -584,7 +584,7 @@ const pmPhuongThucLabel = (pt) => {
 // Gọi API lấy danh sách thanh toán (phân trang cho bảng)
 const fetchPayments = async () => {
   paymentsLoading.value = true
-  paymentsError.value   = null
+  paymentsError.value = null
   try {
     // Chỉ gửi các param có giá trị
     const params = Object.fromEntries(
@@ -616,7 +616,7 @@ const pmApplyFilter = () => {
 // Computed số trang bảng thanh toán (window ±2)
 const pmPageNumbers = computed(() => {
   const total = paymentsMeta.value?.last_page ?? 1
-  const cur   = paymentsMeta.value?.current_page ?? 1
+  const cur = paymentsMeta.value?.current_page ?? 1
   const range = []
   for (let i = Math.max(1, cur - 2); i <= Math.min(total, cur + 2); i++) range.push(i)
   return range
@@ -657,7 +657,7 @@ const applyPaymentRevenueTotal = async (tuNgay, denNgay, gen) => {
     let page = 1
     const perPage = 200
     let lastPage = 1
-    for (;;) {
+    for (; ;) {
       const res = await adminApi.getPayments({
         tu_ngay: tuNgay,
         den_ngay: denNgay,
@@ -742,7 +742,7 @@ onMounted(async () => {
 const formatMoney = (n) => {
   if (!n) return '0 đ'
   if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + ' tỷ'
-  if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1) + ' triệu'
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + ' triệu'
   return n.toLocaleString('vi-VN') + ' đ'
 }
 const formatFull = (n) => (n ?? 0).toLocaleString('vi-VN') + ' ₫'
@@ -763,7 +763,7 @@ const baseTooltip = {
 }
 
 const revenueLineData = computed(() => ({
-  labels: ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'],
+  labels: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'],
   datasets: [{
     label: 'Doanh thu (triệu đ)',
     data: monthlyRevenue.value.map(v => +(v / 1_000_000).toFixed(1)),
@@ -774,7 +774,7 @@ const revenueLineData = computed(() => ({
 }))
 
 const ticketBarData = computed(() => ({
-  labels: ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'],
+  labels: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'],
   datasets: [{
     label: 'Số vé',
     data: monthlyTickets.value,
@@ -787,17 +787,17 @@ const quarterBarData = computed(() => {
   const m = monthlyRevenue.value
   const qYear = filterType.value === 'quarter' ? selectedQuarterYear.value : selectedYear.value
   const qs = [
-    { label: `Q1/${qYear}`, value: m[0]+m[1]+m[2] },
-    { label: `Q2/${qYear}`, value: m[3]+m[4]+m[5] },
-    { label: `Q3/${qYear}`, value: m[6]+m[7]+m[8] },
-    { label: `Q4/${qYear}`, value: m[9]+m[10]+m[11] },
+    { label: `Q1/${qYear}`, value: m[0] + m[1] + m[2] },
+    { label: `Q2/${qYear}`, value: m[3] + m[4] + m[5] },
+    { label: `Q3/${qYear}`, value: m[6] + m[7] + m[8] },
+    { label: `Q4/${qYear}`, value: m[9] + m[10] + m[11] },
   ]
   return {
     labels: qs.map(q => q.label),
     datasets: [{
       label: 'Doanh thu (tỷ đ)',
       data: qs.map(q => +(q.value / 1_000_000_000).toFixed(3)),
-      backgroundColor: ['rgba(34,197,94,0.85)','rgba(59,130,246,0.85)','rgba(168,85,247,0.85)','rgba(249,115,22,0.85)'],
+      backgroundColor: ['rgba(34,197,94,0.85)', 'rgba(59,130,246,0.85)', 'rgba(168,85,247,0.85)', 'rgba(249,115,22,0.85)'],
       borderRadius: 10, borderSkipped: false,
     }]
   }
@@ -851,6 +851,21 @@ const quarterOptions = {
   plugins: { legend: { display: false }, tooltip: { ...baseTooltip, callbacks: { label: ctx => ' ' + ctx.raw + ' tỷ đ' } } }
 }
 
+const operatorBarData = computed(() => ({
+  labels: revenueByBus.value.map(b => b.name),
+  datasets: [{
+    label: 'Doanh thu (triệu đ)',
+    data: revenueByBus.value.map(b => +(b.revenue / 1000000).toFixed(1)),
+    backgroundColor: 'rgba(59,130,246,0.85)',
+    borderRadius: 8, borderSkipped: false,
+  }]
+}))
+
+const operatorBarOptions = {
+  ...barOptions,
+  plugins: { legend: { display: false }, tooltip: { ...baseTooltip, callbacks: { label: ctx => ' ' + ctx.raw + ' triệu đ' } } }
+}
+
 const doughnutOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -868,14 +883,14 @@ const doughnutOptions = {
 // ─── Tab biểu đồ ────────────────────────────────────────────────────
 const activeChartTab = ref('revenue')
 const chartTabs = [
-  { key: 'revenue',  label: 'Doanh thu / Tháng', icon: TrendingUp },
-  { key: 'tickets',  label: 'Vé bán / Tháng',    icon: Ticket },
-  { key: 'quarter',  label: 'Doanh thu / Quý',   icon: BarChart2 },
+  { key: 'revenue', label: 'Doanh thu / Tháng', icon: TrendingUp },
+  { key: 'tickets', label: 'Vé bán / Tháng', icon: Ticket },
+  { key: 'quarter', label: 'Doanh thu / Quý', icon: BarChart2 },
 ]
 
 // dailyData giữ lại để tránh lỗi template (không dùng nữa)
 const currentPage = ref(1)
-const dailyData   = ref([])
+const dailyData = ref([])
 
 // ─── Xuất PDF (ưu tiên BE blob; không được thì in trình duyệt) ───────
 const isExportingPdf = ref(false)
@@ -948,7 +963,7 @@ const handleExportExcel = async () => {
       console.warn('[ThongKe] export Excel BE:', e)
     }
 
-    const now    = new Date()
+    const now = new Date()
     const period = filterType.value === 'year'
       ? `Năm ${selectedYear.value}`
       : filterType.value === 'month'
@@ -957,8 +972,8 @@ const handleExportExcel = async () => {
           ? `Quý ${selectedQuarterNum.value}/${selectedQuarterYear.value}`
           : `${dateFrom.value} → ${dateTo.value}`
 
-    const stats  = totalStats.value
-    const months = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']
+    const stats = totalStats.value
+    const months = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']
 
     // == S1: Tổng quan ==
     const s1 = [
@@ -989,12 +1004,12 @@ const handleExportExcel = async () => {
       ['Tháng', 'Doanh thu (VNĐ)', 'Số vé', 'Doanh thu (triệu đ)'],
     ]
     months.forEach((m, i) => {
-      s2.push([m, monthlyRevenue.value[i], monthlyTickets.value[i], +(monthlyRevenue.value[i]/1_000_000).toFixed(3)])
+      s2.push([m, monthlyRevenue.value[i], monthlyTickets.value[i], +(monthlyRevenue.value[i] / 1_000_000).toFixed(3)])
     })
     const totalRev = monthlyRevenue.value.reduce((a, b) => a + b, 0)
-    const totalTk  = monthlyTickets.value.reduce((a, b) => a + b, 0)
+    const totalTk = monthlyTickets.value.reduce((a, b) => a + b, 0)
     s2.push([])
-    s2.push(['TỔNG CỘNG', totalRev, totalTk, +(totalRev/1_000_000).toFixed(3)])
+    s2.push(['TỔNG CỘNG', totalRev, totalTk, +(totalRev / 1_000_000).toFixed(3)])
 
     // == S3: Doanh thu theo quý ==
     const rev = monthlyRevenue.value
@@ -1004,13 +1019,13 @@ const handleExportExcel = async () => {
       ['Quý', 'Tháng', 'Doanh thu (VNĐ)', 'Tỷ trọng (%)'],
     ]
     const qData = [
-      { label: `Q1/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T1–T3', val: rev[0]+rev[1]+rev[2] },
-      { label: `Q2/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T4–T6', val: rev[3]+rev[4]+rev[5] },
-      { label: `Q3/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T7–T9', val: rev[6]+rev[7]+rev[8] },
-      { label: `Q4/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T10–T12', val: rev[9]+rev[10]+rev[11] },
+      { label: `Q1/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T1–T3', val: rev[0] + rev[1] + rev[2] },
+      { label: `Q2/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T4–T6', val: rev[3] + rev[4] + rev[5] },
+      { label: `Q3/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T7–T9', val: rev[6] + rev[7] + rev[8] },
+      { label: `Q4/${filterType.value === 'year' ? selectedYear.value : ''}`, months: 'T10–T12', val: rev[9] + rev[10] + rev[11] },
     ]
     const qTotal = qData.reduce((s, q) => s + q.val, 0)
-    qData.forEach(q => s3.push([q.label, q.months, q.val, qTotal > 0 ? +((q.val/qTotal)*100).toFixed(1) : 0]))
+    qData.forEach(q => s3.push([q.label, q.months, q.val, qTotal > 0 ? +((q.val / qTotal) * 100).toFixed(1) : 0]))
     s3.push([])
     s3.push(['TỔNG CỘNG', '', qTotal, '100%'])
 
@@ -1026,10 +1041,13 @@ const handleExportExcel = async () => {
       try {
         const res = await adminApi.getPayments({ per_page: 2000, page: 1, ...(tuNgay && { tu_ngay: tuNgay }), ...(denNgay && { den_ngay: denNgay }) })
         detailData = (res?.data ?? res)?.data ?? []
-      } catch {}
+      } catch { }
     }
+    // lấy số tiền
     const getST2 = pm => Number(pm.so_tien_thuc_thu ?? pm.so_tien ?? pm.tong_tien ?? 0)
-    const getPT  = pm => pmPhuongThucLabel(pm.phuong_thuc)
+    // lấy phương thức thanh toán
+    const getPT = pm => pmPhuongThucLabel(pm.phuong_thuc)
+    // lấy trạng thái thanh toán
     const getTT2 = pm => {
       const s = pmTrangThaiLabel(pm.trang_thai ?? pm.status)
       return s.text ?? (pm.trang_thai ?? 'N/A')
@@ -1112,10 +1130,10 @@ const handleExportExcel = async () => {
       + '</Workbook>'
 
     const blob = new Blob([xlsContent], { type: 'application/vnd.ms-excel;charset=utf-8' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    const filename = `BaoCao_ThongKe_${period.replace(/[/\\: ]/g,'_')}_${now.toISOString().slice(0,10)}.xls`
-    a.href     = url
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const filename = `BaoCao_ThongKe_${period.replace(/[/\\: ]/g, '_')}_${now.toISOString().slice(0, 10)}.xls`
+    a.href = url
     a.download = filename
     document.body.appendChild(a)
     a.click()
@@ -1145,16 +1163,13 @@ const handleExportExcel = async () => {
         </div>
       </div>
       <div class="header-actions">
-        <button
-          class="btn-compare"
-          :class="{ active: compareMode }"
-          @click="compareMode = !compareMode"
-          id="btn-compare-mode"
-        >
+        <button class="btn-compare" :class="{ active: compareMode }" @click="compareMode = !compareMode"
+          id="btn-compare-mode">
           <TrendingUp class="btn-icon" />
           So sánh năm trước
         </button>
-        <button class="btn-export btn-export--secondary" type="button" id="btn-export-pdf" @click="handleExportPdf" :disabled="isExportingPdf">
+        <button class="btn-export btn-export--secondary" type="button" id="btn-export-pdf" @click="handleExportPdf"
+          :disabled="isExportingPdf">
           <FileText class="btn-icon" />
           {{ isExportingPdf ? 'Đang mở...' : 'Xuất PDF' }}
         </button>
@@ -1171,14 +1186,8 @@ const handleExportExcel = async () => {
     <!-- ═══ BỘ LỌC THỜI GIAN ═══ -->
     <div class="filter-card">
       <div class="filter-tabs">
-        <button
-          v-for="tab in filterTabs"
-          :key="tab.key"
-          class="filter-tab"
-          :class="{ active: filterType === tab.key }"
-          @click="onChangeFilterTab(tab.key)"
-          :id="`filter-tab-${tab.key}`"
-        >
+        <button v-for="tab in filterTabs" :key="tab.key" class="filter-tab" :class="{ active: filterType === tab.key }"
+          @click="onChangeFilterTab(tab.key)" :id="`filter-tab-${tab.key}`">
           <Calendar class="tab-icon" />
           {{ tab.label }}
         </button>
@@ -1201,22 +1210,27 @@ const handleExportExcel = async () => {
         <template v-if="filterType === 'month'">
           <div class="input-group">
             <label>Chọn tháng</label>
-            <input type="month" v-model="selectedMonth" class="date-input" id="input-month" @change="handleApplyFilter" />
+            <input type="month" v-model="selectedMonth" class="date-input" id="input-month"
+              @change="handleApplyFilter" />
           </div>
         </template>
 
         <template v-if="filterType === 'quarter'">
           <div class="input-group">
-            <label><Calendar class="label-icon" /> Chọn quý</label>
+            <label>
+              <Calendar class="label-icon" /> Chọn quý
+            </label>
             <div class="quarter-wrap">
-              <select v-model="selectedQuarterYear" class="date-input quarter-sel" id="input-quarter-year" @change="handleApplyFilter">
+              <select v-model="selectedQuarterYear" class="date-input quarter-sel" id="input-quarter-year"
+                @change="handleApplyFilter">
                 <option value="2026">2026</option>
                 <option value="2025">2025</option>
                 <option value="2024">2024</option>
                 <option value="2023">2023</option>
               </select>
               <span class="input-sep">–</span>
-              <select v-model="selectedQuarterNum" class="date-input quarter-sel" id="input-quarter-num" @change="handleApplyFilter">
+              <select v-model="selectedQuarterNum" class="date-input quarter-sel" id="input-quarter-num"
+                @change="handleApplyFilter">
                 <option value="1">Quý 1 (T1-T3)</option>
                 <option value="2">Quý 2 (T4-T6)</option>
                 <option value="3">Quý 3 (T7-T9)</option>
@@ -1228,7 +1242,9 @@ const handleExportExcel = async () => {
 
         <template v-if="filterType === 'year'">
           <div class="input-group">
-            <label><Calendar class="label-icon" /> Chọn năm</label>
+            <label>
+              <Calendar class="label-icon" /> Chọn năm
+            </label>
             <select v-model="selectedYear" class="date-input" id="input-year" @change="handleApplyFilter">
               <option value="2026">Năm 2026</option>
               <option value="2025">Năm 2025</option>
@@ -1238,13 +1254,8 @@ const handleExportExcel = async () => {
           </div>
         </template>
 
-        <button
-          class="btn-apply"
-          id="btn-apply-filter"
-          :class="{ loading: paymentsLoading }"
-          :disabled="paymentsLoading"
-          @click="handleApplyFilter"
-        >
+        <button class="btn-apply" id="btn-apply-filter" :class="{ loading: paymentsLoading }"
+          :disabled="paymentsLoading" @click="handleApplyFilter">
           <template v-if="paymentsLoading">
             <div class="btn-spinner"></div>
             Đang tải...
@@ -1261,7 +1272,9 @@ const handleExportExcel = async () => {
     <div class="kpi-grid kpi-grid--four">
       <div class="kpi-card kpi-green">
         <div class="kpi-top">
-          <div class="kpi-icon-wrap green"><DollarSign class="kpi-icon" /></div>
+          <div class="kpi-icon-wrap green">
+            <DollarSign class="kpi-icon" />
+          </div>
         </div>
         <p class="kpi-label">Tổng doanh thu</p>
         <h2 class="kpi-value">{{ formatMoney(totalStats.tongDoanhThu) }}</h2>
@@ -1270,7 +1283,9 @@ const handleExportExcel = async () => {
 
       <div class="kpi-card kpi-blue">
         <div class="kpi-top">
-          <div class="kpi-icon-wrap blue"><Ticket class="kpi-icon" /></div>
+          <div class="kpi-icon-wrap blue">
+            <Ticket class="kpi-icon" />
+          </div>
         </div>
         <p class="kpi-label">Tổng số vé đã bán</p>
         <h2 class="kpi-value">{{ totalStats.tongVeDaBan.toLocaleString() }}</h2>
@@ -1279,7 +1294,9 @@ const handleExportExcel = async () => {
 
       <div class="kpi-card kpi-purple">
         <div class="kpi-top">
-          <div class="kpi-icon-wrap purple"><Percent class="kpi-icon" /></div>
+          <div class="kpi-icon-wrap purple">
+            <Percent class="kpi-icon" />
+          </div>
         </div>
         <p class="kpi-label">Tỷ lệ lấp đầy ghế TB</p>
         <h2 class="kpi-value">{{ totalStats.tyLeLapDay }}%</h2>
@@ -1288,7 +1305,9 @@ const handleExportExcel = async () => {
 
       <div class="kpi-card kpi-orange">
         <div class="kpi-top">
-          <div class="kpi-icon-wrap orange"><Users class="kpi-icon" /></div>
+          <div class="kpi-icon-wrap orange">
+            <Users class="kpi-icon" />
+          </div>
         </div>
         <p class="kpi-label">Khách hàng mới</p>
         <h2 class="kpi-value">{{ totalStats.khachHangMoi.toLocaleString() }}</h2>
@@ -1297,9 +1316,15 @@ const handleExportExcel = async () => {
     </div>
 
     <div class="kpi-secondary-bar">
-      <span><Building2 class="inline-ic" /> Nhà xe: <strong>{{ totalStats.tongNhaXe }}</strong></span>
-      <span><Bus class="inline-ic" /> Chuyến xe (hệ thống): <strong>{{ totalStats.tongChuyenXe }}</strong></span>
-      <span><Users class="inline-ic" /> Khách hàng (tổng): <strong>{{ totalStats.tongKhachHang }}</strong></span>
+      <span>
+        <Building2 class="inline-ic" /> Nhà xe: <strong>{{ totalStats.tongNhaXe }}</strong>
+      </span>
+      <span>
+        <Bus class="inline-ic" /> Chuyến xe (hệ thống): <strong>{{ totalStats.tongChuyenXe }}</strong>
+      </span>
+      <span>
+        <Users class="inline-ic" /> Khách hàng (tổng): <strong>{{ totalStats.tongKhachHang }}</strong>
+      </span>
     </div>
 
     <!-- ═══ BIỂU ĐỒ CHÍNH ═══ -->
@@ -1309,14 +1334,9 @@ const handleExportExcel = async () => {
       <div class="panel chart-panel">
         <div class="panel-header">
           <div class="chart-tabs">
-            <button
-              v-for="tab in chartTabs"
-              :key="tab.key"
-              class="chart-tab"
-              :class="{ active: activeChartTab === tab.key }"
-              @click="activeChartTab = tab.key"
-              :id="`chart-tab-${tab.key}`"
-            >
+            <button v-for="tab in chartTabs" :key="tab.key" class="chart-tab"
+              :class="{ active: activeChartTab === tab.key }" @click="activeChartTab = tab.key"
+              :id="`chart-tab-${tab.key}`">
               <component :is="tab.icon" class="chart-tab-icon" />
               {{ tab.label }}
             </button>
@@ -1386,16 +1406,16 @@ const handleExportExcel = async () => {
           <span class="panel-sub">Theo vé đã thanh toán trong kỳ</span>
         </div>
         <div class="route-list">
-          <div v-if="routeTop.length === 0" class="empty-hint">Chưa có dữ liệu tuyến — kiểm tra API vé có kèm chuyến/tuyến.</div>
-          <div v-for="(r, idx) in routeTop" :key="'top-'+r.label" class="route-item">
+          <div v-if="routeTop.length === 0" class="empty-hint">Chưa có dữ liệu tuyến — kiểm tra API vé có kèm
+            chuyến/tuyến.
+          </div>
+          <div v-for="(r, idx) in routeTop" :key="'top-' + r.label" class="route-item">
             <div class="route-rank" :class="`rank-${idx + 1}`">{{ idx + 1 }}</div>
             <div class="route-info">
               <p class="route-name">{{ r.label }}</p>
               <div class="route-bar-wrap">
-                <div
-                  class="route-bar-fill"
-                  :style="{ width: (routeTop[0]?.doanh_thu ? Math.min(100, (r.doanh_thu / routeTop[0].doanh_thu) * 100) : 0) + '%', background: idx < 3 ? '#22c55e' : '#3b82f6' }"
-                />
+                <div class="route-bar-fill"
+                  :style="{ width: (routeTop[0]?.doanh_thu ? Math.min(100, (r.doanh_thu / routeTop[0].doanh_thu) * 100) : 0) + '%', background: idx < 3 ? '#22c55e' : '#3b82f6' }" />
               </div>
             </div>
             <div class="route-stats">
@@ -1415,7 +1435,7 @@ const handleExportExcel = async () => {
         </div>
         <div class="route-list">
           <div v-if="routeBottom.length === 0" class="empty-hint">—</div>
-          <div v-for="(r, idx) in routeBottom" :key="'low-'+r.label" class="route-item route-item--warn">
+          <div v-for="(r, idx) in routeBottom" :key="'low-' + r.label" class="route-item route-item--warn">
             <div class="route-rank rank-muted">{{ idx + 1 }}</div>
             <div class="route-info">
               <p class="route-name">{{ r.label }}</p>
@@ -1436,127 +1456,13 @@ const handleExportExcel = async () => {
             <Building2 class="panel-icon" />
             Doanh thu theo nhà xe
           </h3>
-          <span class="panel-sub">Top 7 nhà xe</span>
+          <span class="panel-sub">Top 10 nhà xe</span>
         </div>
-        <div class="route-list">
-          <div v-for="(bus, idx) in revenueByBus" :key="idx" class="route-item">
-            <div class="route-rank" :class="`rank-${idx + 1}`">{{ idx + 1 }}</div>
-            <div class="route-info">
-              <p class="route-name">{{ bus.name }}</p>
-              <div class="route-bar-wrap">
-                <div
-                  class="route-bar-fill"
-                  :style="{ width: bus.pct + '%', background: idx < 3 ? '#22c55e' : '#3b82f6' }"
-                ></div>
-              </div>
-            </div>
-            <div class="route-stats">
-              <p class="route-revenue">{{ formatMoney(bus.revenue) }}</p>
-              <p class="route-tickets">{{ bus.tickets.toLocaleString() }} vé</p>
-            </div>
-            <div class="route-pct">{{ bus.pct }}%</div>
-          </div>
+        <div class="chart-body" style="height: 300px; padding: 16px;">
+          <Bar :data="operatorBarData" :options="operatorBarOptions" />
         </div>
       </div>
 
-      <!-- Chỉ số hiệu suất -->
-      <div class="panel rates-panel">
-        <div class="panel-header">
-          <h3 class="panel-title">
-            <Star class="panel-icon" />
-            Chỉ số hiệu suất
-          </h3>
-        </div>
-        <div class="rates-body">
-          <!-- Tỉ lệ hoàn thành -->
-          <div class="rate-card success">
-            <div class="rate-header">
-              <CheckCircle class="rate-icon green" />
-              <span>Hoàn thành</span>
-            </div>
-            <div class="rate-circle-wrap">
-              <svg class="rate-circle" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#dcfce7" stroke-width="8"/>
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#22c55e" stroke-width="8"
-                  stroke-dasharray="213.6"
-                  :stroke-dashoffset="213.6 * (1 - totalStats.tyLeHoanThanh / 100)"
-                  stroke-linecap="round" transform="rotate(-90 40 40)" />
-              </svg>
-              <span class="rate-pct green-text">{{ totalStats.tyLeHoanThanh }}%</span>
-            </div>
-            <p class="rate-desc">{{ totalStats.veHoanThanh.toLocaleString() }} / {{ totalStats.tongVe.toLocaleString() }} vé</p>
-          </div>
-
-          <!-- Tỉ lệ huỷ đơn -->
-          <div class="rate-card danger">
-            <div class="rate-header">
-              <XCircle class="rate-icon red" />
-              <span>Tỉ lệ huỷ</span>
-            </div>
-            <div class="rate-circle-wrap">
-              <svg class="rate-circle" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#fee2e2" stroke-width="8"/>
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#ef4444" stroke-width="8"
-                  stroke-dasharray="213.6"
-                  :stroke-dashoffset="213.6 * (1 - totalStats.tyLeHuy / 100)"
-                  stroke-linecap="round" transform="rotate(-90 40 40)" />
-              </svg>
-              <span class="rate-pct red-text">{{ totalStats.tyLeHuy }}%</span>
-            </div>
-            <p class="rate-desc">{{ totalStats.veHuy.toLocaleString() }} vé bị huỷ</p>
-          </div>
-
-          <!-- Tỉ lệ lấp đầy chỗ -->
-          <div class="rate-card info">
-            <div class="rate-header">
-              <Bus class="rate-icon blue" />
-              <span>Lấp đầy chỗ</span>
-            </div>
-            <div class="rate-circle-wrap">
-              <svg class="rate-circle" viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#dbeafe" stroke-width="8"/>
-                <circle cx="40" cy="40" r="34" fill="none" stroke="#3b82f6" stroke-width="8"
-                  stroke-dasharray="213.6" :stroke-dashoffset="213.6 * (1 - Math.min(100, totalStats.tyLeLapDay) / 100)"
-                  stroke-linecap="round" transform="rotate(-90 40 40)" />
-              </svg>
-              <span class="rate-pct blue-text">{{ totalStats.tyLeLapDay }}%</span>
-            </div>
-            <p class="rate-desc">Bình quân lấp đầy / chuyến (ước lượng)</p>
-          </div>
-        </div>
-
-        <!-- Chỉ số bổ sung -->
-        <div class="extra-stats">
-          <div class="ex-stat">
-            <TrendingUp class="ex-icon green" />
-            <div>
-              <p class="ex-label">Tăng trưởng DT</p>
-              <p class="ex-val green-text">{{ totalStats.tangTruong }}</p>
-            </div>
-          </div>
-          <div class="ex-stat">
-            <DollarSign class="ex-icon blue" />
-            <div>
-              <p class="ex-label">DT / Chuyến TB</p>
-              <p class="ex-val blue-text">{{ formatMoney(totalStats.tongChuyenXe ? Math.round(totalStats.tongDoanhThu / totalStats.tongChuyenXe) : 0) }}</p>
-            </div>
-          </div>
-          <div class="ex-stat">
-            <Users class="ex-icon purple" />
-            <div>
-              <p class="ex-label">Vé / Khách TB</p>
-              <p class="ex-val purple-text">{{ totalStats.tongKhachHang ? (totalStats.tongVe / totalStats.tongKhachHang).toFixed(1) : '0' }}</p>
-            </div>
-          </div>
-          <div class="ex-stat">
-            <Ticket class="ex-icon orange" />
-            <div>
-              <p class="ex-label">DT / Vé TB</p>
-              <p class="ex-val orange-text">{{ formatMoney(totalStats.tongVe ? Math.round(totalStats.tongDoanhThu / totalStats.tongVe) : 0) }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- ═══ BẢNG DANH SÁCH THANH TOÁN (DỮ LIỆU THỰC TỪ API) ═══ -->
@@ -1570,7 +1476,8 @@ const handleExportExcel = async () => {
           <span v-if="paymentsMeta" class="page-info-badge">
             Tổng {{ paymentsMeta.total }} bản ghi
           </span>
-          <button class="btn-refresh" :class="{ spinning: paymentsLoading }" @click="fetchPayments" id="btn-refresh-payments">
+          <button class="btn-refresh" :class="{ spinning: paymentsLoading }" @click="fetchPayments"
+            id="btn-refresh-payments">
             <RefreshCw class="btn-icon" />
           </button>
         </div>
@@ -1578,13 +1485,8 @@ const handleExportExcel = async () => {
 
       <!-- Bộ lọc thanh toán -->
       <div class="pm-filter-bar">
-        <input
-          v-model="pmFilter.search"
-          class="pm-input"
-          placeholder="Tìm mã GD, mã vé..."
-          id="pm-search"
-          @keyup.enter="pmApplyFilter"
-        />
+        <input v-model="pmFilter.search" class="pm-input" placeholder="Tìm mã GD, mã vé..." id="pm-search"
+          @keyup.enter="pmApplyFilter" />
         <select v-model="pmFilter.trang_thai" class="pm-select" id="pm-trang-thai">
           <option value="">Tất cả trạng thái</option>
           <option value="1">Thành công</option>
@@ -1597,7 +1499,7 @@ const handleExportExcel = async () => {
           <option value="2">MoMo</option>
           <option value="3">Tiền mặt</option>
         </select>
-        <input type="date" v-model="pmFilter.tu_ngay"  class="pm-input pm-date" id="pm-tu-ngay"  />
+        <input type="date" v-model="pmFilter.tu_ngay" class="pm-input pm-date" id="pm-tu-ngay" />
         <span class="input-sep">→</span>
         <input type="date" v-model="pmFilter.den_ngay" class="pm-input pm-date" id="pm-den-ngay" />
         <button class="btn-apply" @click="pmApplyFilter" id="btn-pm-filter">
@@ -1634,8 +1536,8 @@ const handleExportExcel = async () => {
               <td colspan="6" class="empty-cell">Không có dữ liệu</td>
             </tr>
             <tr v-for="pm in payments" :key="pm.id">
-              <td class="day-cell">#{{ pm.id }}</td>
-              <td>{{ pm.ma_ve ?? pm.ve_id ?? '—' }}</td>
+              <td class="day-cell">{{ pm.ma_giao_dich || pm.ma_thanh_toan || '#' + pm.id }}</td>
+              <td>{{ pm.ve?.ma_ve || pm.id_ve || '—' }}</td>
               <td class="money-cell">{{ Number(pm.so_tien ?? pm.tong_tien ?? 0).toLocaleString('vi-VN') }} ₫</td>
               <td>{{ pmPhuongThucLabel(pm.phuong_thuc ?? pm.phuong_thuc_id) }}</td>
               <td>
@@ -1655,29 +1557,24 @@ const handleExportExcel = async () => {
           Trang {{ paymentsMeta.current_page }} / {{ paymentsMeta.last_page }} · {{ paymentsMeta.total }} bản ghi
         </span>
         <div class="pagi-controls">
-          <button class="pagi-btn" :disabled="paymentsMeta.current_page === 1" @click="pmGoToPage(paymentsMeta.current_page - 1)" id="btn-pm-prev">
+          <button class="pagi-btn" :disabled="paymentsMeta.current_page === 1"
+            @click="pmGoToPage(paymentsMeta.current_page - 1)" id="btn-pm-prev">
             ‹ Trước
           </button>
 
           <button v-if="pmPageNumbers[0] > 1" class="pagi-btn pagi-num" @click="pmGoToPage(1)">1</button>
           <span v-if="pmPageNumbers[0] > 2" class="pagi-dots">…</span>
 
-          <button
-            v-for="p in pmPageNumbers" :key="p"
-            class="pagi-btn pagi-num"
-            :class="{ active: p === paymentsMeta.current_page }"
-            @click="pmGoToPage(p)"
-            :id="`btn-pm-page-${p}`"
-          >{{ p }}</button>
+          <button v-for="p in pmPageNumbers" :key="p" class="pagi-btn pagi-num"
+            :class="{ active: p === paymentsMeta.current_page }" @click="pmGoToPage(p)" :id="`btn-pm-page-${p}`">{{ p
+            }}</button>
 
           <span v-if="pmPageNumbers[pmPageNumbers.length - 1] < paymentsMeta.last_page - 1" class="pagi-dots">…</span>
-          <button
-            v-if="pmPageNumbers[pmPageNumbers.length - 1] < paymentsMeta.last_page"
-            class="pagi-btn pagi-num"
-            @click="pmGoToPage(paymentsMeta.last_page)"
-          >{{ paymentsMeta.last_page }}</button>
+          <button v-if="pmPageNumbers[pmPageNumbers.length - 1] < paymentsMeta.last_page" class="pagi-btn pagi-num"
+            @click="pmGoToPage(paymentsMeta.last_page)">{{ paymentsMeta.last_page }}</button>
 
-          <button class="pagi-btn" :disabled="paymentsMeta.current_page === paymentsMeta.last_page" @click="pmGoToPage(paymentsMeta.current_page + 1)" id="btn-pm-next">
+          <button class="pagi-btn" :disabled="paymentsMeta.current_page === paymentsMeta.last_page"
+            @click="pmGoToPage(paymentsMeta.current_page + 1)" id="btn-pm-next">
             Sau ›
           </button>
         </div>
@@ -1704,407 +1601,1249 @@ const handleExportExcel = async () => {
   flex-wrap: wrap;
   gap: 16px;
 }
-.header-left { display: flex; align-items: center; gap: 16px; }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .header-icon-wrap {
-  width: 52px; height: 52px;
+  width: 52px;
+  height: 52px;
   border-radius: 14px;
   background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 4px 16px rgba(34,197,94,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.35);
   flex-shrink: 0;
 }
-.header-icon { width: 26px; height: 26px; color: white; }
-.page-title  { font-size: 24px; font-weight: 800; color: #0d4f35; margin: 0 0 3px 0; }
-.page-sub    { font-size: 13px; color: #64748b; margin: 0; }
 
-.header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-
-.btn-compare, .btn-export {
-  display: flex; align-items: center; gap: 6px;
-  padding: 9px 18px; border-radius: 10px;
-  font-size: 13px; font-weight: 600;
-  cursor: pointer; transition: all 0.25s ease; border: 1.5px solid;
+.header-icon {
+  width: 26px;
+  height: 26px;
+  color: white;
 }
-.btn-compare          { background: white; border-color: #e2e8f0; color: #475569; }
+
+.page-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0d4f35;
+  margin: 0 0 3px 0;
+}
+
+.page-sub {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-compare,
+.btn-export {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  border: 1.5px solid;
+}
+
+.btn-compare {
+  background: white;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
 .btn-compare:hover,
-.btn-compare.active   { background: #f0fdf4; border-color: #22c55e; color: #16a34a; }
-.btn-export           { background: linear-gradient(135deg,#22c55e,#15803d); border-color: transparent; color: white; box-shadow: 0 4px 12px rgba(34,197,94,.3); }
-.btn-export:hover     { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(34,197,94,.4); }
+.btn-compare.active {
+  background: #f0fdf4;
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+.btn-export {
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  border-color: transparent;
+  color: white;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, .3);
+}
+
+.btn-export:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, .4);
+}
 
 .btn-refresh {
-  width: 40px; height: 40px; border-radius: 10px;
-  background: white; border: 1.5px solid #e2e8f0;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: all 0.25s; color: #475569;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: white;
+  border: 1.5px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s;
+  color: #475569;
 }
-.btn-refresh:hover            { border-color: #22c55e; color: #16a34a; background: #f0fdf4; }
-.btn-refresh.spinning .btn-icon { animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.btn-icon { width: 16px; height: 16px; }
+
+.btn-refresh:hover {
+  border-color: #22c55e;
+  color: #16a34a;
+  background: #f0fdf4;
+}
+
+.btn-refresh.spinning .btn-icon {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+}
 
 /* ───── FILTER ───── */
 .filter-card {
-  background: white; border-radius: 16px;
-  padding: 20px 24px; margin-bottom: 24px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.05); border: 1px solid #f1f5f9;
+  background: white;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .05);
+  border: 1px solid #f1f5f9;
 }
-.filter-tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
-.filter-tab {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 10px;
-  border: 1.5px solid #e2e8f0; background: white;
-  color: #64748b; font-size: 13px; font-weight: 500;
-  cursor: pointer; transition: all 0.2s;
-}
-.filter-tab:hover  { border-color: #22c55e; color: #16a34a; }
-.filter-tab.active { background: linear-gradient(135deg,#f0fdf4,#dcfce7); border-color: #22c55e; color: #15803d; font-weight: 700; }
-.tab-icon { width: 14px; height: 14px; }
 
-.filter-inputs { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
-.input-group   { display: flex; flex-direction: column; gap: 5px; }
-.input-group label { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-.date-input {
-  height: 40px; padding: 0 14px;
-  border-radius: 10px; border: 1.5px solid #e2e8f0;
-  font-size: 14px; color: #374151; background: #f8fafc;
-  transition: border-color 0.2s; outline: none; min-width: 160px;
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
 }
-.date-input:focus { border-color: #22c55e; background: white; }
-.input-sep { color: #94a3b8; font-size: 18px; padding-bottom: 8px; }
+
+.filter-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-tab:hover {
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+.filter-tab.active {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border-color: #22c55e;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.tab-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.filter-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
 .input-group label {
-  display: flex; align-items: center; gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
-.label-icon { width: 13px; height: 13px; }
-.quarter-wrap { display: flex; align-items: center; gap: 8px; }
-.quarter-sel  { min-width: 90px !important; }
+
+.date-input {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  font-size: 14px;
+  color: #374151;
+  background: #f8fafc;
+  transition: border-color 0.2s;
+  outline: none;
+  min-width: 160px;
+}
+
+.date-input:focus {
+  border-color: #22c55e;
+  background: white;
+}
+
+.input-sep {
+  color: #94a3b8;
+  font-size: 18px;
+  padding-bottom: 8px;
+}
+
+.input-group label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.label-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.quarter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quarter-sel {
+  min-width: 90px !important;
+}
 
 .btn-apply {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 22px; height: 40px; border-radius: 10px;
-  background: linear-gradient(135deg,#22c55e,#15803d); color: white;
-  font-size: 13px; font-weight: 700; border: none; cursor: pointer;
-  transition: all 0.25s; box-shadow: 0 3px 10px rgba(34,197,94,.3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 22px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 3px 10px rgba(34, 197, 94, .3);
 }
-.btn-apply:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(34,197,94,.4); }
+
+.btn-apply:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, .4);
+}
+
 .btn-apply:disabled,
-.btn-apply.loading { opacity: 0.7; cursor: not-allowed; transform: none; }
+.btn-apply.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .btn-spinner {
-  width: 14px; height: 14px; flex-shrink: 0;
-  border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
-  border-radius: 50%; animation: spin 0.7s linear infinite;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 
 /* ───── KPI GRID ───── */
 .kpi-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 18px; margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 16px;
 }
-.kpi-grid--four { grid-template-columns: repeat(4, 1fr); }
+
+.kpi-grid--four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .kpi-secondary-bar {
-  display: flex; flex-wrap: wrap; gap: 22px; align-items: center;
-  padding: 12px 18px; margin-bottom: 22px;
-  background: #f8fafc; border-radius: 14px; border: 1px solid #e2e8f0;
-  font-size: 13px; color: #475569;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  align-items: center;
+  padding: 12px 18px;
+  margin-bottom: 22px;
+  background: #f8fafc;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #475569;
 }
-.kpi-secondary-bar strong { color: #0f172a; }
-.inline-ic { width: 15px; height: 15px; display: inline; vertical-align: -3px; margin-right: 4px; }
+
+.kpi-secondary-bar strong {
+  color: #0f172a;
+}
+
+.inline-ic {
+  width: 15px;
+  height: 15px;
+  display: inline;
+  vertical-align: -3px;
+  margin-right: 4px;
+}
 
 .route-insight-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-bottom: 22px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin-bottom: 22px;
 }
-.empty-hint { padding: 20px; text-align: center; color: #94a3b8; font-size: 13px; }
-.rank-muted { background: #e2e8f0 !important; color: #64748b !important; }
-.route-meta { font-size: 12px; color: #94a3b8; margin: 4px 0 0 0; }
-.route-item--warn { border-left: 3px solid #f59e0b; padding-left: 10px; }
-.btn-export--secondary {
-  background: white; color: #0f172a; border: 1px solid #e2e8f0;
-}
-.btn-export--secondary:hover { background: #f8fafc; }
-.kpi-card {
-  background: white; border-radius: 18px;
-  padding: 22px 20px; box-shadow: 0 2px 14px rgba(0,0,0,.05);
-  border: 1px solid #f1f5f9; transition: transform 0.3s, box-shadow 0.3s;
-  position: relative; overflow: hidden;
-}
-.kpi-card::after {
-  content: ''; position: absolute; top: 0; right: 0;
-  width: 80px; height: 80px; border-radius: 0 18px 0 100%; opacity: 0.07;
-}
-.kpi-green::after  { background: #22c55e; }
-.kpi-blue::after   { background: #3b82f6; }
-.kpi-purple::after { background: #a855f7; }
-.kpi-orange::after { background: #f59e0b; }
-.kpi-teal::after   { background: #06b6d4; }
-.kpi-card:hover    { transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,.08); }
 
-.kpi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-.kpi-icon-wrap {
-  width: 46px; height: 46px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
+.empty-hint {
+  padding: 20px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
 }
-.kpi-icon-wrap.green  { background: linear-gradient(135deg,#22c55e,#16a34a); }
-.kpi-icon-wrap.blue   { background: linear-gradient(135deg,#3b82f6,#2563eb); }
-.kpi-icon-wrap.purple { background: linear-gradient(135deg,#a855f7,#7c3aed); }
-.kpi-icon-wrap.orange { background: linear-gradient(135deg,#f59e0b,#d97706); }
-.kpi-icon-wrap.teal   { background: linear-gradient(135deg,#06b6d4,#0891b2); }
-.kpi-icon { width: 22px; height: 22px; color: white; }
+
+.rank-muted {
+  background: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+.route-meta {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 4px 0 0 0;
+}
+
+.route-item--warn {
+  border-left: 3px solid #f59e0b;
+  padding-left: 10px;
+}
+
+.btn-export--secondary {
+  background: white;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+}
+
+.btn-export--secondary:hover {
+  background: #f8fafc;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 18px;
+  padding: 22px 20px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .05);
+  border: 1px solid #f1f5f9;
+  transition: transform 0.3s, box-shadow 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 0 18px 0 100%;
+  opacity: 0.07;
+}
+
+.kpi-green::after {
+  background: #22c55e;
+}
+
+.kpi-blue::after {
+  background: #3b82f6;
+}
+
+.kpi-purple::after {
+  background: #a855f7;
+}
+
+.kpi-orange::after {
+  background: #f59e0b;
+}
+
+.kpi-teal::after {
+  background: #06b6d4;
+}
+
+.kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .08);
+}
+
+.kpi-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.kpi-icon-wrap {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kpi-icon-wrap.green {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.kpi-icon-wrap.blue {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.kpi-icon-wrap.purple {
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+}
+
+.kpi-icon-wrap.orange {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.kpi-icon-wrap.teal {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+}
+
+.kpi-icon {
+  width: 22px;
+  height: 22px;
+  color: white;
+}
 
 .kpi-badge {
-  display: inline-flex; align-items: center; gap: 2px;
-  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
 }
-.badge-up   { background: #dcfce7; color: #16a34a; }
-.badge-down { background: #fee2e2; color: #dc2626; }
-.badge-icon { width: 12px; height: 12px; }
 
-.kpi-label { font-size: 12px; color: #64748b; font-weight: 500; margin: 0 0 6px 0; }
-.kpi-value { font-size: 26px; font-weight: 800; color: #0d4f35; margin: 0 0 4px 0; line-height: 1.1; }
-.kpi-sub   { font-size: 11px; color: #94a3b8; margin: 0; }
+.badge-up {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.badge-down {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.badge-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  margin: 0 0 6px 0;
+}
+
+.kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0d4f35;
+  margin: 0 0 4px 0;
+  line-height: 1.1;
+}
+
+.kpi-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+}
 
 /* ───── CHARTS GRID ───── */
 .charts-main-grid {
-  display: grid; grid-template-columns: 1fr 380px;
-  gap: 22px; margin-bottom: 22px;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 22px;
+  margin-bottom: 22px;
 }
+
 .charts-bottom-grid {
-  display: grid; grid-template-columns: 1fr 420px;
-  gap: 22px; margin-bottom: 22px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 22px;
+  margin-bottom: 22px;
 }
 
 /* ───── PANEL ───── */
 .panel {
-  background: white; border-radius: 18px;
-  box-shadow: 0 2px 14px rgba(0,0,0,.05);
-  border: 1px solid #f1f5f9; overflow: hidden;
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .05);
+  border: 1px solid #f1f5f9;
+  overflow: hidden;
 }
+
 .panel-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 18px 22px; border-bottom: 1px solid #f8fafc;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 22px;
+  border-bottom: 1px solid #f8fafc;
 }
+
 .panel-title {
-  font-size: 15px; font-weight: 700; color: #0d4f35;
-  margin: 0; display: flex; align-items: center; gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0d4f35;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.panel-icon { width: 18px; height: 18px; color: #22c55e; }
-.panel-sub  { font-size: 12px; color: #94a3b8; font-weight: 500; }
+
+.panel-icon {
+  width: 18px;
+  height: 18px;
+  color: #22c55e;
+}
+
+.panel-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
 
 /* ───── CHART TABS ───── */
-.chart-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
-.chart-tab {
-  display: flex; align-items: center; gap: 5px;
-  padding: 7px 14px; border-radius: 9px;
-  border: 1.5px solid #e2e8f0; background: white;
-  color: #64748b; font-size: 12px; font-weight: 500;
-  cursor: pointer; transition: all 0.2s;
+.chart-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
-.chart-tab:hover  { border-color: #22c55e; color: #16a34a; }
-.chart-tab.active { background: #0d4f35; border-color: #0d4f35; color: white; font-weight: 700; }
-.chart-tab-icon   { width: 14px; height: 14px; }
-.chart-body { padding: 20px; }
-.chart-wrap { height: 320px; }
+
+.chart-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 9px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chart-tab:hover {
+  border-color: #22c55e;
+  color: #16a34a;
+}
+
+.chart-tab.active {
+  background: #0d4f35;
+  border-color: #0d4f35;
+  color: white;
+  font-weight: 700;
+}
+
+.chart-tab-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.chart-body {
+  padding: 20px;
+}
+
+.chart-wrap {
+  height: 320px;
+}
 
 /* ───── DONUT ───── */
-.donut-wrap    { padding: 10px 20px; height: 240px; }
-.donut-summary { padding: 0 20px 16px; display: flex; flex-direction: column; gap: 10px; }
-.ds-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; background: #f8fafc; border-radius: 12px;
+.donut-wrap {
+  padding: 10px 20px;
+  height: 240px;
 }
-.ds-icon { width: 18px; height: 18px; flex-shrink: 0; }
-.ds-icon.green  { color: #22c55e; }
-.ds-icon.red    { color: #ef4444; }
-.ds-icon.yellow { color: #f59e0b; }
-.ds-label  { font-size: 12px; color: #64748b; margin: 0 0 2px; }
-.ds-value  { font-size: 16px; font-weight: 800; margin: 0; }
-.ds-count  { margin-left: auto; font-size: 12px; color: #94a3b8; white-space: nowrap; }
-.green-text  { color: #16a34a; }
-.red-text    { color: #dc2626; }
-.yellow-text { color: #d97706; }
-.blue-text   { color: #2563eb; }
-.purple-text { color: #7c3aed; }
-.orange-text { color: #d97706; }
+
+.donut-summary {
+  padding: 0 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ds-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.ds-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.ds-icon.green {
+  color: #22c55e;
+}
+
+.ds-icon.red {
+  color: #ef4444;
+}
+
+.ds-icon.yellow {
+  color: #f59e0b;
+}
+
+.ds-label {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 2px;
+}
+
+.ds-value {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.ds-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.green-text {
+  color: #16a34a;
+}
+
+.red-text {
+  color: #dc2626;
+}
+
+.yellow-text {
+  color: #d97706;
+}
+
+.blue-text {
+  color: #2563eb;
+}
+
+.purple-text {
+  color: #7c3aed;
+}
+
+.orange-text {
+  color: #d97706;
+}
 
 /* ───── ROUTE LIST (nhà xe) ───── */
-.route-list { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.route-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .route-item {
-  display: flex; align-items: center; gap: 14px;
-  padding: 12px 14px; border-radius: 12px;
-  background: #f8fafc; border: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
   transition: border-color 0.2s, background 0.2s;
 }
-.route-item:hover { border-color: #bbf7d0; background: #f0fdf4; }
-.route-rank {
-  width: 28px; height: 28px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 800; flex-shrink: 0;
-  background: #e2e8f0; color: #64748b;
-}
-.rank-1 { background: linear-gradient(135deg,#fbbf24,#d97706); color: white; }
-.rank-2 { background: linear-gradient(135deg,#94a3b8,#64748b); color: white; }
-.rank-3 { background: linear-gradient(135deg,#f97316,#ea580c); color: white; }
 
-.route-info   { flex: 1; min-width: 0; }
-.route-name   { font-size: 13px; font-weight: 700; color: #1e293b; margin: 0 0 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.route-bar-wrap { height: 5px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
-.route-bar-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
-.route-stats  { text-align: right; }
-.route-revenue { font-size: 13px; font-weight: 700; color: #0d4f35; margin: 0 0 2px; }
-.route-tickets { font-size: 11px; color: #94a3b8; margin: 0; }
-.route-pct    { font-size: 13px; font-weight: 700; color: #3b82f6; min-width: 36px; text-align: right; }
+.route-item:hover {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.route-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.rank-1 {
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  color: white;
+}
+
+.rank-2 {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  color: white;
+}
+
+.rank-3 {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: white;
+}
+
+.route-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.route-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 6px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.route-bar-wrap {
+  height: 5px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.route-bar-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.5s ease;
+}
+
+.route-stats {
+  text-align: right;
+}
+
+.route-revenue {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d4f35;
+  margin: 0 0 2px;
+}
+
+.route-tickets {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.route-pct {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3b82f6;
+  min-width: 36px;
+  text-align: right;
+}
 
 /* ───── RATES ───── */
-.rates-body { display: flex; gap: 12px; padding: 16px 20px; flex-wrap: wrap; }
+.rates-body {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+
 .rate-card {
-  flex: 1; min-width: 110px;
-  background: #f8fafc; border-radius: 14px; padding: 14px 12px;
-  text-align: center; border: 1.5px solid #f1f5f9; transition: all 0.2s;
+  flex: 1;
+  min-width: 110px;
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 14px 12px;
+  text-align: center;
+  border: 1.5px solid #f1f5f9;
+  transition: all 0.2s;
 }
-.rate-card:hover      { transform: translateY(-2px); }
-.rate-card.success    { border-color: #bbf7d0; }
-.rate-card.danger     { border-color: #fecaca; }
-.rate-card.info       { border-color: #bfdbfe; }
+
+.rate-card:hover {
+  transform: translateY(-2px);
+}
+
+.rate-card.success {
+  border-color: #bbf7d0;
+}
+
+.rate-card.danger {
+  border-color: #fecaca;
+}
+
+.rate-card.info {
+  border-color: #bfdbfe;
+}
+
 .rate-header {
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-  font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 10px;
 }
-.rate-icon       { width: 14px; height: 14px; }
-.rate-icon.green { color: #22c55e; }
-.rate-icon.red   { color: #ef4444; }
-.rate-icon.blue  { color: #3b82f6; }
+
+.rate-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.rate-icon.green {
+  color: #22c55e;
+}
+
+.rate-icon.red {
+  color: #ef4444;
+}
+
+.rate-icon.blue {
+  color: #3b82f6;
+}
+
 .rate-circle-wrap {
-  position: relative; width: 80px; height: 80px; margin: 0 auto 8px;
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 8px;
 }
-.rate-circle { width: 80px; height: 80px; }
+
+.rate-circle {
+  width: 80px;
+  height: 80px;
+}
+
 .rate-pct {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%,-50%); font-size: 16px; font-weight: 800;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  font-weight: 800;
 }
-.rate-desc { font-size: 10px; color: #94a3b8; }
+
+.rate-desc {
+  font-size: 10px;
+  color: #94a3b8;
+}
 
 /* ───── EXTRA STATS ───── */
 .extra-stats {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 10px; padding: 0 20px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 20px 20px;
 }
+
 .ex-stat {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 14px; background: #f8fafc;
-  border-radius: 12px; border: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
 }
-.ex-icon        { width: 18px; height: 18px; flex-shrink: 0; }
-.ex-icon.green  { color: #22c55e; }
-.ex-icon.blue   { color: #3b82f6; }
-.ex-icon.purple { color: #a855f7; }
-.ex-icon.orange { color: #f59e0b; }
-.ex-label { font-size: 11px; color: #64748b; margin: 0 0 2px; }
-.ex-val   { font-size: 14px; font-weight: 700; margin: 0; }
+
+.ex-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.ex-icon.green {
+  color: #22c55e;
+}
+
+.ex-icon.blue {
+  color: #3b82f6;
+}
+
+.ex-icon.purple {
+  color: #a855f7;
+}
+
+.ex-icon.orange {
+  color: #f59e0b;
+}
+
+.ex-label {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0 0 2px;
+}
+
+.ex-val {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
 
 /* ───── DAILY TABLE ───── */
-.daily-panel { margin-bottom: 8px; }
-.table-wrap  { overflow-x: auto; }
-.data-table  { width: 100%; border-collapse: collapse; font-size: 13px; }
-.data-table th {
-  padding: 12px 18px; text-align: left;
-  font-size: 11px; font-weight: 700; color: #64748b;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  background: #f8fafc; border-bottom: 1.5px solid #f1f5f9;
+.daily-panel {
+  margin-bottom: 8px;
 }
-.data-table td { padding: 12px 18px; border-bottom: 1px solid #f8fafc; color: #374151; }
-.data-table tr:hover td      { background: #f0fdf4; }
-.data-table tr:last-child td { border-bottom: none; }
-.day-cell   { font-weight: 600; color: #1e293b; }
-.money-cell { font-weight: 700; color: #15803d; }
-.mini-bar-wrap { height: 6px; background: #f1f5f9; border-radius: 10px; overflow: hidden; min-width: 100px; max-width: 180px; }
-.mini-bar { height: 100%; background: linear-gradient(90deg,#22c55e,#16a34a); border-radius: 10px; }
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  padding: 12px 18px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f8fafc;
+  border-bottom: 1.5px solid #f1f5f9;
+}
+
+.data-table td {
+  padding: 12px 18px;
+  border-bottom: 1px solid #f8fafc;
+  color: #374151;
+}
+
+.data-table tr:hover td {
+  background: #f0fdf4;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.day-cell {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.money-cell {
+  font-weight: 700;
+  color: #15803d;
+}
+
+.mini-bar-wrap {
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  overflow: hidden;
+  min-width: 100px;
+  max-width: 180px;
+}
+
+.mini-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+  border-radius: 10px;
+}
 
 /* ───── PANEL HEADER RIGHT ───── */
-.panel-header-right { display: flex; align-items: center; gap: 10px; }
+.panel-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .page-info-badge {
   background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-  border: 1px solid #bbf7d0; color: #15803d;
-  font-size: 12px; font-weight: 600;
-  padding: 4px 12px; border-radius: 20px;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* ───── BADGES (TRẠNG THÁI) ───── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-green {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.badge-red {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+.badge-yellow {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fde68a;
 }
 
 /* ───── PAGINATION ───── */
 .pagination-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-top: 1px solid #f1f5f9;
-  flex-wrap: wrap; gap: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+  gap: 12px;
 }
-.pagi-total { font-size: 13px; color: #64748b; }
-.pagi-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.pagi-total {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.pagi-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .pagi-btn {
-  min-width: 36px; height: 36px; padding: 0 12px;
-  border-radius: 9px; border: 1.5px solid #e2e8f0;
-  background: white; color: #475569; font-size: 13px; font-weight: 500;
-  cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.pagi-btn:hover:not(:disabled) { border-color: #22c55e; color: #16a34a; background: #f0fdf4; }
-.pagi-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.pagi-btn.pagi-num  { min-width: 36px; padding: 0; }
+
+.pagi-btn:hover:not(:disabled) {
+  border-color: #22c55e;
+  color: #16a34a;
+  background: #f0fdf4;
+}
+
+.pagi-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pagi-btn.pagi-num {
+  min-width: 36px;
+  padding: 0;
+}
+
 .pagi-btn.pagi-num.active {
   background: linear-gradient(135deg, #22c55e, #15803d);
-  border-color: transparent; color: white; font-weight: 700;
-  box-shadow: 0 3px 10px rgba(34,197,94,0.35);
+  border-color: transparent;
+  color: white;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(34, 197, 94, 0.35);
 }
-.pagi-dots { color: #94a3b8; font-size: 14px; padding: 0 4px; line-height: 36px; }
+
+.pagi-dots {
+  color: #94a3b8;
+  font-size: 14px;
+  padding: 0 4px;
+  line-height: 36px;
+}
 
 /* ───── PAYMENT FILTER BAR ───── */
 .pm-filter-bar {
-  display: flex; align-items: center; gap: 10px;
-  padding: 14px 20px; border-bottom: 1px solid #f1f5f9;
-  flex-wrap: wrap; background: #fafafa;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+  background: #fafafa;
 }
+
 .pm-input {
-  height: 38px; padding: 0 12px;
-  border-radius: 9px; border: 1.5px solid #e2e8f0;
-  font-size: 13px; color: #374151; background: white;
-  outline: none; transition: border-color 0.2s;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1.5px solid #e2e8f0;
+  font-size: 13px;
+  color: #374151;
+  background: white;
+  outline: none;
+  transition: border-color 0.2s;
 }
-.pm-input:focus  { border-color: #22c55e; }
-.pm-input[placeholder] { min-width: 180px; }
-.pm-date  { min-width: 140px; }
+
+.pm-input:focus {
+  border-color: #22c55e;
+}
+
+.pm-input[placeholder] {
+  min-width: 180px;
+}
+
+.pm-date {
+  min-width: 140px;
+}
+
 .pm-select {
-  height: 38px; padding: 0 10px;
-  border-radius: 9px; border: 1.5px solid #e2e8f0;
-  font-size: 13px; color: #374151; background: white;
-  outline: none; cursor: pointer; transition: border-color 0.2s;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1.5px solid #e2e8f0;
+  font-size: 13px;
+  color: #374151;
+  background: white;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
 }
-.pm-select:focus { border-color: #22c55e; }
+
+.pm-select:focus {
+  border-color: #22c55e;
+}
 
 /* ───── PAYMENT STATE (loading / error) ───── */
 .pm-state-wrap {
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 10px; padding: 48px 20px; color: #64748b; font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 20px;
+  color: #64748b;
+  font-size: 14px;
 }
+
 .pm-spinner {
-  width: 32px; height: 32px;
-  border: 3px solid #e2e8f0; border-top-color: #22c55e;
-  border-radius: 50%; animation: spin 0.8s linear infinite;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #22c55e;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
-.pm-error      { color: #ef4444; }
-.pm-state-icon { width: 28px; height: 28px; }
-.empty-cell    { text-align: center; color: #94a3b8; padding: 36px; font-size: 14px; }
+
+.pm-error {
+  color: #ef4444;
+}
+
+.pm-state-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.empty-cell {
+  text-align: center;
+  color: #94a3b8;
+  padding: 36px;
+  font-size: 14px;
+}
 
 /* ───── RESPONSIVE ───── */
 @media (max-width: 1280px) {
-  .kpi-grid           { grid-template-columns: repeat(2, 1fr); }
-  .charts-main-grid   { grid-template-columns: 1fr; }
-  .charts-bottom-grid { grid-template-columns: 1fr; }
-  .route-insight-grid { grid-template-columns: 1fr; }
-  .donut-wrap         { height: 280px; }
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .charts-main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .charts-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .route-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .donut-wrap {
+    height: 280px;
+  }
 }
+
 @media (max-width: 900px) {
-  .kpi-grid   { grid-template-columns: repeat(2, 1fr); }
-  .rates-body { flex-direction: column; }
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rates-body {
+    flex-direction: column;
+  }
 }
+
 @media (max-width: 640px) {
-  .kpi-grid       { grid-template-columns: 1fr; }
-  .page-title     { font-size: 20px; }
-  .header-actions { gap: 6px; }
-  .extra-stats    { grid-template-columns: 1fr; }
-  .chart-tab      { padding: 6px 10px; font-size: 11px; }
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .extra-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-tab {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
 }
 </style>
