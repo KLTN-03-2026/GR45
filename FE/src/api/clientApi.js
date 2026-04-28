@@ -31,6 +31,10 @@ const clientApi = {
   // nhà xe công khai
   getOperators: (params) => axiosClient.get('/v1/nha-xe', { params }),
   getOperatorDetails: (id) => axiosClient.get(`/v1/nha-xe/${id}`),
+
+  // --- THEO DÕI CHUYẾN XE (cho người thân) ---
+  lookupTripsByPhone: (data) => axiosClient.post('/v1/tracking/lookup-by-phone', data),
+  getLiveTrackingPublic: (tripId, params) => axiosClient.get(`/v1/chuyen-xe/${tripId}/tracking/live`, { params }),
 };
 
 export default clientApi;

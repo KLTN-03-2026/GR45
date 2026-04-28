@@ -69,6 +69,7 @@ Route::prefix('v1')->group(function () {
     Route::get('chuyen-xe/{id}/tram-dung', [KhachHangController::class, 'getTramDungChuyenXe']);
     Route::get('chuyen-xe/{id}/danh-gia', [RatingController::class, 'listRatingsByTrip']);
     Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
+    Route::post('tracking/lookup-by-phone', [ChuyenXeController::class, 'lookupTripsByPhone']);
 
     // quản lý tài xế (DRIVER APP)
     Route::prefix('tai-xe')->group(function () {
