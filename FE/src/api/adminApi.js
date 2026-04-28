@@ -23,6 +23,7 @@ const adminApi = {
 
   // --- QUẢN LÝ NHÀ XE ---
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
+
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
   createOperator: (data) => axiosClient.post('/v1/admin/nha-xe', data),
   updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
@@ -31,6 +32,7 @@ const adminApi = {
 
   // --- QUẢN LÝ TÀI XẾ ---
   getDrivers: (params) => axiosClient.get('/v1/admin/tai-xe', { params }),
+  getDriversPublic: (params) => axiosClient.get('/v1/tai-xe/public', { params }),
   getDriverDetails: (id) => axiosClient.get(`/v1/admin/tai-xe/${id}`),
   createDriver: (data) => axiosClient.post('/v1/admin/tai-xe', data),
   updateDriver: (id, data) => {
@@ -46,6 +48,7 @@ const adminApi = {
 
   // --- QUẢN LÝ XE ---
   getVehicles: (params) => axiosClient.get('/v1/admin/xe', { params }),
+  getVehiclesPublic: (params) => axiosClient.get('/v1/xe/public', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/admin/xe/${id}`),
   createVehicle: (data) => axiosClient.post('/v1/admin/xe', data),
   updateVehicle: (id, data) => axiosClient.put(`/v1/admin/xe/${id}`, data),

@@ -81,7 +81,6 @@ export const useClientStore = defineStore('client', () => {
     isTokenVerified.value = false;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    localStorage.removeItem('auth.active_role');
   }
 
   // Cập nhật thông tin user locally

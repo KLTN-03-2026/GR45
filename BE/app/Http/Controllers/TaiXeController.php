@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use App\Http\Requests\TaiXe\DeleteTaiXeRequest;
+use App\Http\Resources\TaiXeResourceShow;
 
 class TaiXeController extends Controller
 {
@@ -163,6 +164,17 @@ class TaiXeController extends Controller
         return response()->json([
             'success' => true,
             'data'    => TaiXeResource::collection($drivers)->response()->getData(true),
+        ]);
+    }
+
+    public function indexPublic(Request $request): JsonResponse
+    {
+        $filters = $request->only(['search', 'ma_nha_xe', 'tinh_trang', 'per_page']);
+        $drivers = $this->service->getAllPublic($filters);
+
+        return response()->json([
+            'success' => true,
+            'data'    => TaiXeResourceShow::collection($drivers)->response()->getData(true),
         ]);
     }
 

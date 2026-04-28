@@ -131,6 +131,11 @@ class TaiXeService
         return $this->repo->getAll($filters);
     }
 
+    public function getAllPublic(array $filters = [])
+    {
+        return $this->repo->getAllPublic($filters);
+    }
+
     public function getById(int $id): ?TaiXe
     {
         return $this->repo->getById($id);
@@ -147,7 +152,7 @@ class TaiXeService
             $uploaded = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload($file->getRealPath(), [
                 'folder' => 'do_an_kltn/tai_xe',
             ]);
-            
+
             if (!$uploaded) {
                 return null;
             }
@@ -285,7 +290,7 @@ class TaiXeService
     public function updateStatus(int $id, string $status): ?TaiXe
     {
         $taiXe = $this->repo->update($id, ['tinh_trang' => $status]);
-        
+
         if ($taiXe && $taiXe->hoSo) {
             $statusMap = [
                 'cho_duyet' => 'pending',
