@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import clientApi from '@/api/clientApi';
+import { createEcho } from '@/utils/echo.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -256,20 +257,19 @@ const submitBooking = async () => {
       currentStep.value = 4; // Hoàn tất
 
       // Bổ sung lắng nghe Websocket (Pusher/Echo)
-      if (window.Echo) {
-        window.Echo.channel(`ve.${bookingResult.value.ma_ve}`)
-          .listen('.ve.huy_tu_dong', (e) => {
-            if (bookingResult.value) {
-              errorMessage.value = e.message || 'Giao dịch bị từ chối do hết thời gian thanh toán';
-              bookingResult.value.tinh_trang = 'huy'; // Kích hoạt UI che QR lại
-            }
-          })
-          .listen('.ve.da_thanh_toan', (e) => {
-            if (bookingResult.value) {
-              bookingResult.value.tinh_trang = 'da_thanh_toan';
-            }
-          });
-      }
+      const echo = createEcho();
+      echo.channel(`ve.${bookingResult.value.ma_ve}`)
+        .listen('.ve.huy_tu_dong', (e) => {
+          if (bookingResult.value) {
+            errorMessage.value = e.message || 'Giao dịch bị từ chối do hết thời gian thanh toán';
+            bookingResult.value.tinh_trang = 'huy'; // Kích hoạt UI che QR lại
+          }
+        })
+        .listen('.ve.da_thanh_toan', (e) => {
+          if (bookingResult.value) {
+            bookingResult.value.tinh_trang = 'da_thanh_toan';
+          }
+        });
     } else {
       errorMessage.value = res.message || 'Đặt vé thất bại.';
     }

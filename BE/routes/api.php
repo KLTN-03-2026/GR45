@@ -27,6 +27,9 @@ Route::prefix('v1')->group(function () {
     Route::get('tuyen-duong/public', [TuyenDuongController::class, 'indexPublic']);
     Route::get('xe/public', [XeController::class, 'indexPublic']);
     Route::get('tai-xe/public', [TaiXeController::class, 'indexPublic']);
+    
+    // SePay Webhook
+    Route::post('sepay/webhook', [ThanhToanController::class, 'sepayWebhook']);
 
     // API dành cho khách hàng
     Route::post('dang-nhap',  [KhachHangController::class, 'login']);
