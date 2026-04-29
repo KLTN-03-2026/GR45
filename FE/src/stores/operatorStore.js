@@ -76,6 +76,13 @@ export const useOperatorStore = defineStore('operator', () => {
     }
   }
 
+  function markNotificationRead(id) {
+    const note = notifications.value.find(n => n.id === id);
+    if (note) {
+      note.read = true;
+    }
+  }
+
   function logout() {
     token.value = null;
     user.value = null;
@@ -86,6 +93,6 @@ export const useOperatorStore = defineStore('operator', () => {
 
   return {
     token, user, loading, error, isTokenVerified, isLoggedIn,
-    notifications, login, logout, addNotification
+    notifications, login, logout, addNotification, markNotificationRead
   };
 });

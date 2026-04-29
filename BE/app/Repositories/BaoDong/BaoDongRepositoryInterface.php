@@ -24,4 +24,9 @@ interface BaoDongRepositoryInterface
      * Cập nhật trạng thái báo động.
      */
     public function toggleStatusAdmin(int $id, int $adminId);
+
+    /**
+     * Báo động khẩn cấp (tài xế gửi báo động khẩn cấp)
+     */
+    public function baoDongKhanCap(int $chuyenXeId, array $coords = []);
 }

@@ -20,6 +20,8 @@ use App\Repositories\Voucher\VoucherRepository;
 use App\Repositories\Voucher\VoucherRepositoryInterface;
 use App\Repositories\Xe\XeRepository;
 use App\Repositories\Xe\XeRepositoryInterface;
+use App\Repositories\BaoDong\BaoDongRepository;
+use App\Repositories\BaoDong\BaoDongRepositoryInterface;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -38,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(VoucherRepositoryInterface::class, VoucherRepository::class);
         $this->app->bind(ThanhToanRepositoryInterface::class, ThanhToanRepository::class);
         $this->app->bind(XeRepositoryInterface::class, XeRepository::class);
+        $this->app->bind(BaoDongRepositoryInterface::class, BaoDongRepository::class);
     }
 
     /**

@@ -83,6 +83,33 @@ const closeAll = () => {
   isProfileMenuOpen.value = false
   isNotifyMenuOpen.value = false
 }
+
+// Xử lý khi click vào một thông báo
+const handleNotificationClick = (note) => {
+  // Đánh dấu đã đọc
+  operatorStore.markNotificationRead(note.id)
+  note.read = true // Fallback cho sample data không nằm trong store
+
+  // Chuyển hướng dựa trên loại thông báo
+  // 1. Báo động/Cảnh báo -> /nha-xe/canh-bao
+  // 2. Tin nhắn/Hỗ trợ/Thông tin -> /nha-xe/ho-tro
+  // 3. Đặt vé/Thành công -> /nha-xe/ve
+
+  const type = note.type?.toLowerCase() || ''
+  
+  if (type === 'alert' || type === 'warning' || type === 'danger') {
+    router.push('/nha-xe/canh-bao')
+  } else if (type === 'message' || type === 'info' || type === 'chat') {
+    router.push('/nha-xe/ho-tro')
+  } else if (type === 'booking' || type === 'success' || type === 'ticket') {
+    router.push('/nha-xe/ve')
+  } else {
+    // Mặc định chuyển về trang hỗ trợ/tin nhắn
+    router.push('/nha-xe/ho-tro')
+  }
+
+  isNotifyMenuOpen.value = false
+}
 </script>
 
 <template>
@@ -129,6 +156,7 @@ const closeAll = () => {
                 :key="note.id"
                 class="notify-item"
                 :class="{ 'unread': !note.read, [`type-${note.type}`]: true }"
+                @click="handleNotificationClick(note)"
               >
                 <!-- Icon loại thông báo -->
                 <div class="notify-icon-wrap" :class="`icon-${note.type}`">

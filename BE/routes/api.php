@@ -84,6 +84,7 @@ Route::prefix('v1')->group(function () {
             Route::post('doi-mat-khau', [TaiXeController::class, 'doiMatKhau']);
 
             Route::post('bao-dong', [BaoDongController::class, 'store']);
+            Route::post('sos', [BaoDongController::class, 'sos']);
             Route::get('cau-hinh-ai', [BaoDongController::class, 'getCauHinhAi']);
 
             Route::get('chuyen-xe/lich-trinh-ca-nhan', [ChuyenXeController::class, 'getLichTrinhCaNhan']);
