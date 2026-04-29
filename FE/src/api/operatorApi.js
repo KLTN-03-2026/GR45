@@ -91,6 +91,12 @@ const operatorApi = {
 
   // --- ĐÁNH GIÁ CHUYẾN XE ---
   getRatings: (params) => axiosClient.get('/v1/nha-xe/ratings', { params }),
+
+  // --- VÍ NHÀ XE ---
+  getWalletInfo: () => axiosClient.get('/v1/nha-xe/vi-nha-xe'),
+  updateBankInfo: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/update-bank', data),
+  requestTopup: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/topup', data),
+  requestWithdraw: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/withdraw', data),
 };
 
 export default operatorApi;

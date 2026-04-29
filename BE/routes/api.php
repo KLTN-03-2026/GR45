@@ -175,6 +175,12 @@ Route::prefix('v1')->group(function () {
             Route::get('thong-ke/theo-tuyen', [BaoCaoController::class, 'theoTuyenDuong']);
             Route::get('thong-ke/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe']);
             Route::get('thong-ke/export', [BaoCaoController::class, 'export']);
+
+            // Ví nhà xe
+            Route::get('vi-nha-xe', [\App\Http\Controllers\ViNhaXeController::class, 'getWalletInfo']);
+            Route::post('vi-nha-xe/update-bank', [\App\Http\Controllers\ViNhaXeController::class, 'updateBankInfo']);
+            Route::post('vi-nha-xe/withdraw', [\App\Http\Controllers\ViNhaXeController::class, 'requestWithdraw']);
+            Route::post('vi-nha-xe/topup', [\App\Http\Controllers\ViNhaXeController::class, 'requestTopup']);
         });
     });
 

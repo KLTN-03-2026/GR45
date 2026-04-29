@@ -260,6 +260,11 @@ const router = createRouter({
           name: 'operator-cai-dat',
           component: () => import('../views/operator/cai-dat/CaiDatView.vue'),
         },
+        {
+          path: 'vi-nha-xe',
+          name: 'operator-vi-nha-xe',
+          component: () => import('../views/operator/vi-nha-xe/ViNhaXeView.vue'),
+        },
       ],
     },
 
