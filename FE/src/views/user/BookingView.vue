@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import clientApi from '@/api/clientApi';
+import { createEcho } from '@/utils/echo.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -256,20 +257,19 @@ const submitBooking = async () => {
       currentStep.value = 4; // Hoàn tất
 
       // Bổ sung lắng nghe Websocket (Pusher/Echo)
-      if (window.Echo) {
-        window.Echo.channel(`ve.${bookingResult.value.ma_ve}`)
-          .listen('.ve.huy_tu_dong', (e) => {
-            if (bookingResult.value) {
-              errorMessage.value = e.message || 'Giao dịch bị từ chối do hết thời gian thanh toán';
-              bookingResult.value.tinh_trang = 'huy'; // Kích hoạt UI che QR lại
-            }
-          })
-          .listen('.ve.da_thanh_toan', (e) => {
-            if (bookingResult.value) {
-              bookingResult.value.tinh_trang = 'da_thanh_toan';
-            }
-          });
-      }
+      const echo = createEcho();
+      echo.channel(`ve.${bookingResult.value.ma_ve}`)
+        .listen('.ve.huy_tu_dong', (e) => {
+          if (bookingResult.value) {
+            errorMessage.value = e.message || 'Giao dịch bị từ chối do hết thời gian thanh toán';
+            bookingResult.value.tinh_trang = 'huy'; // Kích hoạt UI che QR lại
+          }
+        })
+        .listen('.ve.da_thanh_toan', (e) => {
+          if (bookingResult.value) {
+            bookingResult.value.tinh_trang = 'da_thanh_toan';
+          }
+        });
     } else {
       errorMessage.value = res.message || 'Đặt vé thất bại.';
     }
@@ -304,7 +304,7 @@ onMounted(() => {
       <!-- Title & Stepper -->
       <div class="mb-8 pl-4">
         <h1 class="text-3xl font-extrabold text-slate-900 mb-2">Hoàn tất đặt vé</h1>
-        <p class="text-slate-500">{{ tripData.tuyen_duong.ten_tuyen_duong }} • Khởi hành: {{ tripData.gio_khoi_hanh }}</p>
+        <p class="text-slate-500">{{ tripData.tuyen_duong?.ten_tuyen_duong }} • Khởi hành: {{ tripData.gio_khoi_hanh }}</p>
       </div>
 
       <div class="flex flex-col lg:flex-row gap-8">
@@ -678,12 +678,12 @@ onMounted(() => {
             <div class="space-y-4 mb-6 flex-1">
               <div>
                 <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Nhà xe</span>
-                <span class="block text-base font-bold text-blue-600">{{ tripData.tuyen_duong.nha_xe?.ten_nha_xe || 'GoBus Partner' }}</span>
+                <span class="block text-base font-bold text-blue-600">{{ tripData.tuyen_duong?.nha_xe?.ten_nha_xe }}</span>
               </div>
 
               <div>
                 <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Chuyến xe</span>
-                <span class="block text-base font-bold text-slate-800">{{ tripData.tuyen_duong.ten_tuyen_duong }}</span>
+                <span class="block text-base font-bold text-slate-800">{{ tripData.tuyen_duong?.ten_tuyen_duong }}</span>
               </div>
 
               <div>

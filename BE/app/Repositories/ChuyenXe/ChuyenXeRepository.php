@@ -408,22 +408,44 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
     private function validateDriverLicenseConstraint(TaiXe $driver, Xe $vehicle): void
     {
-        $driverRank = $this->driverLicenseRank((string) ($driver->hoSo->hang_bang_lai ?? ''));
+        $driverLicenseRaw = (string) ($driver->hoSo->hang_bang_lai ?? '');
+        $driverRank = $this->driverLicenseRank($driverLicenseRaw);
         $requiredRank = $this->requiredLicenseRankForVehicle($vehicle);
+        if ($driverRank === 0) {
+            throw new \Exception(
+                "Tài xế #{$driver->id} chưa có hạng bằng lái hợp lệ trong hồ sơ."
+                . ' Vui lòng cập nhật trường hang_bang_lai (B1/B2/C/D/E/FB2/FC/FD/FE).'
+            );
+        }
         if ($driverRank < $requiredRank) {
-            throw new \Exception('Tài xế không đủ hạng bằng lái cho dòng xe được phân công.');
+            throw new \Exception(
+                'Tài xế không đủ hạng bằng lái cho dòng xe được phân công. '
+                . "Hiện có: {$driverLicenseRaw}; yêu cầu tối thiểu: {$this->licenseLabelByRank($requiredRank)}."
+            );
         }
     }
 
     private function driverLicenseRank(string $license): int
     {
         $value = strtoupper(trim($license));
-        if ($value === '') return 0;
-        $map = ['B1' => 1, 'B2' => 2, 'C' => 3, 'D' => 4, 'E' => 5, 'FC' => 6];
-        foreach ($map as $key => $rank) {
-            if (str_contains($value, $key)) return $rank;
+        if ($value === '') {
+            return 0;
         }
-        return 0;
+
+        // FE chỉ cho chọn các option cố định; backend đọc và so trực tiếp từ DB.
+        $map = [
+            'B1' => 1,
+            'B2' => 2,
+            'C'  => 3,
+            'D'  => 4,
+            'E'  => 5,
+            'FB2' => 2,
+            'FC' => 6,
+            'FD' => 6,
+            'FE' => 6,
+        ];
+
+        return $map[$value] ?? 0;
     }
 
     private function requiredLicenseRankForVehicle(Xe $vehicle): int
@@ -432,6 +454,19 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
         if ($seatCount >= 30) return 4; // D
         if ($seatCount >= 10) return 3; // C
         return 2; // B2
+    }
+
+    private function licenseLabelByRank(int $rank): string
+    {
+        return match ($rank) {
+            6 => 'FC',
+            5 => 'E',
+            4 => 'D',
+            3 => 'C',
+            2 => 'B2',
+            1 => 'B1',
+            default => 'không xác định',
+        };
     }
 
     private function notifyDriverScheduleChange(?TaiXe $driver, ChuyenXe $trip, string $action): void

@@ -36,6 +36,33 @@ class TaiXeRepository implements TaiXeRepositoryInterface
         return $query->paginate($filters['per_page'] ?? 15);
     }
 
+    public function getAllPublic(array $filters = []): LengthAwarePaginator
+    {
+        $query = $this->model->query()
+            ->with(['hoSo', 'nhaXe'])
+            ->where('tinh_trang', 'hoat_dong')
+            ->orderByDesc('created_at');
+
+        if (!empty($filters['search'])) {
+            $kw = $filters['search'];
+            $query->where(function ($q) use ($kw) {
+                $q->where('email', 'like', "%$kw%")
+                    ->orWhere('cccd', 'like', "%$kw%")
+                    ->orWhereHas('hoSo', fn($h) => $h->where('ho_va_ten', 'like', "%$kw%"));
+            });
+        }
+
+        if (!empty($filters['ma_nha_xe'])) {
+            $query->where('ma_nha_xe', $filters['ma_nha_xe']);
+        }
+
+        if (isset($filters['tinh_trang'])) {
+            $query->where('tinh_trang', $filters['tinh_trang']);
+        }
+
+        return $query->paginate($filters['per_page'] ?? 15);
+    }
+
     public function getById(int $id): ?TaiXe
     {
         return $this->model->with(['hoSo', 'nhaXe', 'chuyenXes' => fn($q) => $q->latest()->limit(5)])->find($id);

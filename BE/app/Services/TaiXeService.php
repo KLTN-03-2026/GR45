@@ -21,6 +21,16 @@ class TaiXeService
     ) {
     }
 
+    private function normalizeLicenseClass(?string $value): ?string
+    {
+        $raw = strtoupper(trim((string) $value));
+        if ($raw === '') {
+            return null;
+        }
+        $allowed = ['B1', 'B2', 'C', 'D', 'E', 'FB2', 'FC', 'FD', 'FE'];
+        return in_array($raw, $allowed, true) ? $raw : $raw;
+    }
+
     // ── AUTH ──────────────────────────────────────────────────────────
 
     /**
@@ -121,6 +131,11 @@ class TaiXeService
         return $this->repo->getAll($filters);
     }
 
+    public function getAllPublic(array $filters = [])
+    {
+        return $this->repo->getAllPublic($filters);
+    }
+
     public function getById(int $id): ?TaiXe
     {
         return $this->repo->getById($id);
@@ -137,7 +152,7 @@ class TaiXeService
             $uploaded = \CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary::uploadApi()->upload($file->getRealPath(), [
                 'folder' => 'do_an_kltn/tai_xe',
             ]);
-            
+
             if (!$uploaded) {
                 return null;
             }
@@ -188,7 +203,7 @@ class TaiXeService
                 'dia_chi'           => $data['dia_chi'] ?? null,
                 'avatar'            => $data['avatar'] ?? null,
                 'so_gplx'           => $data['so_gplx'] ?? null,
-                'hang_bang_lai'     => $data['hang_bang_lai'] ?? null,
+                'hang_bang_lai'     => $this->normalizeLicenseClass($data['hang_bang_lai'] ?? null),
                 'ngay_cap_gplx'     => $data['ngay_cap_gplx'] ?? null,
                 'ngay_het_han_gplx' => $data['ngay_het_han_gplx'] ?? null,
                 'trang_thai_duyet'  => 'pending',
@@ -231,13 +246,26 @@ class TaiXeService
             if (!$taiXe)
                 return null;
 
-            // 2. Cập nhật hoặc Tạo mới ho_so_tai_xes
+            // 2. Cập nhật hoặc tạo mới ho_so_tai_xes
             // Lọc bỏ các giá trị rỗng để không ghi đè dữ liệu cũ bằng chuỗi trống
             $hoSoData = array_filter($data, function ($value, $key) {
                 return !in_array($key, ['password', 'tinh_trang']) && $value !== '' && $value !== null;
             }, ARRAY_FILTER_USE_BOTH);
             if (isset($data['cccd'])) {
                 $hoSoData['so_cccd'] = $data['cccd'];
+            }
+            if (array_key_exists('hang_bang_lai', $hoSoData)) {
+                $hoSoData['hang_bang_lai'] = $this->normalizeLicenseClass($hoSoData['hang_bang_lai']);
+            }
+
+            // Một số tài xế seed cũ chưa có bản ghi ho_so_tai_xes.
+            // Khi update lần đầu, bổ sung dữ liệu tối thiểu để updateOrCreate tạo hồ sơ hợp lệ.
+            if (!$taiXe->hoSo) {
+                $hoSoData = array_merge([
+                    'ho_va_ten' => $data['ho_va_ten'] ?? $taiXe->ho_va_ten ?? 'Tai xe',
+                    'email' => $data['email'] ?? $taiXe->email,
+                    'ma_nha_xe' => $data['ma_nha_xe'] ?? $taiXe->ma_nha_xe,
+                ], $hoSoData);
             }
 
             // Ánh xạ trạng thái duyệt nếu có thay đổi tinh_trang
@@ -262,7 +290,7 @@ class TaiXeService
     public function updateStatus(int $id, string $status): ?TaiXe
     {
         $taiXe = $this->repo->update($id, ['tinh_trang' => $status]);
-        
+
         if ($taiXe && $taiXe->hoSo) {
             $statusMap = [
                 'cho_duyet' => 'pending',

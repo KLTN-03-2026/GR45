@@ -241,8 +241,8 @@ class VeService
             });
         }
 
-        if (!empty($filters['id_chuyen_xe'])) {
-            $query->where('id_chuyen_xe', $filters['id_chuyen_xe']);
+        if (!empty($filters['ngay_khoi_hanh'])) {
+            $query->where('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
         }
 
         if (!empty($filters['tinh_trang'])) {
