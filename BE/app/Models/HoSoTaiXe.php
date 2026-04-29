@@ -27,11 +27,11 @@ class HoSoTaiXe extends Model
         'anh_cccd_mat_sau',
         // Bằng lái
         'so_gplx',
-        'anh_gplx',
-        'anh_gplx_mat_sau',
         'hang_bang_lai',
         'ngay_cap_gplx',
         'ngay_het_han_gplx',
+        'anh_gplx',
+        'anh_gplx_mat_sau',
         // Duyệt hồ sơ
         'trang_thai_duyet',
         'ly_do_tu_choi',
@@ -41,10 +41,10 @@ class HoSoTaiXe extends Model
     ];
 
     protected $casts = [
-        'ngay_sinh'           => 'date',
-        'ngay_cap_gplx'       => 'date',
-        'ngay_het_han_gplx'   => 'date',
-        'ngay_duyet'          => 'datetime',
+        'ngay_sinh' => 'date',
+        'ngay_cap_gplx' => 'date',
+        'ngay_het_han_gplx' => 'date',
+        'ngay_duyet' => 'datetime',
     ];
 
     // ── Relationships ────────────────────────────────────────────────
