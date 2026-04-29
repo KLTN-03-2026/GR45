@@ -22,6 +22,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+                // --- Tang 0: Danh muc tinh thanh ---
+            // TinhThanhSeeder::class,
                 // --- Tang 1: Danh muc goc ---
             ChucVuSeeder::class,
             ChucNangSeeder::class,
@@ -46,21 +48,27 @@ class DatabaseSeeder extends Seeder
 
                 // --- Tang 5: Tai xe (phu thuoc NhaXe) ---
             TaiXeSeeder::class,
+            HoSoTaiXeSeeder::class,
 
                 // --- Tang 6: Xe (phu thuoc NhaXe + LoaiXe + TaiXe) ---
             XeSeeder::class,
+            HoSoXeSeeder::class,
+            GheSeeder::class,
 
                 // --- Tang 7: Tuyen duong ---
             TuyenDuongSeeder::class,
+            TramDungSeeder::class,
 
                 // --- Tang 8: Chuyen xe (phu thuoc TuyenDuong + Xe + TaiXe) ---
             ChuyenXeSeeder::class,
 
                 // --- Tang 9: Ve (phu thuoc KhachHang + ChuyenXe) ---
             VeSeeder::class,
+            ChiTietVeSeeder::class,
 
                 // --- Tang 10: Thanh toan (phu thuoc Ve + KhachHang) ---
             ThanhToanSeeder::class,
+            LichSuThanhToanNhaXe::class,
 
         ]);
     }

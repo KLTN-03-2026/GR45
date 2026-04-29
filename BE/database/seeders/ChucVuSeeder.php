@@ -22,6 +22,8 @@ class ChucVuSeeder extends Seeder
             ['ten_chuc_vu' => 'Nhân viên bán vé', 'slug' => 'nhan-vien-ban-ve', 'tinh_trang' => 'hoat_dong'],
         ];
 
-        DB::table('chuc_vus')->insert($chucVus);
+        foreach ($chucVus as $cv) {
+            DB::table('chuc_vus')->updateOrInsert(['slug' => $cv['slug']], $cv);
+        }
     }
 }
