@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import clientApi from '@/api/clientApi.js';
 import CustomDatePicker from '@/components/common/CustomDatePicker.vue';
@@ -71,6 +71,54 @@ const isOpenTo = ref(false);
 const fromSelectRef = ref(null);
 const toSelectRef = ref(null);
 
+const searchFromQuery = ref('');
+const searchToQuery = ref('');
+const fromInputText = ref('');
+const toInputText = ref('');
+
+const filteredFromProvinces = computed(() => {
+  const q = searchFromQuery.value.toLowerCase().trim();
+  if (!q) return provinces.value;
+  return provinces.value.filter(p => 
+    p.ten_tinh_thanh && p.ten_tinh_thanh.toLowerCase().includes(q)
+  );
+});
+
+const filteredToProvinces = computed(() => {
+  const q = searchToQuery.value.toLowerCase().trim();
+  if (!q) return provinces.value;
+  return provinces.value.filter(p => 
+    p.ten_tinh_thanh && p.ten_tinh_thanh.toLowerCase().includes(q)
+  );
+});
+
+watch(isOpenFrom, (isOpen) => {
+  if (!isOpen) {
+    fromInputText.value = searchForm.tinh_thanh_di_id ? getProvinceName(searchForm.tinh_thanh_di_id) : '';
+    searchFromQuery.value = '';
+  }
+});
+
+watch(isOpenTo, (isOpen) => {
+  if (!isOpen) {
+    toInputText.value = searchForm.tinh_thanh_den_id ? getProvinceName(searchForm.tinh_thanh_den_id) : '';
+    searchToQuery.value = '';
+  }
+});
+
+watch(() => searchForm.tinh_thanh_di_id, (newId) => {
+  fromInputText.value = newId ? getProvinceName(newId) : '';
+});
+
+watch(() => searchForm.tinh_thanh_den_id, (newId) => {
+  toInputText.value = newId ? getProvinceName(newId) : '';
+});
+
+watch(provinces, () => {
+  if (searchForm.tinh_thanh_di_id) fromInputText.value = getProvinceName(searchForm.tinh_thanh_di_id);
+  if (searchForm.tinh_thanh_den_id) toInputText.value = getProvinceName(searchForm.tinh_thanh_den_id);
+});
+
 const handleOutsideClick = (e) => {
   if (fromSelectRef.value && !fromSelectRef.value.contains(e.target)) {
     isOpenFrom.value = false;
@@ -128,16 +176,22 @@ onBeforeUnmount(() => {
           <div class="md:col-span-3">
             <div class="relative group" ref="fromSelectRef">
               <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary z-10 pointer-events-none">location_on</span>
-              <div 
+              <input 
+                v-model="fromInputText"
+                @focus="isOpenFrom = true; isOpenTo = false"
+                @input="searchFromQuery = fromInputText; isOpenFrom = true"
+                type="text"
+                placeholder="Điểm Đi"
+                class="w-full h-14 pl-12 pr-10 bg-slate-50 border border-slate-200 text-slate-800 text-base rounded-2xl flex items-center justify-between font-bold hover:border-slate-300 transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white shadow-sm"
+                :class="{'border-red-500': formErrors.tinh_thanh_di_id}"
+              />
+              <span 
                 @click="isOpenFrom = !isOpenFrom; isOpenTo = false"
-                class="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 text-slate-700 text-base rounded-2xl flex items-center justify-between cursor-pointer font-bold hover:border-slate-300 transition-all select-none"
-                :class="{'border-red-500': formErrors.tinh_thanh_di_id, 'ring-2 ring-primary/20 border-primary bg-white shadow-sm': isOpenFrom}"
+                class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer transition-transform duration-300" 
+                :class="{'rotate-180 text-primary': isOpenFrom}"
               >
-                <span class="truncate pr-2" :class="!searchForm.tinh_thanh_di_id ? 'text-slate-500' : 'text-slate-800'">
-                  {{ searchForm.tinh_thanh_di_id ? getProvinceName(searchForm.tinh_thanh_di_id) : 'Điểm Đi' }}
-                </span>
-                <span class="material-symbols-outlined text-slate-400 transition-transform duration-300 flex-shrink-0" :class="{'rotate-180 text-primary': isOpenFrom}">expand_more</span>
-              </div>
+                expand_more
+              </span>
 
               <!-- Dropdown Menu List -->
               <transition 
@@ -147,8 +201,8 @@ onBeforeUnmount(() => {
                 <div v-if="isOpenFrom" class="absolute top-[calc(100%+8px)] left-0 w-full min-w-[240px] bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden z-50">
                   <div class="max-h-[280px] overflow-y-auto overscroll-contain py-2 custom-scrollbar">
                     <button 
-                      v-for="province in provinces" :key="province.id"
-                      @click.prevent="searchForm.tinh_thanh_di_id = province.id; isOpenFrom = false"
+                      v-for="province in filteredFromProvinces" :key="province.id"
+                      @click.prevent="searchForm.tinh_thanh_di_id = province.id; isOpenFrom = false; fromInputText = province.ten_tinh_thanh"
                       class="w-full text-left px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 text-base group/item"
                       :class="{'bg-blue-50/50': searchForm.tinh_thanh_di_id === province.id}"
                     >
@@ -182,16 +236,22 @@ onBeforeUnmount(() => {
           <div class="md:col-span-3">
             <div class="relative group" ref="toSelectRef">
                <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-orange-500 z-10 pointer-events-none">location_on</span>
-              <div 
+              <input 
+                v-model="toInputText"
+                @focus="isOpenTo = true; isOpenFrom = false"
+                @input="searchToQuery = toInputText; isOpenTo = true"
+                type="text"
+                placeholder="Điểm Đến"
+                class="w-full h-14 pl-12 pr-10 bg-slate-50 border border-slate-200 text-slate-800 text-base rounded-2xl flex items-center justify-between font-bold hover:border-slate-300 transition-all focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:bg-white shadow-sm"
+                :class="{'border-red-500': formErrors.tinh_thanh_den_id}"
+              />
+              <span 
                 @click="isOpenTo = !isOpenTo; isOpenFrom = false"
-                class="w-full h-14 pl-12 pr-4 bg-slate-50 border border-slate-200 text-slate-700 text-base rounded-2xl flex items-center justify-between cursor-pointer font-bold hover:border-slate-300 transition-all select-none"
-                :class="{'border-red-500': formErrors.tinh_thanh_den_id, 'ring-2 ring-orange-500/20 border-orange-500 bg-white shadow-sm': isOpenTo}"
+                class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer transition-transform duration-300" 
+                :class="{'rotate-180 text-orange-500': isOpenTo}"
               >
-                <span class="truncate pr-2" :class="!searchForm.tinh_thanh_den_id ? 'text-slate-500' : 'text-slate-800'">
-                  {{ searchForm.tinh_thanh_den_id ? getProvinceName(searchForm.tinh_thanh_den_id) : 'Điểm Đến' }}
-                </span>
-                <span class="material-symbols-outlined text-slate-400 transition-transform duration-300 flex-shrink-0" :class="{'rotate-180 text-orange-500': isOpenTo}">expand_more</span>
-              </div>
+                expand_more
+              </span>
 
                <!-- Dropdown Menu List -->
                <transition 
@@ -201,8 +261,8 @@ onBeforeUnmount(() => {
                 <div v-if="isOpenTo" class="absolute top-[calc(100%+8px)] left-0 md:-left-4 lg:left-0 w-full min-w-[240px] bg-white rounded-2xl shadow-xl shadow-slate-200 border border-slate-100 overflow-hidden z-50">
                   <div class="max-h-[280px] overflow-y-auto overscroll-contain py-2 custom-scrollbar">
                     <button 
-                      v-for="province in provinces" :key="province.id"
-                      @click.prevent="searchForm.tinh_thanh_den_id = province.id; isOpenTo = false"
+                      v-for="province in filteredToProvinces" :key="province.id"
+                      @click.prevent="searchForm.tinh_thanh_den_id = province.id; isOpenTo = false; toInputText = province.ten_tinh_thanh"
                       class="w-full text-left px-5 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3 text-base group/item"
                       :class="{'bg-orange-50/50': searchForm.tinh_thanh_den_id === province.id}"
                     >

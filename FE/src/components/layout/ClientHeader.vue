@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
           >
           Lịch trình
         </a>
-        <a
+        <!-- <a
           href="javascript:void(0)"
           class="client-header__nav-link"
           @click="scrollToSection('tim-chuyen')"
@@ -142,17 +142,30 @@ onBeforeUnmount(() => {
             >search</span
           >
           Tìm chuyến
-        </a>
-        <a
-          href="javascript:void(0)"
+        </a> -->
+        <RouterLink
+          to="/hop-tac"
           class="client-header__nav-link"
-          @click="scrollToSection('hop-tac')"
+          :class="{ 'client-header__nav-link--active': route.path === '/hop-tac' }"
         >
           <span class="material-symbols-outlined client-header__nav-icon"
             >handshake</span
           >
           Hợp tác với chúng tôi
-        </a>
+        </RouterLink>
+        <RouterLink
+          to="/theo-doi-chuyen-xe"
+          class="client-header__nav-link"
+          :class="{
+            'client-header__nav-link--active':
+              route.path === '/theo-doi-chuyen-xe',
+          }"
+        >
+          <span class="material-symbols-outlined client-header__nav-icon"
+            >share_location</span
+          >
+          Theo dõi xe
+        </RouterLink>
       </div>
 
       <!-- Khu vực bên phải: Đăng nhập / Profile -->
@@ -210,11 +223,11 @@ onBeforeUnmount(() => {
                 </RouterLink>
                 <RouterLink
                   @click="isProfileMenuOpen = false"
-                  to="/lich-su-dat-ve"
+                  to="/profile?tab=tickets"
                   class="client-header__dropdown-item"
                 >
                   <span class="material-symbols-outlined">history</span>
-                  Lịch sử đặt vé
+                  Vé của tôi
                 </RouterLink>
                 <div class="client-header__dropdown-divider"></div>
                 <button
@@ -270,14 +283,23 @@ onBeforeUnmount(() => {
           <span class="material-symbols-outlined">search</span>
           Tìm chuyến
         </a>
-        <a
-          href="javascript:void(0)"
+        <RouterLink
+          to="/hop-tac"
           class="client-header__mobile-link"
-          @click="scrollToSection('hop-tac')"
+          :class="{ 'client-header__mobile-link--active': route.path === '/hop-tac' }"
+          @click="isMobileMenuOpen = false"
         >
           <span class="material-symbols-outlined">handshake</span>
           Hợp tác với chúng tôi
-        </a>
+        </RouterLink>
+        <RouterLink
+          to="/theo-doi-chuyen-xe"
+          class="client-header__mobile-link"
+          @click="isMobileMenuOpen = false"
+        >
+          <span class="material-symbols-outlined">share_location</span>
+          Theo dõi xe
+        </RouterLink>
         <div class="client-header__mobile-divider"></div>
 
         <!-- Nút đăng nhập / profile trong mobile menu -->
@@ -304,12 +326,12 @@ onBeforeUnmount(() => {
             Thông tin cá nhân
           </RouterLink>
           <RouterLink
-            to="/lich-su-dat-ve"
+            to="/profile?tab=tickets"
             class="client-header__mobile-link"
             @click="isMobileMenuOpen = false"
           >
             <span class="material-symbols-outlined">history</span>
-            Lịch sử đặt vé
+            Vé của tôi
           </RouterLink>
           <button
             @click="handleLogout"

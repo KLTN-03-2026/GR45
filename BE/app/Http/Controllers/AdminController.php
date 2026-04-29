@@ -186,6 +186,7 @@ class AdminController extends Controller
             }
 
             $xes = \App\Models\Xe::with('loaiXe')->get();
+
             $countNewSeats = 0;
             $countVehiclesUpdated = 0;
 
@@ -217,7 +218,7 @@ class AdminController extends Controller
                             'id_loai_ghe' => $idLoaiGhe, // Gán loại ghế mặc định
                             'ma_ghe' => $maGhe,
                             'tang' => $tang,
-                            'trang_thai' => 1 // 1: Đang hoạt động thông thường
+                            'trang_thai' => "hoat_dong" // 1: Đang hoạt động thông thường
                         ]);
                         $countNewSeats++;
                     }

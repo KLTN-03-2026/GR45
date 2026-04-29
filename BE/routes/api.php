@@ -23,6 +23,13 @@ use App\Http\Controllers\RatingController;
 use App\Http\Controllers\BaoCaoController;
 
 Route::prefix('v1')->group(function () {
+    //API public
+    Route::get('tuyen-duong/public', [TuyenDuongController::class, 'indexPublic']);
+    Route::get('xe/public', [XeController::class, 'indexPublic']);
+    Route::get('tai-xe/public', [TaiXeController::class, 'indexPublic']);
+    
+    // SePay Webhook
+    Route::post('sepay/webhook', [ThanhToanController::class, 'sepayWebhook']);
 
     // API dành cho khách hàng
     Route::post('dang-nhap',  [KhachHangController::class, 'login']);
@@ -30,7 +37,8 @@ Route::prefix('v1')->group(function () {
     Route::post('kich-hoat-tai-khoan', [KhachHangController::class, 'kichHoatTaiKhoan']);
     Route::post('quen-mat-khau', [KhachHangController::class, 'requestPasswordReset']);
     Route::post('dat-lai-mat-khau', [KhachHangController::class, 'resetPassword']);
-    
+
+    Route::get('voucher/public',           [KhachHangController::class, 'getVoucherCongKhai']);
     Route::middleware('auth.khach-hang')->group(function () {
         Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
         Route::post('dang-xuat',    [KhachHangController::class, 'logout']);
@@ -63,8 +71,8 @@ Route::prefix('v1')->group(function () {
     Route::get('chuyen-xe/{id}/ghe',       [KhachHangController::class, 'getGheChuyenXe']);
     Route::get('chuyen-xe/{id}/tram-dung', [KhachHangController::class, 'getTramDungChuyenXe']);
     Route::get('chuyen-xe/{id}/danh-gia', [RatingController::class, 'listRatingsByTrip']);
-    Route::get('voucher/public',           [KhachHangController::class, 'getVoucherCongKhai']);
     Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
+    Route::post('tracking/lookup-by-phone', [ChuyenXeController::class, 'lookupTripsByPhone']);
 
     // quản lý tài xế (DRIVER APP)
     Route::prefix('tai-xe')->group(function () {
@@ -76,12 +84,13 @@ Route::prefix('v1')->group(function () {
             Route::post('doi-mat-khau', [TaiXeController::class, 'doiMatKhau']);
 
             Route::post('bao-dong', [BaoDongController::class, 'store']);
+            Route::post('sos', [BaoDongController::class, 'sos']);
             Route::get('cau-hinh-ai', [BaoDongController::class, 'getCauHinhAi']);
 
             Route::get('chuyen-xe/lich-trinh-ca-nhan', [ChuyenXeController::class, 'getLichTrinhCaNhan']);
             Route::get('stats',         [TaiXeController::class, 'stats']);
             Route::get('upcoming-trips', [TaiXeController::class, 'upcomingTrips']);
-            
+
             Route::get('chuyen-xe/{id}/lich-trinh', [ChuyenXeController::class, 'getLichTrinh']);
             Route::post('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'postTracking']);
             Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
@@ -118,6 +127,8 @@ Route::prefix('v1')->group(function () {
             Route::delete('tuyen-duong/{id}', [TuyenDuongController::class, 'destroy']);
 
             Route::get('chuyen-xe', [ChuyenXeController::class, 'index']);
+            Route::get('chuyen-xe/dang-chay', [ChuyenXeController::class, 'getActiveTrips']);
+            Route::get('chuyen-xe/da-hoan-thanh', [ChuyenXeController::class, 'getCompletedTrips']);
             Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show']);
             Route::post('chuyen-xe', [ChuyenXeController::class, 'store']);
             Route::put('chuyen-xe/{id}', [ChuyenXeController::class, 'update']);
@@ -165,6 +176,12 @@ Route::prefix('v1')->group(function () {
             Route::get('thong-ke/theo-tuyen', [BaoCaoController::class, 'theoTuyenDuong']);
             Route::get('thong-ke/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe']);
             Route::get('thong-ke/export', [BaoCaoController::class, 'export']);
+
+            // Ví nhà xe
+            Route::get('vi-nha-xe', [\App\Http\Controllers\ViNhaXeController::class, 'getWalletInfo']);
+            Route::post('vi-nha-xe/update-bank', [\App\Http\Controllers\ViNhaXeController::class, 'updateBankInfo']);
+            Route::post('vi-nha-xe/withdraw', [\App\Http\Controllers\ViNhaXeController::class, 'requestWithdraw']);
+            Route::post('vi-nha-xe/topup', [\App\Http\Controllers\ViNhaXeController::class, 'requestTopup']);
         });
     });
 
@@ -236,6 +253,8 @@ Route::prefix('v1')->group(function () {
             // Chuyến xe
             Route::post('chuyen-xe/auto-generate', [ChuyenXeController::class, 'autoGenerate'])->middleware('permission:auto-generate-chuyen-xe');
             Route::get('chuyen-xe', [ChuyenXeController::class, 'index'])->middleware('permission:xem-chuyen-xe');
+            Route::get('chuyen-xe/dang-chay', [ChuyenXeController::class, 'getActiveTrips'])->middleware('permission:xem-tracking-chuyen-xe');
+            Route::get('chuyen-xe/da-hoan-thanh', [ChuyenXeController::class, 'getCompletedTrips'])->middleware('permission:xem-tracking-chuyen-xe');
             Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show'])->middleware('permission:xem-chuyen-xe');
             Route::post('chuyen-xe', [ChuyenXeController::class, 'store'])->middleware('permission:them-chuyen-xe');
             Route::put('chuyen-xe/{id}', [ChuyenXeController::class, 'update'])->middleware('permission:sua-chuyen-xe');
@@ -272,6 +291,11 @@ Route::prefix('v1')->group(function () {
 
             // Đánh giá
             Route::get('ratings', [RatingController::class, 'getAdminRatings']);
+
+            // Thanh toán và thống kê
+            Route::get('thanh-toan/thong-ke', [ThanhToanController::class, 'thongKe']);
+            Route::get('thanh-toan', [ThanhToanController::class, 'index']);
+            Route::get('thanh-toan/{id}', [ThanhToanController::class, 'show']);
 
             // Auto generate
             Route::post('xe/auto-generate-seats', [AdminController::class, 'generateSeatsForVehicles'])->middleware('permission:auto-generate-ghe-xe');

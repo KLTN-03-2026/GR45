@@ -52,7 +52,7 @@ class BaoDongViPhamEvent implements ShouldBroadcastNow
             'vi_do_luc_bao'   => $this->baoDong->vi_do_luc_bao,
             'kinh_do_luc_bao' => $this->baoDong->kinh_do_luc_bao,
             'created_at'      => $this->baoDong->created_at?->toISOString(),
-            'message'         => '⚠️ Phát hiện tài xế ngủ gật trên chuyến #' . $this->baoDong->id_chuyen_xe,
+            'message'         => '⚠️ Cảnh báo ' . strtoupper($this->baoDong->muc_do) . ' trên chuyến #' . $this->baoDong->id_chuyen_xe . ($this->baoDong->muc_do === 'khan_cap' ? ' - SOS!' : ''),
         ];
     }
 }

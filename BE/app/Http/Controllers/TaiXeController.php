@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use App\Http\Requests\TaiXe\DeleteTaiXeRequest;
+use App\Http\Resources\TaiXeResourceShow;
 
 class TaiXeController extends Controller
 {
@@ -166,6 +167,17 @@ class TaiXeController extends Controller
         ]);
     }
 
+    public function indexPublic(Request $request): JsonResponse
+    {
+        $filters = $request->only(['search', 'ma_nha_xe', 'tinh_trang', 'per_page']);
+        $drivers = $this->service->getAllPublic($filters);
+
+        return response()->json([
+            'success' => true,
+            'data'    => TaiXeResourceShow::collection($drivers)->response()->getData(true),
+        ]);
+    }
+
     public function show(int $id, Request $request): JsonResponse
     {
         $user = $request->user('sanctum');
@@ -194,8 +206,9 @@ class TaiXeController extends Controller
 
         try {
             $taiXe = $this->service->create($data);
-            return response()->json(['success' => true, 'message' => 'Tạo tài xế thành công.', 'data' => $taiXe], 201);
+            return response()->json(['success' => true, 'message' => 'Tạo tài xế thành công.', 'data' => null]);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Loi khi tao tai xe: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['success' => false, 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
         }
     }
@@ -222,8 +235,9 @@ class TaiXeController extends Controller
 
         try {
             $taiXe = $this->service->update($id, $data);
-            return response()->json(['success' => true, 'message' => 'Cập nhật tài xế thành công.', 'data' => new TaiXeResource($taiXe)]);
+            return response()->json(['success' => true, 'message' => 'Cập nhật tài xế thành công.', 'data' => null]);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Loi khi cap nhat tai xe: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['success' => false, 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
         }
     }

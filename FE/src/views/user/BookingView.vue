@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import clientApi from '@/api/clientApi';
+import { createEcho } from '@/utils/echo.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -256,20 +257,19 @@ const submitBooking = async () => {
       currentStep.value = 4; // Hoàn tất
 
       // Bổ sung lắng nghe Websocket (Pusher/Echo)
-      if (window.Echo) {
-        window.Echo.channel(`ve.${bookingResult.value.ma_ve}`)
-          .listen('.ve.huy_tu_dong', (e) => {
-            if (bookingResult.value) {
-              errorMessage.value = e.message || 'Giao dịch bị từ chối do hết thời gian thanh toán';
-              bookingResult.value.tinh_trang = 'huy'; // Kích hoạt UI che QR lại
-            }
-          })
-          .listen('.ve.da_thanh_toan', (e) => {
-            if (bookingResult.value) {
-              bookingResult.value.tinh_trang = 'da_thanh_toan';
-            }
-          });
-      }
+      const echo = createEcho();
+      echo.channel(`ve.${bookingResult.value.ma_ve}`)
+        .listen('.ve.huy_tu_dong', (e) => {
+          if (bookingResult.value) {
+            errorMessage.value = e.message || 'Giao dịch bị từ chối do hết thời gian thanh toán';
+            bookingResult.value.tinh_trang = 'huy'; // Kích hoạt UI che QR lại
+          }
+        })
+        .listen('.ve.da_thanh_toan', (e) => {
+          if (bookingResult.value) {
+            bookingResult.value.tinh_trang = 'da_thanh_toan';
+          }
+        });
     } else {
       errorMessage.value = res.message || 'Đặt vé thất bại.';
     }
@@ -304,7 +304,7 @@ onMounted(() => {
       <!-- Title & Stepper -->
       <div class="mb-8 pl-4">
         <h1 class="text-3xl font-extrabold text-slate-900 mb-2">Hoàn tất đặt vé</h1>
-        <p class="text-slate-500">{{ tripData.tuyen_duong.ten_tuyen_duong }} • Khởi hành: {{ tripData.gio_khoi_hanh }}</p>
+        <p class="text-slate-500">{{ tripData.tuyen_duong?.ten_tuyen_duong }} • Khởi hành: {{ tripData.gio_khoi_hanh }}</p>
       </div>
 
       <div class="flex flex-col lg:flex-row gap-8">
@@ -405,11 +405,11 @@ onMounted(() => {
               <div>
                 <h4 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Đón</h4>
                 <div v-if="stopsData.tram_don.length === 0" class="text-slate-500 italic">Không có dữ liệu trạm đón.</div>
-                <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll">
-                  <label v-for="stop in stopsData.tram_don" :key="'don-'+stop.id" class="radio-card">
+                <div class="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scroll">
+                  <label v-for="stop in stopsData.tram_don" :key="'don-'+stop.id" class="radio-card block">
                     <input type="radio" :value="stop.id" v-model="pickupPointId" name="pickup">
                     <div 
-                      class="card-content flex items-start p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden"
+                      class="card-content flex items-start p-4 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden h-full min-h-[90px]"
                       :class="pickupPointId === stop.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'"
                     >
                       <!-- Thanh xanh bên trái khi được chọn -->
@@ -437,11 +437,11 @@ onMounted(() => {
               <div>
                 <h4 class="font-semibold text-slate-700 mb-4 pb-2 border-b">Điểm Trả</h4>
                 <div v-if="stopsData.tram_tra.length === 0" class="text-slate-500 italic">Không có dữ liệu trạm trả.</div>
-                <div class="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scroll">
-                  <label v-for="stop in stopsData.tram_tra" :key="'tra-'+stop.id" class="radio-card">
+                <div class="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scroll">
+                  <label v-for="stop in stopsData.tram_tra" :key="'tra-'+stop.id" class="radio-card block">
                     <input type="radio" :value="stop.id" v-model="dropoffPointId" name="dropoff">
                     <div 
-                      class="card-content flex items-start p-3 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden"
+                      class="card-content flex items-start p-4 gap-3 border-2 rounded-xl cursor-pointer transition-all relative overflow-hidden h-full min-h-[90px]"
                       :class="dropoffPointId === stop.id ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200 hover:border-blue-300'"
                     >
                       <!-- Thanh xanh bên trái khi được chọn -->
@@ -663,9 +663,14 @@ onMounted(() => {
               </div>
             </div>
 
-            <button @click="$router.push('/')" class="btn-primary mx-auto mt-4">
-              Quay về Trang Chủ
-            </button>
+            <div class="flex justify-center pt-4">
+              <button 
+                @click="$router.push('/')" 
+                class="px-10 py-3.5 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl active:scale-95"
+              >
+                Quay về Trang Chủ
+              </button>
+            </div>
           </div>
 
         </div>
@@ -678,12 +683,12 @@ onMounted(() => {
             <div class="space-y-4 mb-6 flex-1">
               <div>
                 <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Nhà xe</span>
-                <span class="block text-base font-bold text-blue-600">{{ tripData.tuyen_duong.nha_xe?.ten_nha_xe || 'GoBus Partner' }}</span>
+                <span class="block text-base font-bold text-blue-600">{{ tripData.tuyen_duong?.nha_xe?.ten_nha_xe }}</span>
               </div>
 
               <div>
                 <span class="block text-xs text-slate-400 font-bold uppercase tracking-wider mb-1.5">Chuyến xe</span>
-                <span class="block text-base font-bold text-slate-800">{{ tripData.tuyen_duong.ten_tuyen_duong }}</span>
+                <span class="block text-base font-bold text-slate-800">{{ tripData.tuyen_duong?.ten_tuyen_duong }}</span>
               </div>
 
               <div>

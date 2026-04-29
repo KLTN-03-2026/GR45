@@ -48,15 +48,17 @@ class StoreTaiXeRequest extends FormRequest
             // Profile info
             'ngay_sinh'         => 'nullable|date',
             'dia_chi'           => 'nullable|string|max:255',
-            'so_gplx'           => 'required|string|max:50',
-            'hang_bang_lai'     => 'required|string|max:10',
-            'ngay_cap_gplx'     => 'required|date',
-            'ngay_het_han_gplx' => 'required|date',
+            'so_gplx'           => 'nullable|string|max:50',
+            'hang_bang_lai'     => 'nullable|string|max:10|in:B1,B2,C,D,E,FB2,FC,FD,FE',
+            'ngay_cap_gplx'     => 'nullable|date',
+            'ngay_het_han_gplx' => 'nullable|date',
 
             // Files validate
             'avatar'             => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'anh_cccd_mat_truoc' => 'required|image|mimes:jpeg,png,jpg|max:5120',
             'anh_cccd_mat_sau'   => 'required|image|mimes:jpeg,png,jpg|max:5120',
+            'anh_gplx'           => 'required|image|mimes:jpeg,png,jpg|max:5120',
+            'anh_gplx_mat_sau'   => 'required|image|mimes:jpeg,png,jpg|max:5120',
         ];
     }
 
@@ -81,6 +83,7 @@ class StoreTaiXeRequest extends FormRequest
 
             'so_gplx.required'           => 'Số GPLX không được để trống.',
             'hang_bang_lai.required'     => 'Hạng bằng lái không được để trống.',
+            'hang_bang_lai.in'           => 'Hạng bằng lái không hợp lệ.',
             'ngay_cap_gplx.required'     => 'Ngày cấp GPLX không được để trống.',
             'ngay_het_han_gplx.required' => 'Ngày hết hạn GPLX không được để trống.',
 

@@ -130,7 +130,7 @@ class NhaXeService
             'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
             'ty_le_chiet_khau' => isset($data['ty_le_chiet_khau']) ? (float) $data['ty_le_chiet_khau'] : null,
             'tai_khoan_nhan_tien' => $data['tai_khoan_nhan_tien'] ?? null,
-        ], static fn ($value) => $value !== null);
+        ], static fn($value) => $value !== null);
     }
 
     protected function buildHoSoPayload(array $data, ?NhaXe $nhaXe = null): array
@@ -145,7 +145,7 @@ class NhaXeService
             'id_phuong_xa' => $data['id_phuong_xa'] ?? null,
             'dia_chi_chi_tiet' => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? null,
             'trang_thai' => $data['trang_thai'] ?? null,
-        ], static fn ($value) => $value !== null);
+        ], static fn($value) => $value !== null);
     }
 
     /**
@@ -171,10 +171,16 @@ class NhaXeService
         if ($validator->fails())
             throw new ValidationException($validator);
 
-        // Tu sinh ma_nha_xe doc nhat
-        $maNhaXe = 'NX' . strtoupper(Str::random(4));
+        // Sinh mã nhà xe tuần tự: NX001, NX002, ...
+        $lastMaNhaXe = NhaXe::where('ma_nha_xe', 'like', 'NX%')
+            ->orderByRaw("CAST(SUBSTRING(ma_nha_xe, 3) AS UNSIGNED) DESC")
+            ->value('ma_nha_xe');
+        $nextNum = $lastMaNhaXe ? ((int) ltrim(substr($lastMaNhaXe, 2), '0') ?: 0) + 1 : 1;
+        $maNhaXe = 'NX' . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
+        // Phòng trùng trong trường hợp race condition
         while ($this->repo->getByMaNhaXe($maNhaXe)) {
-            $maNhaXe = 'NX' . strtoupper(Str::random(4));
+            $nextNum++;
+            $maNhaXe = 'NX' . str_pad($nextNum, 3, '0', STR_PAD_LEFT);
         }
 
         $nhaXe = $this->repo->create(array_merge([
@@ -190,6 +196,43 @@ class NhaXeService
             ['ma_nha_xe' => $nhaXe->ma_nha_xe],
             $this->buildHoSoPayload($data, $nhaXe)
         );
+
+        // Sinh mã ví tuần tự: VI001, VI002, ...
+        $lastMaVi = \App\Models\ViNhaXe::where('ma_vi_nha_xe', 'like', 'VI%')
+            ->orderByRaw("CAST(SUBSTRING(ma_vi_nha_xe, 3) AS UNSIGNED) DESC")
+            ->value('ma_vi_nha_xe');
+        $nextViNum = $lastMaVi ? ((int) ltrim(substr($lastMaVi, 2), '0') ?: 0) + 1 : 1;
+        $maViNhaXe = 'VI' . str_pad($nextViNum, 3, '0', STR_PAD_LEFT);
+        // Phòng trùng trong trường hợp race condition nếu có 2 request đến cùng 1 lúc
+        while (\App\Models\ViNhaXe::where('ma_vi_nha_xe', $maViNhaXe)->exists()) {
+            $nextViNum++;
+            $maViNhaXe = 'VI' . str_pad($nextViNum, 3, '0', STR_PAD_LEFT);
+        }
+
+        \App\Models\ViNhaXe::firstOrCreate(
+            ['ma_nha_xe' => $nhaXe->ma_nha_xe],
+            [
+                'ma_vi_nha_xe' => $maViNhaXe,
+                'so_du' => 0,
+                'tong_nap' => 0,
+                'tong_phi_hoa_hong' => 0,
+                'han_muc_toi_thieu' => 500000,
+                'trang_thai' => 'hoat_dong',
+            ]
+        );
+
+        // Tự động tạo địa chỉ trụ sở chính cho nhà xe.
+        // id_phuong_xa lấy bản ghi đầu tiên trong bảng phuong_xas làm giá trị mặc định.
+        $idPhuongXa = \App\Models\PhuongXa::value('id') ?? 1;
+        $nhaXe->diaChiNhaXes()->create([
+            'ten_chi_nhanh' => 'Trụ sở chính ' . $nhaXe->ten_nha_xe,
+            'dia_chi' => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? '',
+            'id_phuong_xa' => $idPhuongXa,
+            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
+            'toa_do_x' => 21.0285,  // Mặc định: trung tâm Hà Nội
+            'toa_do_y' => 105.8542,
+            'tinh_trang' => 'hoat_dong',
+        ]);
 
         return new NhaXeResource($this->repo->getById($nhaXe->id));
     }

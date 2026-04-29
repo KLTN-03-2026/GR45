@@ -46,10 +46,21 @@ class UpdateTaiXeRequest extends FormRequest
             'ma_nha_xe' => 'sometimes|required|string|exists:nha_xes,ma_nha_xe',
             'tinh_trang' => 'nullable|string|in:hoat_dong,khoa,cho_duyet',
 
+            // Profile info (update)
+            'ho_va_ten'         => 'sometimes|required|string|max:255',
+            'ngay_sinh'         => 'nullable|date',
+            'dia_chi'           => 'nullable|string|max:255',
+            'so_gplx'           => 'nullable|string|max:50',
+            'hang_bang_lai'     => 'nullable|string|max:10|in:B1,B2,C,D,E,FB2,FC,FD,FE',
+            'ngay_cap_gplx'     => 'nullable|date',
+            'ngay_het_han_gplx' => 'nullable|date',
+
             // Files validate (khi update, file có thể không cần thiết phải gửi lại nếu đã có)
             'avatar'             => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'anh_cccd_mat_truoc' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'anh_cccd_mat_sau'   => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'anh_gplx'           => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'anh_gplx_mat_sau'   => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
         ];
     }
 
@@ -66,6 +77,9 @@ class UpdateTaiXeRequest extends FormRequest
             'password.min' => 'Mật khẩu phải từ 6 ký tự trở lên.',
             'ma_nha_xe.required' => 'Mã nhà xe không được để trống.',
             'ma_nha_xe.exists' => 'Mã nhà xe không tồn tại.',
+            'so_gplx.required' => 'Số GPLX không được để trống.',
+            'hang_bang_lai.required' => 'Hạng bằng lái không được để trống.',
+            'hang_bang_lai.in' => 'Hạng bằng lái không hợp lệ.',
 
             '*.image' => 'File tải lên phải là hình ảnh.',
             '*.mimes' => 'Hình ảnh phải có định dạng jpeg, png, jpg.',

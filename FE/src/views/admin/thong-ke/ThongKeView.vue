@@ -72,32 +72,30 @@ const baoCaoSetsPrimaryKpi = ref(false)
 const routeTop = ref([])
 const routeBottom = ref([])
 
-const unwrapApi = (res) => {
-  if (res == null) return null
-  if (res.success === false) return null
-  return res.data !== undefined ? res.data : res
-}
+/** 
+ * Mở bọc payload trả về từ API (xử lý case có/không có wrapper .data) 
+ * @param {Object} res - Kết quả trả về từ axios
+ */
+const unwrapApi = (res) => res?.success === false ? null : (res?.data ?? res)
 
+/** 
+ * Lấy mảng dữ liệu (rows) từ response API (hỗ trợ cả phân trang và mảng thẳng)
+ * @param {Object} res - Kết quả trả về từ axios
+ * @returns {Array} Mảng dữ liệu
+ */
 const extractPaginatedRows = (res) => {
-  const payload = unwrapApi(res)
-  if (Array.isArray(payload)) return payload
-  if (Array.isArray(payload?.data)) return payload.data
-  if (Array.isArray(payload?.data?.data)) return payload.data.data
-  return []
+  const p = unwrapApi(res)
+  return Array.isArray(p?.data?.data) ? p.data.data : Array.isArray(p?.data) ? p.data : Array.isArray(p) ? p : []
 }
 
+/** 
+ * Lấy meta thông tin phân trang (current_page, total...) từ response API 
+ * @param {Object} res - Kết quả trả về từ axios
+ */
 const extractPaginatedMeta = (res) => {
-  const payload = unwrapApi(res)
-  if (!payload || typeof payload !== 'object') {
-    return { current_page: 1, last_page: 1, total: 0, per_page: 15 }
-  }
-  const metaSource = payload?.data?.current_page ? payload.data : payload
-  return {
-    current_page: Number(metaSource?.current_page ?? 1),
-    last_page: Number(metaSource?.last_page ?? 1),
-    total: Number(metaSource?.total ?? 0),
-    per_page: Number(metaSource?.per_page ?? 15),
-  }
+  const p = unwrapApi(res)
+  const m = p?.data?.current_page ? p.data : (p && typeof p === 'object' ? p : {})
+  return { current_page: +(m.current_page || 1), last_page: +(m.last_page || 1), total: +(m.total || 0), per_page: +(m.per_page || 15) }
 }
 
 const normalizeTuyenRow = (x) => {
@@ -117,7 +115,13 @@ const normalizeTuyenRow = (x) => {
   }
 }
 
-/** Gộp dữ liệu từ BaoCaoController (admin) */
+/** 
+ * Tầng 1: Lấy dữ liệu báo cáo chuyên dụng từ API Admin (Dashboard, Tuyến đường, Trạng thái vé).
+ * Đây là nguồn dữ liệu ưu tiên cao nhất, nếu thành công sẽ set cờ `baoCaoSetsPrimaryKpi = true`.
+ * @param {string} tuNgay - Ngày bắt đầu (YYYY-MM-DD)
+ * @param {string} denNgay - Ngày kết thúc (YYYY-MM-DD)
+ * @param {number} gen - Biến thế hệ để chống race condition khi gọi API nhiều lần
+ */
 const fetchBaoCaoAdmin = async (tuNgay, denNgay, gen) => {
   if (!tuNgay || !denNgay) return
   const prm = { tu_ngay: tuNgay, den_ngay: denNgay }
@@ -219,24 +223,23 @@ const buildDateRange = () => {
   return { tuNgay: `${selectedYear.value}-01-01`, denNgay: `${selectedYear.value}-12-31` }
 }
 
-const parseTicketsFromResponse = (res) => {
-  const d = res?.data ?? res
-  let list = []
-  if (d?.data?.data?.data) list = d.data.data.data
-  else if (d?.data?.data) list = d.data.data
-  else if (Array.isArray(d?.data)) list = d.data
-  else if (Array.isArray(d)) list = d
-  return Array.isArray(list) ? list : []
-}
+// parseTicketsFromResponse đã được gộp chung vào extractPaginatedRows
 
-const isHuyVe = (t) => {
-  const s = String(t?.tinh_trang ?? '').toLowerCase()
-  return s === 'huy' || s === 'da_huy'
-}
+/** Lọc kiểm tra vé đã hủy chưa */
+const isHuyVe = (t) => ['huy', 'da_huy'].includes(String(t?.tinh_trang ?? '').toLowerCase())
+/** Lọc kiểm tra vé đã thanh toán thành công chưa */
 const isDaThanhToan = (t) => String(t?.tinh_trang ?? '').toLowerCase() === 'da_thanh_toan'
+/** Lọc kiểm tra vé có thanh toán bằng tiền mặt không */
 const isTienMat = (t) => String(t?.phuong_thuc_thanh_toan ?? '').toLowerCase() === 'tien_mat'
 
-/** Lấy toàn bộ vé trong khoảng ngày (phân trang) để tính tuyến / pie / lấp đầy */
+/** 
+ * Tầng 3 (Fallback một phần): Lấy toàn bộ danh sách vé trong khoảng thời gian để tính toán nội bộ (Client-side)
+ * Sử dụng để tính tỉ lệ lấp đầy ghế, phân bổ vé, tuyến đường (nếu API Tầng 1/2 không có).
+ * Lấy tối đa 50 trang (5000 vé) để giới hạn tải.
+ * @param {string} tuNgay - Ngày bắt đầu
+ * @param {string} denNgay - Ngày kết thúc
+ * @param {number} gen - Thế hệ request
+ */
 const fetchTicketsAnalytics = async (tuNgay, denNgay, gen) => {
   const acc = []
   let page = 1
@@ -247,7 +250,7 @@ const fetchTicketsAnalytics = async (tuNgay, denNgay, gen) => {
       if (tuNgay) params.tu_ngay = tuNgay
       if (denNgay) params.den_ngay = denNgay
       const res = await adminApi.getTickets(params)
-      const chunk = parseTicketsFromResponse(res)
+      const chunk = extractPaginatedRows(res)
       acc.push(...chunk)
       if (chunk.length < perPage) break
       page += 1
@@ -359,7 +362,14 @@ const fetchNewClientsInRange = async (tuNgay, denNgay) => {
   }
 }
 
-// ─── Fetch thống kê doanh thu (endpoint thong-ke, fallback danh sách) ──
+/** 
+ * Tầng 2: Lấy dữ liệu thống kê từ API bảng Thanh Toán.
+ * Nếu endpoint này trả về dữ liệu (có tổng giao dịch > 0 hoặc tổng doanh thu > 0), nó sẽ cập nhật KPI.
+ * Nếu trả về 0, nó sẽ tự động kích hoạt Tầng 3 (Fallback sang danh sách).
+ * @param {string} tuNgay 
+ * @param {string} denNgay 
+ * @param {number} gen 
+ */
 const statsLoading = ref(false)
 const fetchStats = async (tuNgay, denNgay, gen) => {
   statsLoading.value = true
@@ -447,7 +457,13 @@ const fetchStats = async (tuNgay, denNgay, gen) => {
   } finally { statsLoading.value = false }
 }
 
-// Fallback: tính aggregate từ danh sách khi endpoint thong-ke chưa có hoặc trả về 0
+/**
+ * Tầng 3 (Fallback toàn phần): Lấy danh sách giao dịch từ API `/thanh-toan` và tự tính toán Client-side.
+ * Sử dụng khi API `thong-ke` chưa hỗ trợ hoặc bị lỗi.
+ * @param {string} tuNgay 
+ * @param {string} denNgay 
+ * @param {number} gen 
+ */
 const fetchStatsFromList = async (tuNgay, denNgay, gen) => {
   if (baoCaoSetsPrimaryKpi.value) return
   try {
@@ -627,7 +643,13 @@ const isPmThanhToanCong = (pm) => {
   return true
 }
 
-/** Tổng doanh thu KPI = cộng toàn bộ số tiền hiển thị trong danh sách thanh toán theo bộ lọc hiện tại. */
+/** 
+ * Quét toàn bộ danh sách thanh toán trong kỳ (phân trang) để cộng dồn TỔNG DOANH THU chính xác.
+ * Doanh thu này dựa trên các giao dịch thanh toán thành công (không tính tiền mặt chưa nộp).
+ * @param {string} tuNgay 
+ * @param {string} denNgay 
+ * @param {number} gen 
+ */
 const applyPaymentRevenueTotal = async (tuNgay, denNgay, gen) => {
   if (!tuNgay || !denNgay) return
   let sum = 0

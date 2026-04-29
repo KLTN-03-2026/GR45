@@ -9,6 +9,11 @@ const profile = ref({
   ten_nha_xe: 'Nhà xe',
   email: '---',
   so_dien_thoai: '---',
+  ma_nha_xe: '---',
+  ten_cong_ty: '---',
+  ma_so_thue: '---',
+  nguoi_dai_dien: '---',
+  so_du_vi: '---',
 })
 const router = useRouter()
 const operatorStore = useOperatorStore()
@@ -49,13 +54,40 @@ const fetchProfile = async () => {
   isLoading.value = true
   try {
     const res = await operatorApi.getProfile()
-    const payload = res?.data?.data || {}
+    // axiosClient đã unwrap response => res thường là { success, data }
+    // nhưng vẫn fallback các dạng cũ để tương thích.
+    const payload =
+      res?.data?.nha_xe ||
+      res?.data ||
+      res?.nha_xe ||
+      res?.data?.data?.nha_xe ||
+      res?.data?.data ||
+      res?.data?.nha_xe ||
+      {}
+    const hoSo = payload.ho_so || {}
+    const viTopup = payload.vi_top_up || {}
     profile.value = {
       ten_nha_xe: payload.ten_nha_xe || payload.ten || payload.name || 'Nhà xe',
       email: payload.email || '---',
       so_dien_thoai: payload.so_dien_thoai || payload.phone || '---',
+      ma_nha_xe: payload.ma_nha_xe || '---',
+      ten_cong_ty: hoSo.ten_cong_ty || '---',
+      ma_so_thue: hoSo.ma_so_thue || '---',
+      nguoi_dai_dien: hoSo.nguoi_dai_dien || '---',
+      so_du_vi: viTopup.so_du || '---',
     }
   } catch (error) {
+    const fallback = operatorStore.user || {}
+    profile.value = {
+      ten_nha_xe: fallback.ten_nha_xe || 'Nhà xe',
+      email: fallback.email || '---',
+      so_dien_thoai: fallback.so_dien_thoai || '---',
+      ma_nha_xe: fallback.ma_nha_xe || '---',
+      ten_cong_ty: '---',
+      ma_so_thue: '---',
+      nguoi_dai_dien: '---',
+      so_du_vi: '---',
+    }
     showToast(error?.response?.data?.message || 'Không tải được thông tin nhà xe.', 'error')
   } finally {
     isLoading.value = false
@@ -99,6 +131,10 @@ onMounted(fetchProfile)
       <p v-if="isLoading" class="muted">Đang tải thông tin...</p>
       <div v-else class="profile-grid">
         <div class="profile-item">
+          <span>Mã nhà xe</span>
+          <strong>{{ profile.ma_nha_xe }}</strong>
+        </div>
+        <div class="profile-item">
           <span>Tên nhà xe</span>
           <strong>{{ profile.ten_nha_xe }}</strong>
         </div>
@@ -109,6 +145,22 @@ onMounted(fetchProfile)
         <div class="profile-item">
           <span>Số điện thoại</span>
           <strong>{{ profile.so_dien_thoai }}</strong>
+        </div>
+        <div class="profile-item">
+          <span>Công ty</span>
+          <strong>{{ profile.ten_cong_ty }}</strong>
+        </div>
+        <div class="profile-item">
+          <span>Mã số thuế</span>
+          <strong>{{ profile.ma_so_thue }}</strong>
+        </div>
+        <div class="profile-item">
+          <span>Người đại diện</span>
+          <strong>{{ profile.nguoi_dai_dien }}</strong>
+        </div>
+        <div class="profile-item">
+          <span>Số dư ví</span>
+          <strong>{{ profile.so_du_vi }}</strong>
         </div>
       </div>
     </article>

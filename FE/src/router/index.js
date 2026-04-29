@@ -56,6 +56,16 @@ const router = createRouter({
           beforeEnter: checkClientLogin,
         },
         {
+          path: 'theo-doi-chuyen-xe',
+          name: 'tracking-relative',
+          component: () => import('../views/user/TrackingView.vue'),
+        },
+        {
+          path: 'hop-tac',
+          name: 'partner',
+          component: () => import('../views/user/PartnerView.vue'),
+        },
+        {
           path: 've-cua-toi',
           redirect: { name: 'client-ticket-history' },
         },
@@ -88,8 +98,13 @@ const router = createRouter({
           component: () => import('../views/admin/chuyen-xe/ChuyenXeView.vue'),
         },
         {
-          path: 'tracking',
-          name: 'admin-tracking',
+          path: 'live-tracking',
+          name: 'admin-live-tracking',
+          component: () => import('../views/admin/tracking/LiveTrackingView.vue'),
+        },
+        {
+          path: 'lich-su-hanh-trinh',
+          name: 'admin-lich-su-hanh-trinh',
           component: () => import('../views/admin/tracking/TrackingView.vue'),
         },
         {
@@ -201,8 +216,13 @@ const router = createRouter({
           component: () => import('../views/operator/chuyen-xe/ChuyenXeView.vue'),
         },
         {
-          path: 'tracking',
-          name: 'operator-tracking',
+          path: 'live-tracking',
+          name: 'operator-live-tracking',
+          component: () => import('../views/operator/tracking/LiveTrackingView.vue'),
+        },
+        {
+          path: 'lich-su-hanh-trinh',
+          name: 'operator-lich-su-hanh-trinh',
           component: () => import('../views/operator/tracking/TrackingView.vue'),
         },
         {
@@ -239,6 +259,11 @@ const router = createRouter({
           path: 'cai-dat',
           name: 'operator-cai-dat',
           component: () => import('../views/operator/cai-dat/CaiDatView.vue'),
+        },
+        {
+          path: 'vi-nha-xe',
+          name: 'operator-vi-nha-xe',
+          component: () => import('../views/operator/vi-nha-xe/ViNhaXeView.vue'),
         },
       ],
     },
@@ -303,6 +328,11 @@ const router = createRouter({
           path: 'operator-login',
           name: 'operator-login',
           component: () => import('../views/auth/OperatorLoginView.vue'),
+        },
+        {
+          path: 'operator-register',
+          name: 'operator-register',
+          component: () => import('../views/auth/OperatorRegister.vue'),
         },
         {
           path: 'driver-login',

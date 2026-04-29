@@ -51,6 +51,84 @@ const currentTrip = ref({
 });
 
 const alerts = ref([]);
+const isFetchingTrip = ref(true);
+const isStartingTrip = ref(false);
+const isSendingSOS = ref(false);
+
+const sendSOS = async () => {
+  if (!currentTrip.value.id || isSendingSOS.value) return;
+
+  if (
+    !confirm(
+      "XÁC NHẬN GỬI TÍN HIỆU SOS KHẨN CẤP?\nTín hiệu sẽ được gửi ngay lập tức về trung tâm điều hành nhà xe."
+    )
+  ) {
+    return;
+  }
+
+  isSendingSOS.value = true;
+  try {
+    const res = await driverApi.postSOS({
+      id_chuyen_xe: currentTrip.value.id,
+      vi_do_luc_bao: currentPosition.value.lat,
+      kinh_do_luc_bao: currentPosition.value.lng,
+    });
+    if (res.success || res.data) {
+      alerts.value.unshift({
+        id: Date.now(),
+        type: "danger",
+        message: "🆘 TÍN HIỆU SOS ĐÃ ĐƯỢC GỬI! Trung tâm đang tiếp nhận xử lý.",
+        time: new Date().toLocaleTimeString("vi-VN"),
+      });
+      // Tạo hiệu ứng rung nếu thiết bị hỗ trợ
+      if ("vibrate" in navigator) {
+        navigator.vibrate([500, 200, 500, 200, 500]);
+      }
+    }
+  } catch (error) {
+    console.error("Lỗi khi gửi SOS:", error);
+    alerts.value.unshift({
+      id: Date.now(),
+      type: "danger",
+      message: "Lỗi khi gửi SOS: " + (error.response?.data?.message || error.message),
+      time: new Date().toLocaleTimeString("vi-VN"),
+    });
+  } finally {
+    isSendingSOS.value = false;
+  }
+};
+
+const batDauDiChuyen = async () => {
+  if (!currentTrip.value.id) return;
+  isStartingTrip.value = true;
+  try {
+    const res = await driverApi.updateTrangThaiChuyenXe(currentTrip.value.id, {
+      trang_thai: "dang_di_chuyen",
+    });
+    if (res.success || res.data) {
+      currentTrip.value.trang_thai = "dang_di_chuyen";
+      alerts.value.unshift({
+        id: Date.now(),
+        type: "warning",
+        message: "Chuyến xe đã bắt đầu di chuyển!",
+        time: new Date().toLocaleTimeString("vi-VN"),
+      });
+      setTimeout(() => {
+        if (mapInstance) mapInstance.resize();
+      }, 300);
+    }
+  } catch (error) {
+    console.error("Lỗi khi cập nhật trạng thái:", error);
+    alerts.value.unshift({
+      id: Date.now(),
+      type: "danger",
+      message: "Không thể bắt đầu chuyến xe: " + error.message,
+      time: new Date().toLocaleTimeString("vi-VN"),
+    });
+  } finally {
+    isStartingTrip.value = false;
+  }
+};
 
 // --- AI Camera State (Ngủ gật) ---
 const aiVideoRef = ref(null);
@@ -99,7 +177,7 @@ const aiStatusColor = computed(() => {
 });
 
 const earPercent = computed(() =>
-  Math.min(100, Math.max(0, (aiEar.value / 0.35) * 100)),
+  Math.min(100, Math.max(0, (aiEar.value / 0.35) * 100))
 );
 
 // --- YOLO Computed ---
@@ -144,7 +222,7 @@ const toggleAiCamera = async () => {
     drowsinessAgent.setTripId(currentTrip.value.id);
     drowsinessAgent.setPosition(
       currentPosition.value.lat,
-      currentPosition.value.lng,
+      currentPosition.value.lng
     );
 
     drowsinessAgent.onStatusChange = (status, ear) => {
@@ -209,14 +287,16 @@ const toggleYoloCamera = async () => {
 
     // Đảm bảo ref video/canvas đã sẵn sàng
     if (!yoloVideoRef.value || !yoloCanvasRef.value) {
-      throw new Error("Video hoặc Canvas element chưa sẵn sàng. Vui lòng thử lại.");
+      throw new Error(
+        "Video hoặc Canvas element chưa sẵn sàng. Vui lòng thử lại."
+      );
     }
 
     violationAgent.attachElements(yoloVideoRef.value, yoloCanvasRef.value);
     violationAgent.setTripId(currentTrip.value.id);
     violationAgent.setPosition(
       currentPosition.value.lat,
-      currentPosition.value.lng,
+      currentPosition.value.lng
     );
 
     // Callbacks
@@ -234,7 +314,9 @@ const toggleYoloCamera = async () => {
       alerts.value.unshift({
         id: Date.now(),
         type: "danger",
-        message: `${data.label} — độ tin cậy: ${(data.confidence * 100).toFixed(0)}%`,
+        message: `${data.label} — độ tin cậy: ${(data.confidence * 100).toFixed(
+          0
+        )}%`,
         time: new Date().toLocaleTimeString("vi-VN"),
       });
       if (alerts.value.length > 20) alerts.value.pop();
@@ -325,6 +407,8 @@ const postLiveTracking = async () => {
       vi_do: currentPosition.value.lat,
       kinh_do: currentPosition.value.lng,
       van_toc: currentTrip.value.van_toc,
+      huong_di: currentPosition.value.heading || 0,
+      do_chinh_xac_gps: currentPosition.value.accuracy || 0,
     });
   } catch (e) {
     console.error("Lỗi gửi tracking", e);
@@ -334,16 +418,24 @@ const postLiveTracking = async () => {
 // 2. Fetch trip
 /** Ưu tiên chuyến từ ?chuyen=id (từ Lịch trình → Vào điều khiển), không thì auto chọn chuyến hiện tại. */
 const fetchTripByIdOrFallback = async () => {
-  const raw = route.query.chuyen;
-  const id = raw != null && String(raw).trim() !== "" ? Number(raw) : NaN;
-  if (Number.isFinite(id) && id > 0) {
-    try {
+  console.log("fetchTripByIdOrFallback started");
+  isFetchingTrip.value = true;
+  try {
+    const raw = route.query.chuyen;
+    const id = raw != null && String(raw).trim() !== "" ? Number(raw) : NaN;
+    if (Number.isFinite(id) && id > 0) {
+      console.log("Fetching specific trip by ID:", id);
       const res = await driverApi.getChuyenXeDetail(id);
       if (res?.success && res.data) {
         let trip = res.data;
         try {
+          console.log("Fetching stops for trip ID:", id);
           const lt = await driverApi.getLichTrinhChuyen(id);
-          if (lt?.success && Array.isArray(lt.data?.lich_trinh) && lt.data.lich_trinh.length) {
+          if (
+            lt?.success &&
+            Array.isArray(lt.data?.lich_trinh) &&
+            lt.data.lich_trinh.length
+          ) {
             trip = {
               ...trip,
               tuyen_duong: {
@@ -352,51 +444,95 @@ const fetchTripByIdOrFallback = async () => {
               },
             };
           }
-        } catch {
-          /* giữ tram_dungs từ chi tiết chuyến */
+        } catch (ltErr) {
+          console.warn("Không lấy được lịch trình trạm dừng:", ltErr);
         }
         applyTripData(trip);
         return;
       }
-    } catch (e) {
-      console.warn("Không tải được chuyến theo query chuyen=", id, e);
     }
+    console.log("No valid trip ID in query, falling back to fetchCurrentTrip");
+    await fetchCurrentTrip();
+  } catch (e) {
+    console.error("Lỗi trong fetchTripByIdOrFallback:", e);
+    await fetchCurrentTrip();
+  } finally {
+    isFetchingTrip.value = false;
+    console.log("fetchTripByIdOrFallback finished");
   }
-  await fetchCurrentTrip();
 };
 
 const fetchCurrentTrip = async () => {
+  console.log("fetchCurrentTrip started");
+  isFetchingTrip.value = true;
   try {
-    // 1. Tìm chuyến xe đang chạy
-    const params = { trang_thai: "dang_di_chuyen" };
-    let response = await driverApi.getChuyenXeList(params);
-    let trips = response?.data?.data || [];
+    const today = new Date().toISOString().split("T")[0];
 
-    // 2. Nếu không có chuyến nào đang chạy, tìm chuyến sắp tới trong hôm nay
-    if (trips.length === 0) {
-      const today = new Date().toISOString().split("T")[0];
-      response = await driverApi.getLichTrinhCaNhan({
-        ngay_bat_dau: today,
-        ngay_ket_thuc: today,
-      });
-      const todayTrips = response?.data?.data || [];
-      // Lọc ra các chuyến sẵn sàng chạy hoặc chờ chạy
-      trips = todayTrips.filter((t) =>
-        ["hoat_dong", "ChoChay"].includes(t.trang_thai),
-      );
-      // Sắp xếp giờ khởi hành tăng dần để lấy chuyến sớm nhất trong ngày
-      trips.sort((a, b) => a.gio_khoi_hanh.localeCompare(b.gio_khoi_hanh));
+    // 1. Tìm chuyến xe đang chạy
+    console.log("Checking for active trips (dang_di_chuyen)...");
+    let response = await driverApi.getChuyenXeList({
+      trang_thai: "dang_di_chuyen",
+    });
+    let trips = response?.data?.data || response?.data || [];
+    if (!Array.isArray(trips) && response?.data) trips = [response.data];
+
+    if (Array.isArray(trips) && trips.length > 0) {
+      console.log("Found active trip:", trips[0].id);
+      const activeTrip = trips.find(t => t.trang_thai === "dang_di_chuyen") || trips[0];
+      applyTripData(activeTrip);
+      return;
     }
 
-    if (trips.length > 0) {
-      applyTripData(trips[0]);
+    // 2. Nếu không có chuyến nào đang chạy, tìm chuyến sắp tới trong hôm nay
+    console.log("No active trip. Checking today's schedule for upcoming trips...");
+    response = await driverApi.getLichTrinhCaNhan({
+      ngay_bat_dau: today,
+      ngay_ket_thuc: today,
+    });
+
+    const todayTrips = response?.data?.data || response?.data || [];
+    console.log(`Found ${Array.isArray(todayTrips) ? todayTrips.length : 0} total trips today.`);
+    
+    if (Array.isArray(todayTrips)) {
+      todayTrips.forEach(t => {
+        console.log(`- Trip ID ${t.id}: status=${t.trang_thai}, date=${t.ngay_khoi_hanh} (Today is ${today})`);
+      });
+    }
+
+    // Lọc ra các chuyến hoạt động
+    let upcomingTrips = Array.isArray(todayTrips) ? todayTrips.filter(
+      (t) => t.trang_thai === "hoat_dong" && t.ngay_khoi_hanh?.startsWith(today)
+    ) : [];
+
+    if (upcomingTrips.length > 0) {
+      console.log(`Found ${upcomingTrips.length} upcoming 'hoat_dong' trips.`);
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      upcomingTrips.sort((a, b) => {
+        const timeAStr = a.gio_khoi_hanh || "00:00";
+        const timeBStr = b.gio_khoi_hanh || "00:00";
+        const [hA, mA] = timeAStr.split(":").map(Number);
+        const timeA = (hA || 0) * 60 + (mA || 0);
+        const [hB, mB] = timeBStr.split(":").map(Number);
+        const timeB = (hB || 0) * 60 + (mB || 0);
+        return (
+          Math.abs(timeA - currentMinutes) - Math.abs(timeB - currentMinutes)
+        );
+      });
+
+      console.log("Selecting closest trip:", upcomingTrips[0].id);
+      applyTripData(upcomingTrips[0]);
     } else {
-      console.warn(
-        "Không có chuyến xe nào đang chạy hay sắp chạy trong hôm nay.",
-      );
+      currentTrip.value.id = null;
+      console.warn("Hôm nay không có lịch trình di chuyển.");
     }
   } catch (error) {
     console.warn("Lỗi khi load dữ liệu chuyến xe:", error.message);
+    currentTrip.value.id = null;
+  } finally {
+    isFetchingTrip.value = false;
+    console.log("fetchCurrentTrip finished");
   }
 };
 
@@ -420,7 +556,7 @@ watch(
   () => route.query.chuyen,
   () => {
     fetchTripByIdOrFallback();
-  },
+  }
 );
 
 // Polyline decoder
@@ -512,7 +648,7 @@ const routeToStop = async (tram) => {
       const oLng = hasRealGps.value ? currentPosition.value.lng : originLng;
       const oLat = hasRealGps.value ? currentPosition.value.lat : originLat;
       const osrmData = await openmapApi.getDrivingRoute(
-        `${oLng},${oLat};${tram.toa_do_y},${tram.toa_do_x}`,
+        `${oLng},${oLat};${tram.toa_do_y},${tram.toa_do_x}`
       );
       if (osrmData?.code === "Ok" && osrmData.routes?.length > 0) {
         const route = osrmData.routes[0];
@@ -557,7 +693,7 @@ const drawPath = (pathCoordinates) => {
   }
   const bounds = new maplibregl.LngLatBounds(
     pathCoordinates[0],
-    pathCoordinates[0],
+    pathCoordinates[0]
   );
   for (const coord of pathCoordinates) bounds.extend(coord);
   mapInstance.fitBounds(bounds, { padding: 60 });
@@ -574,7 +710,9 @@ const drawAllStops = () => {
       waypoints.push({ lat, lng });
       lngLats.push([lng, lat]);
       const popup = new maplibregl.Popup({ offset: 25 }).setHTML(
-        `<b>${tram.ten_tram}</b><br>Loại: ${tram.loai_tram === "don" ? "Đón khách" : "Trả khách"}`,
+        `<b>${tram.ten_tram}</b><br>Loại: ${
+          tram.loai_tram === "don" ? "Đón khách" : "Trả khách"
+        }`
       );
       new maplibregl.Marker({
         element: createStopElement(tram.loai_tram, waypoints.length),
@@ -648,14 +786,22 @@ const rotateMap = () => {
   mapInstance.easeTo({ bearing: mapBearing.value, duration: 600 });
 };
 
-onMounted(() => {
+const initMap = () => {
+  if (mapInstance || !mapContainer.value) return;
+
+  console.log("Initializing map...");
   const apiKey = import.meta.env.VITE_OPENMAP_API_KEY;
+  if (!apiKey) {
+    console.warn("VITE_OPENMAP_API_KEY is missing!");
+  }
+
   mapInstance = new maplibregl.Map({
     container: mapContainer.value,
     style: `https://maptiles.openmap.vn/styles/day-v1/style.json?apikey=${apiKey}`,
     center: [currentPosition.value.lng, currentPosition.value.lat],
     zoom: 13,
   });
+
   mapInstance.on("load", () => {
     mapInstance.addSource("actualRoute", {
       type: "geojson",
@@ -685,18 +831,40 @@ onMounted(() => {
             "line-dasharray": [2, 2],
           },
         },
-        "actualRoute",
+        "actualRoute"
       );
     }
+    
+    currentPopup = new maplibregl.Popup({ offset: 25 }).setHTML(
+      "Vị trí xe hiện tại"
+    );
+    busMarker = new maplibregl.Marker({ element: createBusElement() })
+      .setLngLat([currentPosition.value.lng, currentPosition.value.lat])
+      .setPopup(currentPopup)
+      .addTo(mapInstance);
+      
+    if (sortedStops.value.length > 0) {
+      drawAllStops();
+    }
   });
-  currentPopup = new maplibregl.Popup({ offset: 25 }).setHTML(
-    "Vị trí xe hiện tại",
-  );
-  busMarker = new maplibregl.Marker({ element: createBusElement() })
-    .setLngLat([currentPosition.value.lng, currentPosition.value.lat])
-    .setPopup(currentPopup)
-    .addTo(mapInstance);
+};
+
+watch(
+  () => currentTrip.value.trang_thai,
+  (newStatus) => {
+    if (newStatus === "dang_di_chuyen") {
+      setTimeout(() => {
+        initMap();
+      }, 100);
+    }
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  console.log("DashboardView Mounted - Bắt đầu tải dữ liệu...");
   fetchTripByIdOrFallback();
+
   if ("geolocation" in navigator) {
     let gpsRetryCount = 0;
     const MAX_GPS_RETRIES = 5;
@@ -707,8 +875,14 @@ onMounted(() => {
           hasRealGps.value = true;
           gpsError.value = null;
           gpsRetryCount = 0; // reset khi thành công
-          const { latitude, longitude, speed } = position.coords;
-          currentPosition.value = { lat: latitude, lng: longitude };
+          const { latitude, longitude, speed, heading, accuracy } =
+            position.coords;
+          currentPosition.value = {
+            lat: latitude,
+            lng: longitude,
+            heading: heading || 0,
+            accuracy: accuracy || 0,
+          };
           currentTrip.value.van_toc = speed ? Math.round(speed * 3.6) : 0;
           drowsinessAgent?.setPosition(latitude, longitude);
           if (busMarker) busMarker.setLngLat([longitude, latitude]);
@@ -724,7 +898,6 @@ onMounted(() => {
           console.warn("GPS Error code:", error.code, "-", error.message);
 
           if (error.code === 1) {
-            // PERMISSION_DENIED — không retry, hiển thị thông báo
             gpsError.value =
               "Trình duyệt bị từ chối quyền truy cập vị trí. Vui lòng cấp quyền trong cài đặt.";
             return;
@@ -741,13 +914,11 @@ onMounted(() => {
           if (watchId) navigator.geolocation.clearWatch(watchId);
 
           if (error.code === 2) {
-            // POSITION_UNAVAILABLE — thử lại với độ chính xác thấp hơn
             console.info(
-              `GPS unavailable, thử lại (lần ${gpsRetryCount}) với lowAccuracy...`,
+              `GPS unavailable, thử lại (lần ${gpsRetryCount}) với lowAccuracy...`
             );
             setTimeout(() => startGpsWatch(false), 5000);
           } else if (error.code === 3) {
-            // TIMEOUT — thử lại bình thường
             console.info(`GPS timeout, thử lại (lần ${gpsRetryCount})...`);
             setTimeout(() => startGpsWatch(highAccuracy), 3000);
           }
@@ -756,14 +927,14 @@ onMounted(() => {
           enableHighAccuracy: highAccuracy,
           maximumAge: 0,
           timeout: highAccuracy ? 15000 : 30000,
-        },
+        }
       );
     };
     startGpsWatch();
   } else {
     gpsError.value = "Trình duyệt không hỗ trợ GPS";
   }
-  trackingInterval = setInterval(postLiveTracking, 120000);
+  trackingInterval = setInterval(postLiveTracking, 30000); // Gửi tracking mỗi 30 giây
   postLiveTracking();
 });
 
@@ -778,406 +949,512 @@ onUnmounted(() => {
 
 <template>
   <div class="driver-dashboard-wrapper">
-    <!-- GPS Warning Banner -->
-    <div class="gps-warning-banner" v-if="!hasRealGps">
-      <WifiOff class="gps-warn-icon" />
-      <div class="gps-warn-text">
-        <strong>Tín hiệu GPS yếu hoặc chưa kết nối</strong>
-        <span>{{
-          gpsError ||
-          "Đang tìm kiếm vệ tinh... Chỉ đường sẽ dựa trên trạm dừng gần nhất."
-        }}</span>
-      </div>
-      <div class="gps-signal-anim"><span></span><span></span><span></span></div>
+    <!-- Loading state -->
+    <div v-if="isFetchingTrip" class="loading-full">
+      <div class="spinner"></div>
+      <p>Đang tải lịch trình...</p>
     </div>
 
-    <!-- Header -->
-    <header class="dashboard-header">
-      <div class="header-left">
-        <div class="header-icon-wrap"><Truck class="header-icon" /></div>
-        <div>
-          <h1 class="page-title">Dashboard Tài Xế</h1>
-          <p class="subtitle">
-            <span class="route-name">{{ currentTrip.ten_tuyen_duong }}</span>
-            <span class="divider">•</span>
-            <span class="plate-badge">{{ currentTrip.bien_so }}</span>
-          </p>
-        </div>
+    <!-- No trip state -->
+    <div v-else-if="!currentTrip.id" class="no-trip-container">
+      <div class="no-trip-content glass-card">
+        <Truck class="no-trip-icon" :size="64" />
+        <h2>Hôm nay không có lịch trình di chuyển</h2>
+        <p>Bạn có thể nghỉ ngơi hoặc liên hệ điều hành nếu có thắc mắc.</p>
+        <button class="action-btn refresh-btn" @click="fetchCurrentTrip">
+          <RefreshCw /> Tải lại
+        </button>
       </div>
-      <div class="header-right">
-        <div class="speed-gauge">
-          <Zap class="speed-icon" />
-          <span class="speed-value">{{ currentTrip.van_toc }}</span>
-          <span class="speed-unit">km/h</span>
-        </div>
-        <div class="status-badge" :class="currentTrip.trang_thai">
-          <span
-            class="pulsing-dot"
-            v-if="currentTrip.trang_thai === 'dang_di_chuyen'"
-          ></span>
+    </div>
+
+    <template v-else>
+      <!-- GPS Warning Banner -->
+      <div
+        class="gps-warning-banner"
+        v-if="!hasRealGps && currentTrip.trang_thai === 'dang_di_chuyen'"
+      >
+        <WifiOff class="gps-warn-icon" />
+        <div class="gps-warn-text">
+          <strong>Tín hiệu GPS yếu hoặc chưa kết nối</strong>
           <span>{{
-            currentTrip.trang_thai === "dang_di_chuyen"
-              ? "Đang di chuyển"
-              : "Sẵn sàng"
+            gpsError ||
+            "Đang tìm kiếm vệ tinh... Chỉ đường sẽ dựa trên trạm dừng gần nhất."
           }}</span>
         </div>
+        <div class="gps-signal-anim">
+          <span></span><span></span><span></span>
+        </div>
       </div>
-    </header>
 
-    <!-- Info Cards -->
-    <div class="trip-info-row">
-      <div class="info-card">
-        <div class="info-icon-wrap icon-blue"><Route class="info-icon" /></div>
-        <div class="info-data">
-          <span class="info-label">Lộ trình</span>
-          <span class="info-val"
-            >{{ currentTrip.diem_bat_dau }} →
-            {{ currentTrip.diem_ket_thuc }}</span
+      <!-- Header -->
+      <header class="dashboard-header">
+        <div class="header-left">
+          <div class="header-icon-wrap"><Truck class="header-icon" /></div>
+          <div>
+            <h1 class="page-title">Dashboard Tài Xế</h1>
+            <p class="subtitle">
+              <span class="route-name">{{ currentTrip.ten_tuyen_duong }}</span>
+              <span class="divider">•</span>
+              <span class="plate-badge">{{ currentTrip.bien_so }}</span>
+            </p>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="speed-gauge">
+            <Zap class="speed-icon" />
+            <span class="speed-value">{{ currentTrip.van_toc }}</span>
+            <span class="speed-unit">km/h</span>
+          </div>
+          <div class="status-badge" :class="currentTrip.trang_thai">
+            <span
+              class="pulsing-dot"
+              v-if="currentTrip.trang_thai === 'dang_di_chuyen'"
+            ></span>
+            <span>{{
+              currentTrip.trang_thai === "dang_di_chuyen"
+                ? "Đang di chuyển"
+                : "Sẵn sàng"
+            }}</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Info Cards -->
+      <div class="trip-info-row">
+        <div class="info-card">
+          <div class="info-icon-wrap icon-blue">
+            <Route class="info-icon" />
+          </div>
+          <div class="info-data">
+            <span class="info-label">Lộ trình</span>
+            <span class="info-val"
+              >{{ currentTrip.diem_bat_dau }} →
+              {{ currentTrip.diem_ket_thuc }}</span
+            >
+          </div>
+        </div>
+        <div class="info-card">
+          <div class="info-icon-wrap icon-green">
+            <MapPin class="info-icon" />
+          </div>
+          <div class="info-data">
+            <span class="info-label">Quãng đường</span>
+            <span class="info-val">{{ currentTrip.quang_duong }} km</span>
+          </div>
+        </div>
+        <div class="info-card">
+          <div class="info-icon-wrap icon-amber">
+            <Clock class="info-icon" />
+          </div>
+          <div class="info-data">
+            <span class="info-label">Giờ khởi hành</span>
+            <span class="info-val">{{ currentTrip.gio_khoi_hanh }}</span>
+          </div>
+        </div>
+        <div class="info-card">
+          <div class="info-icon-wrap icon-purple">
+            <CircleDot class="info-icon" />
+          </div>
+          <div class="info-data">
+            <span class="info-label">Số trạm dừng</span>
+            <span class="info-val">{{ sortedStops.length }} trạm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Grid (dang_di_chuyen) -->
+      <div
+        class="dashboard-grid"
+        v-if="currentTrip.trang_thai === 'dang_di_chuyen'"
+      >
+        <!-- Map Column -->
+        <div class="col-left">
+          <div class="glass-card map-card">
+            <div class="card-header flex-between">
+              <h3 class="card-title">
+                <MapPin class="icon" /> Bản đồ & Tracking
+                <span class="legend-route"
+                  ><span class="line-blue"></span> Kế hoạch</span
+                >
+                <span class="legend-route"
+                  ><span class="line-red"></span> Đã đi</span
+                >
+              </h3>
+            </div>
+            <div class="map-container-wrapper">
+              <div class="map-container" ref="mapContainer"></div>
+              <!-- Map Control Buttons -->
+              <div class="map-controls">
+                <button
+                  class="map-ctrl-btn"
+                  @click="centerToCurrentLocation"
+                  title="Về vị trí hiện tại"
+                >
+                  <Crosshair class="ctrl-icon" />
+                </button>
+                <button
+                  class="map-ctrl-btn"
+                  @click="rotateMap"
+                  title="Xoay bản đồ"
+                >
+                  <Compass
+                    class="ctrl-icon"
+                    :style="{ transform: `rotate(${mapBearing}deg)` }"
+                  />
+                </button>
+              </div>
+              <!-- GPS indicator on map -->
+              <div
+                class="map-gps-indicator"
+                :class="{ 'gps-ok': hasRealGps, 'gps-no': !hasRealGps }"
+              >
+                <Wifi v-if="hasRealGps" class="gps-ind-icon" />
+                <WifiOff v-else class="gps-ind-icon" />
+                <span>{{ hasRealGps ? "GPS OK" : "Không có GPS" }}</span>
+              </div>
+            </div>
+            <div class="map-footer">
+              <button
+                class="action-btn sos-btn"
+                @click="sendSOS"
+                :disabled="isSendingSOS"
+              >
+                <div class="spinner-sm" v-if="isSendingSOS"></div>
+                <AlertTriangle v-else class="icon" /> S.O.S KHẨN CẤP
+              </button>
+              <button class="action-btn report-btn">
+                <Truck class="icon" /> Báo cáo kẹt xe
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-right">
+          <!-- Stops List -->
+          <div class="glass-card stops-card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <Navigation class="icon" /> Danh sách trạm dừng
+              </h3>
+              <span class="stop-count-badge">{{ sortedStops.length }}</span>
+            </div>
+            <div class="stops-scroll-area">
+              <div
+                v-for="(tram, index) in sortedStops"
+                :key="tram.id"
+                class="stop-item"
+                :class="{ 'active-stop': activeTargetStop?.id === tram.id }"
+                @click="routeToStop(tram)"
+              >
+                <div class="stop-order-num">{{ index + 1 }}</div>
+                <div class="stop-icon-wrap" :class="`icon-${tram.loai_tram}`">
+                  <MapPin v-if="tram.loai_tram === 'don'" />
+                  <Flag v-else />
+                </div>
+                <div class="stop-info-txt">
+                  <span class="stop-name">{{ tram.ten_tram }}</span>
+                  <span class="stop-type">{{
+                    tram.loai_tram === "don" ? "Đón khách" : "Trả khách"
+                  }}</span>
+                  <div
+                    v-if="
+                      activeTargetStop?.id === tram.id && tram.routingDistance
+                    "
+                    class="stop-routing-info"
+                  >
+                    <span class="routing-chip route-dist"
+                      ><Route class="inline-icon" :size="13" />
+                      {{ tram.routingDistance }}</span
+                    >
+                    <span class="routing-chip route-time"
+                      ><Clock class="inline-icon" :size="13" />
+                      {{ tram.routingDuration }}</span
+                    >
+                  </div>
+                  <div
+                    v-if="
+                      activeTargetStop?.id === tram.id &&
+                      !hasRealGps &&
+                      !tram.routingDistance &&
+                      !isLoadingRoute
+                    "
+                    class="fallback-note"
+                  >
+                    <WifiOff :size="12" /> Chỉ đường từ trạm trước đó
+                  </div>
+                </div>
+                <div class="stop-action">
+                  <div
+                    v-if="activeTargetStop?.id === tram.id && isLoadingRoute"
+                    class="loading-spinner"
+                  ></div>
+                  <Navigation
+                    v-else-if="activeTargetStop?.id === tram.id"
+                    class="anim-pulse icon-nav"
+                  />
+                  <ChevronRight v-else class="icon-nav-inactive" />
+                </div>
+                <!-- Connector line -->
+                <div
+                  v-if="index < sortedStops.length - 1"
+                  class="stop-connector"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI Camera -->
+          <div class="glass-card camera-card">
+            <div class="card-header flex-between">
+              <h3 class="card-title">
+                <Video class="icon" /> Camera AI Giám sát
+              </h3>
+              <div class="camera-controls">
+                <span v-if="aiCameraOn" class="live-tag">● LIVE</span>
+                <span class="fps-badge" v-if="aiCameraOn">{{ aiFps }} FPS</span>
+                <button
+                  class="cam-toggle-btn"
+                  :class="{ active: aiCameraOn }"
+                  @click="toggleAiCamera"
+                >
+                  <Camera :size="16" />
+                  {{ aiCameraOn ? "Tắt" : "Bật" }}
+                </button>
+              </div>
+            </div>
+            <div class="camera-stream-container">
+              <!-- Video + Canvas overlay -->
+              <video
+                ref="aiVideoRef"
+                class="ai-video"
+                autoplay
+                playsinline
+                muted
+              ></video>
+              <canvas ref="aiCanvasRef" class="ai-canvas-overlay"></canvas>
+
+              <!-- Placeholder khi chưa bật -->
+              <div v-if="!aiCameraOn" class="camera-placeholder">
+                <div class="cam-placeholder-content">
+                  <ShieldAlert :size="32" />
+                  <span>Nhấn <strong>Bật</strong> để khởi động Camera AI</span>
+                  <span class="cam-hint"
+                    >Hệ thống sẽ giám sát ngủ gật bằng AI</span
+                  >
+                </div>
+                <div class="scanning-line" v-if="aiStatus === 'loading'"></div>
+              </div>
+
+              <!-- EAR Gauge -->
+              <div v-if="aiCameraOn" class="ear-gauge">
+                <div class="ear-gauge-label">EAR</div>
+                <div class="ear-gauge-bar">
+                  <div
+                    class="ear-gauge-fill"
+                    :style="{
+                      width: earPercent + '%',
+                      background: aiStatusColor,
+                    }"
+                  ></div>
+                </div>
+                <div class="ear-gauge-value" :style="{ color: aiStatusColor }">
+                  {{ aiEar.toFixed(3) }}
+                </div>
+              </div>
+
+              <!-- Status overlay -->
+              <div class="camera-status" :class="`cam-status-${aiStatus}`">
+                <div class="cam-status-left">
+                  <Eye v-if="aiStatus === 'normal'" :size="16" />
+                  <EyeOff
+                    v-else-if="aiStatus === 'danger' || aiStatus === 'warning'"
+                    :size="16"
+                  />
+                  <ShieldAlert v-else :size="16" />
+                  <span class="cam-status-text">{{ aiStatusLabel }}</span>
+                </div>
+                <div class="cam-status-right" v-if="aiCameraOn">
+                  <span v-if="aiViolationCount > 0" class="violation-count"
+                    >{{ aiViolationCount }} vi phạm</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- YOLO Camera — Phát hiện vật thể vi phạm -->
+          <div class="glass-card yolo-camera-card">
+            <div class="card-header flex-between">
+              <h3 class="card-title">
+                <ScanLine class="icon" /> Camera Giám sát Cabin
+              </h3>
+              <div class="camera-controls">
+                <span v-if="yoloCameraOn" class="live-tag yolo-live"
+                  >● DETECT</span
+                >
+                <span class="fps-badge" v-if="yoloCameraOn"
+                  >{{ yoloFps }} FPS</span
+                >
+                <button
+                  class="cam-toggle-btn"
+                  :class="{ active: yoloCameraOn }"
+                  @click="toggleYoloCamera"
+                >
+                  <ScanLine :size="16" />
+                  {{ yoloCameraOn ? "Tắt" : "Bật" }}
+                </button>
+              </div>
+            </div>
+            <div class="camera-stream-container">
+              <!-- Video + Canvas overlay cho bounding box -->
+              <video
+                ref="yoloVideoRef"
+                class="ai-video yolo-video"
+                autoplay
+                playsinline
+                muted
+              ></video>
+              <canvas
+                ref="yoloCanvasRef"
+                class="ai-canvas-overlay yolo-canvas"
+              ></canvas>
+
+              <!-- Placeholder khi chưa bật -->
+              <div
+                v-if="!yoloCameraOn"
+                class="camera-placeholder yolo-placeholder"
+              >
+                <div class="cam-placeholder-content">
+                  <Swords :size="32" />
+                  <span
+                    >Nhấn <strong>Bật</strong> để khởi động YOLO Detection</span
+                  >
+                  <span class="cam-hint"
+                    >Phát hiện dao, hút thuốc, vi phạm trên xe</span
+                  >
+                </div>
+                <div
+                  class="scanning-line yolo-scan"
+                  v-if="yoloStatus === 'loading'"
+                ></div>
+              </div>
+
+              <!-- Danh sách detections realtime -->
+              <div
+                v-if="yoloCameraOn && yoloDetections.length > 0"
+                class="yolo-detections-overlay"
+              >
+                <div
+                  v-for="(det, idx) in yoloDetections"
+                  :key="idx"
+                  class="yolo-det-chip"
+                  :class="`det-${det.className.replace(' ', '_')}`"
+                >
+                  <Swords v-if="det.className === 'knife'" :size="13" />
+                  <Cigarette
+                    v-else-if="det.className === 'cell phone'"
+                    :size="13"
+                  />
+                  <AlertTriangle v-else :size="13" />
+                  <span>{{
+                    det.className === "knife"
+                      ? "Dao"
+                      : det.className === "cell phone"
+                      ? "Hút thuốc"
+                      : "Vi phạm"
+                  }}</span>
+                  <span class="det-conf"
+                    >{{ (det.confidence * 100).toFixed(0) }}%</span
+                  >
+                </div>
+              </div>
+
+              <!-- Status overlay -->
+              <div
+                class="camera-status"
+                :class="`cam-status-${
+                  yoloStatus === 'violation'
+                    ? 'danger'
+                    : yoloStatus === 'detecting'
+                    ? 'normal'
+                    : yoloStatus
+                }`"
+              >
+                <div class="cam-status-left">
+                  <ScanLine v-if="yoloStatus === 'detecting'" :size="16" />
+                  <AlertTriangle
+                    v-else-if="yoloStatus === 'violation'"
+                    :size="16"
+                  />
+                  <ShieldAlert v-else :size="16" />
+                  <span class="cam-status-text">{{ yoloStatusLabel }}</span>
+                </div>
+                <div class="cam-status-right" v-if="yoloCameraOn">
+                  <span v-if="yoloViolationCount > 0" class="violation-count"
+                    >{{ yoloViolationCount }} vi phạm</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alerts -->
+          <div class="glass-card alerts-card">
+            <div class="card-header warning-header">
+              <h3 class="card-title text-danger">
+                <AlertTriangle class="icon" /> Cảnh báo
+              </h3>
+            </div>
+            <div class="alerts-list">
+              <div
+                v-for="alert in alerts"
+                :key="alert.id"
+                class="alert-item"
+                :class="`alert-${alert.type}`"
+              >
+                <div class="alert-icon">
+                  <Bell v-if="alert.type === 'warning'" /><AlertTriangle
+                    v-else
+                  />
+                </div>
+                <div class="alert-content">
+                  <p class="alert-msg">{{ alert.message }}</p>
+                  <span class="alert-time">{{ alert.time }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ready to Start Screen (Trạng thái hoạt động) -->
+      <div
+        class="ready-to-start-container"
+        v-else-if="currentTrip.trang_thai === 'hoat_dong'"
+      >
+        <div class="ready-content glass-card">
+          <div class="ready-icon-wrap">
+            <Truck class="ready-icon" :size="64" />
+          </div>
+          <h2>Chuyến xe đã sẵn sàng</h2>
+          <p>
+            Vui lòng kiểm tra lại thông tin chuyến xe, số lượng hành khách trước
+            khi khởi hành.
+          </p>
+          <button
+            class="btn-start-trip"
+            @click="batDauDiChuyen"
+            :disabled="isStartingTrip"
           >
+            <div class="spinner" v-if="isStartingTrip"></div>
+            <span v-else>BẮT ĐẦU DI CHUYỂN <ChevronRight /></span>
+          </button>
         </div>
       </div>
-      <div class="info-card">
-        <div class="info-icon-wrap icon-green">
-          <MapPin class="info-icon" />
-        </div>
-        <div class="info-data">
-          <span class="info-label">Quãng đường</span>
-          <span class="info-val">{{ currentTrip.quang_duong }} km</span>
-        </div>
-      </div>
-      <div class="info-card">
-        <div class="info-icon-wrap icon-amber"><Clock class="info-icon" /></div>
-        <div class="info-data">
-          <span class="info-label">Giờ khởi hành</span>
-          <span class="info-val">{{ currentTrip.gio_khoi_hanh }}</span>
-        </div>
-      </div>
-      <div class="info-card">
-        <div class="info-icon-wrap icon-purple">
-          <CircleDot class="info-icon" />
-        </div>
-        <div class="info-data">
-          <span class="info-label">Số trạm dừng</span>
-          <span class="info-val">{{ sortedStops.length }} trạm</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Grid -->
-    <div class="dashboard-grid">
-      <!-- Map Column -->
-      <div class="col-left">
-        <div class="glass-card map-card">
-          <div class="card-header flex-between">
-            <h3 class="card-title">
-              <MapPin class="icon" /> Bản đồ & Tracking
-              <span class="legend-route"
-                ><span class="line-blue"></span> Kế hoạch</span
-              >
-              <span class="legend-route"
-                ><span class="line-red"></span> Đã đi</span
-              >
-            </h3>
-          </div>
-          <div class="map-container-wrapper">
-            <div class="map-container" ref="mapContainer"></div>
-            <!-- Map Control Buttons -->
-            <div class="map-controls">
-              <button
-                class="map-ctrl-btn"
-                @click="centerToCurrentLocation"
-                title="Về vị trí hiện tại"
-              >
-                <Crosshair class="ctrl-icon" />
-              </button>
-              <button
-                class="map-ctrl-btn"
-                @click="rotateMap"
-                title="Xoay bản đồ"
-              >
-                <Compass
-                  class="ctrl-icon"
-                  :style="{ transform: `rotate(${mapBearing}deg)` }"
-                />
-              </button>
-            </div>
-            <!-- GPS indicator on map -->
-            <div
-              class="map-gps-indicator"
-              :class="{ 'gps-ok': hasRealGps, 'gps-no': !hasRealGps }"
-            >
-              <Wifi v-if="hasRealGps" class="gps-ind-icon" />
-              <WifiOff v-else class="gps-ind-icon" />
-              <span>{{ hasRealGps ? "GPS OK" : "Không có GPS" }}</span>
-            </div>
-          </div>
-          <div class="map-footer">
-            <button class="action-btn sos-btn">
-              <AlertTriangle class="icon" /> S.O.S KHẨN CẤP
-            </button>
-            <button class="action-btn report-btn">
-              <Truck class="icon" /> Báo cáo kẹt xe
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column -->
-      <div class="col-right">
-        <!-- Stops List -->
-        <div class="glass-card stops-card">
-          <div class="card-header">
-            <h3 class="card-title">
-              <Navigation class="icon" /> Danh sách trạm dừng
-            </h3>
-            <span class="stop-count-badge">{{ sortedStops.length }}</span>
-          </div>
-          <div class="stops-scroll-area">
-            <div
-              v-for="(tram, index) in sortedStops"
-              :key="tram.id"
-              class="stop-item"
-              :class="{ 'active-stop': activeTargetStop?.id === tram.id }"
-              @click="routeToStop(tram)"
-            >
-              <div class="stop-order-num">{{ index + 1 }}</div>
-              <div class="stop-icon-wrap" :class="`icon-${tram.loai_tram}`">
-                <MapPin v-if="tram.loai_tram === 'don'" />
-                <Flag v-else />
-              </div>
-              <div class="stop-info-txt">
-                <span class="stop-name">{{ tram.ten_tram }}</span>
-                <span class="stop-type">{{
-                  tram.loai_tram === "don" ? "Đón khách" : "Trả khách"
-                }}</span>
-                <div
-                  v-if="
-                    activeTargetStop?.id === tram.id && tram.routingDistance
-                  "
-                  class="stop-routing-info"
-                >
-                  <span class="routing-chip route-dist"
-                    ><Route class="inline-icon" :size="13" />
-                    {{ tram.routingDistance }}</span
-                  >
-                  <span class="routing-chip route-time"
-                    ><Clock class="inline-icon" :size="13" />
-                    {{ tram.routingDuration }}</span
-                  >
-                </div>
-                <div
-                  v-if="
-                    activeTargetStop?.id === tram.id &&
-                    !hasRealGps &&
-                    !tram.routingDistance &&
-                    !isLoadingRoute
-                  "
-                  class="fallback-note"
-                >
-                  <WifiOff :size="12" /> Chỉ đường từ trạm trước đó
-                </div>
-              </div>
-              <div class="stop-action">
-                <div
-                  v-if="activeTargetStop?.id === tram.id && isLoadingRoute"
-                  class="loading-spinner"
-                ></div>
-                <Navigation
-                  v-else-if="activeTargetStop?.id === tram.id"
-                  class="anim-pulse icon-nav"
-                />
-                <ChevronRight v-else class="icon-nav-inactive" />
-              </div>
-              <!-- Connector line -->
-              <div
-                v-if="index < sortedStops.length - 1"
-                class="stop-connector"
-              ></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- AI Camera -->
-        <div class="glass-card camera-card">
-          <div class="card-header flex-between">
-            <h3 class="card-title">
-              <Video class="icon" /> Camera AI Giám sát
-            </h3>
-            <div class="camera-controls">
-              <span v-if="aiCameraOn" class="live-tag">● LIVE</span>
-              <span class="fps-badge" v-if="aiCameraOn">{{ aiFps }} FPS</span>
-              <button
-                class="cam-toggle-btn"
-                :class="{ active: aiCameraOn }"
-                @click="toggleAiCamera"
-              >
-                <Camera :size="16" />
-                {{ aiCameraOn ? "Tắt" : "Bật" }}
-              </button>
-            </div>
-          </div>
-          <div class="camera-stream-container">
-            <!-- Video + Canvas overlay -->
-            <video
-              ref="aiVideoRef"
-              class="ai-video"
-              autoplay
-              playsinline
-              muted
-            ></video>
-            <canvas ref="aiCanvasRef" class="ai-canvas-overlay"></canvas>
-
-            <!-- Placeholder khi chưa bật -->
-            <div v-if="!aiCameraOn" class="camera-placeholder">
-              <div class="cam-placeholder-content">
-                <ShieldAlert :size="32" />
-                <span>Nhấn <strong>Bật</strong> để khởi động Camera AI</span>
-                <span class="cam-hint"
-                  >Hệ thống sẽ giám sát ngủ gật bằng AI</span
-                >
-              </div>
-              <div class="scanning-line" v-if="aiStatus === 'loading'"></div>
-            </div>
-
-            <!-- EAR Gauge -->
-            <div v-if="aiCameraOn" class="ear-gauge">
-              <div class="ear-gauge-label">EAR</div>
-              <div class="ear-gauge-bar">
-                <div
-                  class="ear-gauge-fill"
-                  :style="{
-                    width: earPercent + '%',
-                    background: aiStatusColor,
-                  }"
-                ></div>
-              </div>
-              <div class="ear-gauge-value" :style="{ color: aiStatusColor }">
-                {{ aiEar.toFixed(3) }}
-              </div>
-            </div>
-
-            <!-- Status overlay -->
-            <div class="camera-status" :class="`cam-status-${aiStatus}`">
-              <div class="cam-status-left">
-                <Eye v-if="aiStatus === 'normal'" :size="16" />
-                <EyeOff
-                  v-else-if="aiStatus === 'danger' || aiStatus === 'warning'"
-                  :size="16"
-                />
-                <ShieldAlert v-else :size="16" />
-                <span class="cam-status-text">{{ aiStatusLabel }}</span>
-              </div>
-              <div class="cam-status-right" v-if="aiCameraOn">
-                <span v-if="aiViolationCount > 0" class="violation-count"
-                  >{{ aiViolationCount }} vi phạm</span
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- YOLO Camera — Phát hiện vật thể vi phạm -->
-        <div class="glass-card yolo-camera-card">
-          <div class="card-header flex-between">
-            <h3 class="card-title">
-              <ScanLine class="icon" /> Camera Giám sát Cabin
-            </h3>
-            <div class="camera-controls">
-              <span v-if="yoloCameraOn" class="live-tag yolo-live">● DETECT</span>
-              <span class="fps-badge" v-if="yoloCameraOn">{{ yoloFps }} FPS</span>
-              <button
-                class="cam-toggle-btn"
-                :class="{ active: yoloCameraOn }"
-                @click="toggleYoloCamera"
-              >
-                <ScanLine :size="16" />
-                {{ yoloCameraOn ? "Tắt" : "Bật" }}
-              </button>
-            </div>
-          </div>
-          <div class="camera-stream-container">
-            <!-- Video + Canvas overlay cho bounding box -->
-            <video
-              ref="yoloVideoRef"
-              class="ai-video yolo-video"
-              autoplay
-              playsinline
-              muted
-            ></video>
-            <canvas ref="yoloCanvasRef" class="ai-canvas-overlay yolo-canvas"></canvas>
-
-            <!-- Placeholder khi chưa bật -->
-            <div v-if="!yoloCameraOn" class="camera-placeholder yolo-placeholder">
-              <div class="cam-placeholder-content">
-                <Swords :size="32" />
-                <span>Nhấn <strong>Bật</strong> để khởi động YOLO Detection</span>
-                <span class="cam-hint">Phát hiện dao, hút thuốc, vi phạm trên xe</span>
-              </div>
-              <div class="scanning-line yolo-scan" v-if="yoloStatus === 'loading'"></div>
-            </div>
-
-            <!-- Danh sách detections realtime -->
-            <div v-if="yoloCameraOn && yoloDetections.length > 0" class="yolo-detections-overlay">
-              <div
-                v-for="(det, idx) in yoloDetections"
-                :key="idx"
-                class="yolo-det-chip"
-                :class="`det-${det.className.replace(' ', '_')}`"
-              >
-                <Swords v-if="det.className === 'knife'" :size="13" />
-                <Cigarette v-else-if="det.className === 'cell phone'" :size="13" />
-                <AlertTriangle v-else :size="13" />
-                <span>{{ det.className === 'knife' ? 'Dao' : det.className === 'cell phone' ? 'Hút thuốc' : 'Vi phạm' }}</span>
-                <span class="det-conf">{{ (det.confidence * 100).toFixed(0) }}%</span>
-              </div>
-            </div>
-
-            <!-- Status overlay -->
-            <div class="camera-status" :class="`cam-status-${yoloStatus === 'violation' ? 'danger' : yoloStatus === 'detecting' ? 'normal' : yoloStatus}`">
-              <div class="cam-status-left">
-                <ScanLine v-if="yoloStatus === 'detecting'" :size="16" />
-                <AlertTriangle v-else-if="yoloStatus === 'violation'" :size="16" />
-                <ShieldAlert v-else :size="16" />
-                <span class="cam-status-text">{{ yoloStatusLabel }}</span>
-              </div>
-              <div class="cam-status-right" v-if="yoloCameraOn">
-                <span v-if="yoloViolationCount > 0" class="violation-count"
-                  >{{ yoloViolationCount }} vi phạm</span
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Alerts -->
-        <div class="glass-card alerts-card">
-          <div class="card-header warning-header">
-            <h3 class="card-title text-danger">
-              <AlertTriangle class="icon" /> Cảnh báo
-            </h3>
-          </div>
-          <div class="alerts-list">
-            <div
-              v-for="alert in alerts"
-              :key="alert.id"
-              class="alert-item"
-              :class="`alert-${alert.type}`"
-            >
-              <div class="alert-icon">
-                <Bell v-if="alert.type === 'warning'" /><AlertTriangle v-else />
-              </div>
-              <div class="alert-content">
-                <p class="alert-msg">{{ alert.message }}</p>
-                <span class="alert-time">{{ alert.time }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
-
 <style scoped>
 /* ===== BASE ===== */
 .driver-dashboard-wrapper {
@@ -1408,9 +1685,7 @@ onUnmounted(() => {
   gap: 14px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   border: 1px solid #e2e8f0;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 .info-card:hover {
   transform: translateY(-2px);
@@ -1983,9 +2258,7 @@ onUnmounted(() => {
 .ear-gauge-fill {
   height: 100%;
   border-radius: 3px;
-  transition:
-    width 0.15s,
-    background 0.3s;
+  transition: width 0.15s, background 0.3s;
 }
 .ear-gauge-value {
   font-size: 12px;
@@ -2099,7 +2372,12 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #0c0a1a 0%, #1a1145 100%) !important;
 }
 .yolo-scan {
-  background: linear-gradient(90deg, transparent, #6366f1, transparent) !important;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #6366f1,
+    transparent
+  ) !important;
   box-shadow: 0 0 16px rgba(99, 102, 241, 0.6) !important;
 }
 
@@ -2125,8 +2403,14 @@ onUnmounted(() => {
   animation: detChipIn 0.3s ease;
 }
 @keyframes detChipIn {
-  from { transform: translateX(20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 .det-knife {
   background: rgba(239, 68, 68, 0.85);
@@ -2144,12 +2428,171 @@ onUnmounted(() => {
   box-shadow: 0 2px 12px rgba(139, 92, 246, 0.4);
 }
 .det-conf {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 11px;
   opacity: 0.9;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
   padding: 1px 6px;
   border-radius: 10px;
+}
+
+/* ===== ADDITIONAL STATES ===== */
+.loading-full {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  gap: 16px;
+  color: #64748b;
+  font-weight: 500;
+}
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.no-trip-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 200px);
+}
+.no-trip-content {
+  text-align: center;
+  padding: 48px;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: white;
+}
+.no-trip-icon {
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+.no-trip-content h2 {
+  font-size: 24px;
+  color: #1e293b;
+  margin: 0;
+}
+.no-trip-content p {
+  color: #64748b;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+.refresh-btn {
+  padding: 10px 20px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.refresh-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.ready-to-start-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.ready-content {
+  text-align: center;
+  padding: 48px;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  background: white;
+}
+.ready-icon-wrap {
+  width: 96px;
+  height: 96px;
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4f46e5;
+  margin-bottom: 8px;
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.2);
+}
+.ready-content h2 {
+  font-size: 28px;
+  color: #1e293b;
+  margin: 0;
+}
+.ready-content p {
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+}
+.btn-start-trip {
+  margin-top: 12px;
+  padding: 16px 32px;
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+}
+.btn-start-trip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(79, 70, 229, 0.4);
+}
+.btn-start-trip:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-start-trip span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-start-trip .spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+  border-top-color: white;
+  border-right-color: rgba(255, 255, 255, 0.3);
+  border-bottom-color: rgba(255, 255, 255, 0.3);
+  border-left-color: rgba(255, 255, 255, 0.3);
 }
 
 /* ===== RESPONSIVE ===== */

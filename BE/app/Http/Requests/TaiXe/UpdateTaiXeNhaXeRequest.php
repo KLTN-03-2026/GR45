@@ -35,7 +35,7 @@ class UpdateTaiXeNhaXeRequest extends FormRequest
 
             // Driving License
             'so_gplx'           => 'required|string|max:50',
-            'hang_bang_lai'     => 'required|string|max:10',
+            'hang_bang_lai'     => 'required|string|max:10|in:B1,B2,C,D,E,FB2,FC,FD,FE',
             'ngay_cap_gplx'     => 'nullable|date',
             'ngay_het_han_gplx' => 'nullable|date',
         ];
@@ -46,6 +46,7 @@ class UpdateTaiXeNhaXeRequest extends FormRequest
         return [
             'email.unique' => 'Email này đã được sử dụng.',
             'cccd.unique'  => 'Số CCCD này đã được đăng ký.',
+            'hang_bang_lai.in' => 'Hạng bằng lái không hợp lệ.',
         ];
     }
 }

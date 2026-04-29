@@ -20,15 +20,17 @@ const pagination = reactive({
 
 const filters = reactive({
   id_chuyen_xe: "",
+  ngay_khoi_hanh: "",
   tinh_trang: "",
   search: "",
 });
 
 // Cột BaseTable
 const tableColumns = [
-  { key: "id", label: "Mã Vé" },
+  { key: "ma_ve", label: "Mã Vé" },
   { key: "chuyen_xe", label: "Chuyến Xe" },
   { key: "khach_hang", label: "Khách Hàng" },
+  { key: "ngay_khoi_hanh", label: "Ngày khởi hành" },
   { key: "ghe", label: "Ghế" },
   { key: "tong_tien", label: "Tổng Tiền" },
   { key: "tinh_trang", label: "Trạng Thái" },
@@ -123,6 +125,24 @@ const openCancelModal = (id) => {
   cancelModal.show = true;
 };
 
+const seatText = (ticket) => {
+  if (Array.isArray(ticket?.chi_tiet_ves)) {
+    const seatsFromDetails = ticket.chi_tiet_ves
+      .map((detail) => detail?.ghe?.ma_ghe || detail?.ma_ghe)
+      .filter(Boolean);
+    if (seatsFromDetails.length) return seatsFromDetails.join(", ");
+  }
+
+  if (Array.isArray(ticket?.danh_sach_ghe)) {
+    const list = ticket.danh_sach_ghe.filter(Boolean);
+    if (list.length) return list.join(", ");
+  }
+
+  if (ticket?.ghe?.ma_ghe) return ticket.ghe.ma_ghe;
+  if (ticket?.ma_ghe) return ticket.ma_ghe;
+  return "—";
+};
+
 const executeCancelTicket = async () => {
   try {
     cancelModal.loading = true;
@@ -164,12 +184,12 @@ onMounted(() => {
         </div>
 
         <div class="filter-item">
-          <span class="filter-label">Chuyến xe ID</span>
+          <span class="filter-label">Ngày khởi hành</span>
           <input
-            type="number"
-            v-model="filters.id_chuyen_xe"
+            type="date"
+            v-model="filters.ngay_khoi_hanh"
             class="custom-input"
-            placeholder="VD: 5"
+            placeholder="VD: 2022-01-01"
             @change="handleSearch"
           />
         </div>
@@ -201,38 +221,63 @@ onMounted(() => {
     <div class="table-card">
       <BaseTable :columns="tableColumns" :data="tickets" :loading="loading">
         <!-- Mã Vé -->
-        <template #cell(id)="{ value }">
-          <span class="fw-bold">V-{{ value.toString().padStart(5, "0") }}</span>
+        <template #cell(ma_ve)="{ value }">
+          <span class="fw-bold text-primary">{{ value }}</span>
         </template>
 
         <!-- Chuyến Xe -->
         <template #cell(chuyen_xe)="{ item }">
-          <div class="text-sm">
-            Chuyến ID: <span class="fw-bold">{{ item.id_chuyen_xe }}</span>
+          <div v-if="item.chuyen_xe">
+            <div class="fw-bold text-dark">
+              {{
+                item.chuyen_xe.tuyen_duong?.ten_tuyen_duong ||
+                `Chuyến #${item.id_chuyen_xe}`
+              }}
+            </div>
+            <div
+              class="text-sm text-primary"
+              v-if="item.chuyen_xe.tuyen_duong?.nha_xe"
+            >
+              🏢 {{ item.chuyen_xe.tuyen_duong.nha_xe.ten_nha_xe }}
+            </div>
+            <div class="text-sm text-muted">
+              📅 {{ formatDate(item.chuyen_xe.ngay_khoi_hanh) }} -
+              {{ item.chuyen_xe.gio_khoi_hanh }}
+            </div>
           </div>
+          <span v-else class="text-muted">#{{ item.id_chuyen_xe }}</span>
         </template>
 
         <!-- Khách Hàng -->
         <template #cell(khach_hang)="{ item }">
-          <div class="fw-bold text-dark">
-            {{ item.khach_hang.ten_khach_hang || "Khách vãng lai" }}
+          <div v-if="item.khach_hang">
+            <div class="fw-bold text-dark">
+              {{
+                item.khach_hang.ho_va_ten ||
+                item.khach_hang.ten_khach_hang ||
+                "Khách vãng lai"
+              }}
+            </div>
+            <div class="text-sm text-muted">
+              📞 {{ item.khach_hang.so_dien_thoai || "Chưa cung cấp SĐT" }}
+            </div>
           </div>
-          <div class="text-sm text-muted">
-            {{ item.khach_hang.so_dien_thoai || "Chưa cung cấp SĐT" }}
-          </div>
+          <span v-else class="text-muted">KH #{{ item.id_khach_hang }}</span>
         </template>
 
         <!-- Ghế -->
         <template #cell(ghe)="{ item }">
           <div class="fw-bold text-primary">
-            {{
-              Array.isArray(item.danh_sach_ghe)
-                ? item.danh_sach_ghe.join(", ")
-                : item.danh_sach_ghe
-            }}
+            {{ seatText(item) }}
           </div>
         </template>
 
+        <!-- ngày khời hành -->
+        <template #cell(ngay_khoi_hanh)="{ item }">
+          <div class="fw-bold text-primary">
+            {{ formatDate(item.chuyen_xe.ngay_khoi_hanh) }}
+          </div>
+        </template>
         <!-- Tổng Tiền -->
         <template #cell(tong_tien)="{ value }">
           <span class="fw-bold">{{ formatCurrency(value) }}</span>
@@ -508,7 +553,8 @@ onMounted(() => {
   background: white;
   border-radius: 12px;
   padding: 1rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05),
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.05),
     0 4px 6px -2px rgba(0, 0, 0, 0.025);
   border: 1px solid rgba(226, 232, 240, 0.8);
 }

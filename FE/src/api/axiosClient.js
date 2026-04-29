@@ -8,6 +8,15 @@ const ROLE_TOKEN_MAP = {
   driver: 'auth.driver.token',
 };
 
+// Hàm xác định role từ URL
+function getRoleFromUrl(url) {
+  if (!url) return 'client';
+  if (url.includes('/admin/')) return 'admin';
+  if (url.includes('/nha-xe/')) return 'operator';
+  if (url.includes('/tai-xe/')) return 'driver';
+  return 'client';
+}
+
 const axiosClient = axios.create({
   baseURL: 'http://127.0.0.1:8000/api/',
   headers: { 'Content-Type': 'application/json' },
@@ -15,10 +24,11 @@ const axiosClient = axios.create({
 });
 
 // --- REQUEST INTERCEPTOR ---
-// Tự động đính Bearer Token của role đang active vào mỗi request
+// Tự động đính Bearer Token của role phù hợp vào mỗi request
 axiosClient.interceptors.request.use(
   (config) => {
-    const activeRole = localStorage.getItem('auth.active_role');
+    // Xác định role từ URL thay vì dùng 'auth.active_role' chung
+    const activeRole = getRoleFromUrl(config.url);
     const tokenKey = ROLE_TOKEN_MAP[activeRole];
     const token = tokenKey ? localStorage.getItem(tokenKey) : null;
 
@@ -31,6 +41,9 @@ axiosClient.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
 
+    // Gắn role vào config để dùng ở response interceptor
+    config._role = activeRole;
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -40,15 +53,14 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    // Nếu 401 → xóa token của role đang active
+    // Nếu 401 → xóa token của đúng role gọi API
     if (error.response?.status === 401) {
-      const activeRole = localStorage.getItem('auth.active_role');
+      const activeRole = error.config?._role || getRoleFromUrl(error.config?.url);
       const tokenKey = ROLE_TOKEN_MAP[activeRole];
       if (tokenKey) {
         localStorage.removeItem(tokenKey);
         localStorage.removeItem(tokenKey.replace('.token', '.user'));
       }
-      localStorage.removeItem('auth.active_role');
     }
     return Promise.reject(error);
   }

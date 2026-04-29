@@ -226,7 +226,7 @@ class VeService
 
     public function getDanhSachVe(array $filters, string $role)
     {
-        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe'])->orderByDesc('created_at');
+        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.tinhThanh', 'chiTietVes.tramTra.phuongXa.tinhThanh'])->orderByDesc('created_at');
 
         if ($role === 'khach_hang') {
             $user = auth('khach_hang')->user();
@@ -238,8 +238,8 @@ class VeService
             });
         }
 
-        if (!empty($filters['id_chuyen_xe'])) {
-            $query->where('id_chuyen_xe', $filters['id_chuyen_xe']);
+        if (!empty($filters['ngay_khoi_hanh'])) {
+            $query->where('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
         }
 
         if (!empty($filters['tinh_trang'])) {
@@ -259,7 +259,7 @@ class VeService
 
     public function getChiTietVe($id, string $role)
     {
-        $ve = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon', 'chiTietVes.tramTra'])->findOrFail($id);
+        $ve = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.tinhThanh', 'chiTietVes.tramTra.phuongXa.tinhThanh'])->findOrFail($id);
 
         if ($role === 'khach_hang') {
             $user = auth('khach_hang')->user();

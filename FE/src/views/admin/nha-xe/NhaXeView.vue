@@ -82,11 +82,17 @@ const statusOptions = [
   { value: 'khoa', label: 'Đã khóa' }
 ]
 
+/** Chuyển đổi giá trị sang số an toàn — trả về 0 nếu không hợp lệ */
 const safeNumber = (value) => {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
 }
 
+/**
+ * Hiển thị thông báo toast tự động ẩn sau 3 giây
+ * @param {string} message - Nội dung thông báo
+ * @param {'success'|'error'} type - Loại thông báo
+ */
 const showToast = (message, type = 'success') => {
   toast.message = message
   toast.type = type
@@ -97,144 +103,136 @@ const showToast = (message, type = 'success') => {
   }, 3000)
 }
 
-const extractResponseData = (response) => {
-  if (!response) return null
-  const firstLayer = response.data ?? response
-  if (firstLayer?.data && Array.isArray(firstLayer.data.data)) return firstLayer.data
-  if (Array.isArray(firstLayer?.data)) return firstLayer
-  if (Array.isArray(firstLayer)) return { data: firstLayer }
-  return firstLayer?.data ?? firstLayer
+/**
+ * Chuẩn hoá response từ axios về dạng { data: [], current_page, last_page, total }
+ * Hỗ trợ cả response phân trang lồng nhau và mảng thẳng
+ * @param {*} res - Response trả về từ axios
+ */
+const extractResponseData = (res) => {
+  const data = res?.data ?? res
+  return data?.data?.data ? data.data : (Array.isArray(data?.data) ? data : { data: Array.isArray(data) ? data : [] })
 }
 
+/**
+ * Chuẩn hoá dữ liệu một nhà xe từ API về định dạng thống nhất để hiển thị
+ * — gộp các trường từ ho_so, dia_chi_nha_xe, tai_khoan_nhan_tien về một mức
+ * @param {Object} item - Dữ liệu nhà xe thô từ API
+ * @returns {Object} Dữ liệu nhà xe đã chuẩn hoá
+ */
 const normalizeOperator = (item) => {
-  const firstOffice = Array.isArray(item.dia_chi_nha_xe) ? item.dia_chi_nha_xe[0] : null
+  const hoSo = item.ho_so || {}
   return {
     ...item,
-    giay_phep_kinh_doanh: item.ho_so?.so_dang_ky_kinh_doanh || item.giay_phep_kinh_doanh || '',
-    dia_chi_van_phong: firstOffice?.dia_chi || item.ho_so?.dia_chi || item.ho_so?.dia_chi_chi_tiet || item.dia_chi_van_phong || '',
-    nguoi_dai_dien: item.ho_so?.nguoi_dai_dien || item.nguoi_dai_dien || '',
-    tai_khoan_ngan_hang:
-      item.tai_khoan_ngan_hang ||
-      item.thong_tin_tai_khoan_nhan_tien ||
-      item.tai_khoan_nhan_tien ||
-      '',
+    giay_phep_kinh_doanh: hoSo.so_dang_ky_kinh_doanh || item.giay_phep_kinh_doanh || '',
+    dia_chi_van_phong: (Array.isArray(item.dia_chi_nha_xe) ? item.dia_chi_nha_xe[0]?.dia_chi : null) || hoSo.dia_chi || hoSo.dia_chi_chi_tiet || item.dia_chi_van_phong || '',
+    nguoi_dai_dien: hoSo.nguoi_dai_dien || item.nguoi_dai_dien || '',
+    tai_khoan_ngan_hang: item.tai_khoan_ngan_hang || item.thong_tin_tai_khoan_nhan_tien || item.tai_khoan_nhan_tien || '',
     ty_le_chiet_khau: safeNumber(item.ty_le_chiet_khau ?? item.chiet_khau ?? item.hoa_hong),
     tong_sos: safeNumber(item.tong_sos),
     tong_ngu_gat: safeNumber(item.tong_ngu_gat)
   }
 }
 
-const getStatusKey = (status) => {
-  if (status === 'hoat_dong' || status === 1) return 'hoat_dong'
-  if (status === 'cho_duyet') return 'cho_duyet'
-  if (status === 'khoa' || status === 0) return 'khoa'
-  return 'unknown'
-}
+/**
+ * Chuẩn hoá trạng thái nhà xe về key thống nhất
+ * — hỗ trợ cả giá trị số (1/0) lẫn chuỗi
+ * @param {string|number} status - Giá trị trạng thái thô
+ * @returns {'hoat_dong'|'cho_duyet'|'khoa'|'unknown'}
+ */
+const getStatusKey = (status) => ({ 1: 'hoat_dong', 0: 'khoa', hoat_dong: 'hoat_dong', cho_duyet: 'cho_duyet', khoa: 'khoa' }[status] || 'unknown')
 
-const getStatusMeta = (status) => {
-  const key = getStatusKey(status)
-  if (key === 'hoat_dong') return { text: 'Hoạt động', cls: 'badge-green' }
-  if (key === 'cho_duyet') return { text: 'Chờ duyệt', cls: 'badge-yellow' }
-  if (key === 'khoa') return { text: 'Đã khóa', cls: 'badge-red' }
-  return { text: 'Không rõ', cls: 'badge-gray' }
-}
+/**
+ * Trả về nhãn và class CSS badge tương ứng với trạng thái nhà xe
+ * @param {string|number} status - Trạng thái nhà xe
+ * @returns {{ text: string, cls: string }}
+ */
+const getStatusMeta = (status) => ({
+  hoat_dong: { text: 'Hoạt động', cls: 'badge-green' },
+  cho_duyet: { text: 'Chờ duyệt', cls: 'badge-yellow' },
+  khoa: { text: 'Đã khóa', cls: 'badge-red' }
+}[getStatusKey(status)] || { text: 'Không rõ', cls: 'badge-gray' })
 
+/** Kiểm tra nhà xe có đang chờ phê duyệt không */
 const canApprove = (item) => getStatusKey(item.tinh_trang) === 'cho_duyet'
 
-const displayedOperators = computed(() => {
-  if (activeTab.value === 'all') return operatorList.value
-  if (activeTab.value === 'approval') return operatorList.value.filter((item) => canApprove(item))
-  if (activeTab.value === 'safety') return operatorList.value
-  return operatorList.value
-})
+/** Danh sách nhà xe hiển thị theo tab đang chọn */
+const displayedOperators = computed(() => activeTab.value === 'approval' ? operatorList.value.filter(canApprove) : operatorList.value)
 
+/** Thống kê tổng hợp cho dashboard: tổng, chờ duyệt, hoạt động, cảnh báo AI */
 const dashboardStats = computed(() => {
-  const total = meta.total || operatorList.value.length
-  const pending = operatorList.value.filter((item) => canApprove(item)).length
-  const active = operatorList.value.filter((item) => getStatusKey(item.tinh_trang) === 'hoat_dong').length
-  const totalSos = operatorList.value.reduce((sum, item) => sum + safeNumber(item.tong_sos), 0)
-  const totalDrowsy = operatorList.value.reduce((sum, item) => sum + safeNumber(item.tong_ngu_gat), 0)
-  return { total, pending, active, totalSos, totalDrowsy }
+  const stats = { total: meta.total, pending: 0, active: 0, totalSos: 0, totalDrowsy: 0 }
+  operatorList.value.forEach(item => {
+    const key = getStatusKey(item.tinh_trang)
+    if (key === 'cho_duyet') stats.pending++
+    if (key === 'hoat_dong') stats.active++
+    stats.totalSos += item.tong_sos
+    stats.totalDrowsy += item.tong_ngu_gat
+  })
+  return stats
 })
 
+/**
+ * Tải danh sách nhà xe từ API theo bộ lọc và trang hiện tại
+ * @param {number} page - Số trang cần tải (mặc định: 1)
+ */
 const fetchOperators = async (page = 1) => {
   loading.value = true
   try {
-    const params = {
-      page,
-      per_page: filters.perPage,
-      search: filters.keyword || undefined,
-      tinh_trang: filters.status || undefined
-    }
-    const res = await adminApi.getOperators(params)
-    const payload = extractResponseData(res) || {}
-    operatorList.value = Array.isArray(payload.data) ? payload.data.map(normalizeOperator) : []
+    const res = await adminApi.getOperators({ page, per_page: filters.perPage, search: filters.keyword || undefined, tinh_trang: filters.status || undefined })
+    const payload = extractResponseData(res)
+    operatorList.value = payload.data.map(normalizeOperator)
     meta.current_page = payload.current_page || 1
     meta.last_page = payload.last_page || 1
     meta.total = payload.total || operatorList.value.length
-    filters.page = meta.current_page
-  } catch (error) {
-    console.error('Lỗi tải danh sách nhà xe:', error)
-    showToast('Không thể tải danh sách nhà xe.', 'error')
+    filters.page = page
+  } catch (e) {
+    showToast('Không thể tải danh sách.', 'error')
   } finally {
     loading.value = false
   }
 }
 
+/** Đặt lại toàn bộ dữ liệu form về trạng thái trống ban đầu */
 const resetForm = () => {
-  form.id = null
-  form.ten_nha_xe = ''
-  form.email = ''
-  form.password = ''
-  form.so_dien_thoai = ''
-  form.nguoi_dai_dien = ''
-  form.giay_phep_kinh_doanh = ''
-  form.dia_chi_van_phong = ''
-  form.tai_khoan_ngan_hang = ''
-  form.ty_le_chiet_khau = 0
-  form.dia_chi_nha_xe_label = ''
+  Object.assign(form, { id: null, ten_nha_xe: '', email: '', password: '', so_dien_thoai: '', nguoi_dai_dien: '', giay_phep_kinh_doanh: '', dia_chi_van_phong: '', tai_khoan_ngan_hang: '', ty_le_chiet_khau: 0, dia_chi_nha_xe_label: '' })
   formError.value = ''
 }
 
-const openAddModal = async () => {
-  formMode.value = 'add'
-  resetForm()
-  await nextTick()
-  formModalInstance?.show()
-}
+/** Mở modal thêm mới nhà xe (reset form, chuyển mode sang 'add') */
+const openAddModal = async () => { formMode.value = 'add'; resetForm(); await nextTick(); formModalInstance?.show() }
 
+/**
+ * Mở modal chỉnh sửa nhà xe — điền sẵn dữ liệu từ item vào form
+ * @param {Object} item - Nhà xe cần chỉnh sửa
+ */
 const openEditModal = async (item) => {
-  formMode.value = 'edit'
-  resetForm()
-  form.id = item.id
-  form.ten_nha_xe = item.ten_nha_xe || ''
-  form.email = item.email || ''
-  form.so_dien_thoai = item.so_dien_thoai || ''
-  form.nguoi_dai_dien = item.nguoi_dai_dien || ''
-  form.giay_phep_kinh_doanh = item.giay_phep_kinh_doanh || ''
-  form.dia_chi_van_phong = item.dia_chi_van_phong || ''
-  form.tai_khoan_ngan_hang = item.tai_khoan_ngan_hang || ''
-  form.ty_le_chiet_khau = safeNumber(item.ty_le_chiet_khau)
-  form.dia_chi_nha_xe_label = item.dia_chi_van_phong || item.ho_so?.dia_chi || ''
-  await nextTick()
-  formModalInstance?.show()
+  formMode.value = 'edit'; resetForm(); Object.assign(form, item, { dia_chi_nha_xe_label: item.dia_chi_van_phong || item.ho_so?.dia_chi || '' }); await nextTick(); formModalInstance?.show()
 }
 
+/**
+ * Xây dựng payload gửi lên API từ dữ liệu form hiện tại
+ * — map tên field FE sang tên field BE, chỉ thêm password khi tạo mới
+ * @returns {Object} Payload sẵn sàng gửi API
+ */
 const buildFormPayload = () => {
   const payload = {
-    ten_nha_xe: form.ten_nha_xe,
-    email: form.email,
-    so_dien_thoai: form.so_dien_thoai,
-    nguoi_dai_dien: form.nguoi_dai_dien,
+    ten_nha_xe:            form.ten_nha_xe,
+    email:                 form.email,
+    so_dien_thoai:         form.so_dien_thoai,
+    nguoi_dai_dien:        form.nguoi_dai_dien,
     so_dang_ky_kinh_doanh: form.giay_phep_kinh_doanh,
-    dia_chi_chi_tiet: form.dia_chi_van_phong,
-    tai_khoan_nhan_tien: form.tai_khoan_ngan_hang,
-    ty_le_chiet_khau: safeNumber(form.ty_le_chiet_khau)
+    dia_chi_chi_tiet:      form.dia_chi_van_phong,
+    tai_khoan_nhan_tien:   form.tai_khoan_ngan_hang,
+    ty_le_chiet_khau:      safeNumber(form.ty_le_chiet_khau)
   }
   if (formMode.value === 'add') payload.password = form.password
   return payload
 }
 
+/**
+ * Validate và lưu form nhà xe (thêm mới hoặc cập nhật)
+ * — kiểm tra các trường bắt buộc, validate chiết khấu, gọi API tương ứng
+ */
 const saveForm = async () => {
   if (!form.ten_nha_xe || !form.email) {
     formError.value = 'Vui lòng nhập đầy đủ tên doanh nghiệp và email.'
@@ -248,11 +246,11 @@ const saveForm = async () => {
     formError.value = 'Mật khẩu phải có ít nhất 6 ký tự.'
     return
   }
-  if (!Number.isFinite(Number(form.ty_le_chiet_khau)) || Number(form.ty_le_chiet_khau) < 0 || Number(form.ty_le_chiet_khau) > 100) {
+  const ck = Number(form.ty_le_chiet_khau)
+  if (!Number.isFinite(ck) || ck < 0 || ck > 100) {
     formError.value = 'Tỷ lệ chiết khấu/hoa hồng phải là số trong khoảng 0 đến 100.'
     return
   }
-
   submitLoading.value = true
   formError.value = ''
   try {
@@ -269,145 +267,62 @@ const saveForm = async () => {
   } catch (error) {
     console.error('Lỗi lưu nhà xe:', error)
     const detailedErrors = Object.values(error?.response?.data?.errors || {}).flat().join('\n')
-    const message = detailedErrors || error?.response?.data?.message || 'Không thể lưu dữ liệu nhà xe.'
-    formError.value = message
+    formError.value = detailedErrors || error?.response?.data?.message || 'Không thể lưu dữ liệu nhà xe.'
   } finally {
     submitLoading.value = false
   }
 }
 
-const extractListFromAnyResponse = (response) => {
-  const payload = extractResponseData(response)
-  return Array.isArray(payload?.data) ? payload.data : []
+/**
+ * Kiểm tra nhà xe có ít nhất một tuyến đường đã được duyệt không
+ * — điều kiện bắt buộc để kích hoạt hoặc duyệt tham gia hệ thống
+ * @param {Object} operator - Nhà xe cần kiểm tra
+ * @returns {Promise<boolean>}
+ */
+const checkRoutes = async (operator) => {
+  const res = await adminApi.getRoutes({ per_page: 100, search: operator.ma_nha_xe || operator.ten_nha_xe })
+  return extractResponseData(res).data.some(r => ['hoat_dong', 'da_duyet'].includes(r.tinh_trang || r.trang_thai))
 }
 
-const hasAtLeastOneApprovedRoute = async (operator) => {
-  const searchKey = operator.ma_nha_xe || operator.ten_nha_xe
-  if (!searchKey) return false
-  const res = await adminApi.getRoutes({ per_page: 100, search: searchKey })
-  const routes = extractListFromAnyResponse(res)
-  const approvedSet = new Set(['hoat_dong', 'da_duyet'])
-  return routes.some((route) => {
-    const sameOperator =
-      (route.ma_nha_xe && operator.ma_nha_xe && route.ma_nha_xe === operator.ma_nha_xe) ||
-      (route.ten_nha_xe && route.ten_nha_xe === operator.ten_nha_xe) ||
-      (!operator.ma_nha_xe && route.ma_nha_xe === searchKey)
-    if (!sameOperator) return false
-    return approvedSet.has(route.tinh_trang) || approvedSet.has(route.trang_thai)
-  })
-}
-
-const parseDateFromItem = (item) => {
-  const raw = item?.ngay_khoi_hanh || item?.ngay_di || item?.ngay_xuat_ben || item?.ngay
-  if (!raw) return null
-  const date = new Date(raw)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
-const hasFutureIncompleteRecords = async (operator) => {
-  const maNhaXe = operator.ma_nha_xe
-  if (!maNhaXe) return false
-
-  const [tripRes, ticketRes] = await Promise.all([
-    adminApi.getTrips({ per_page: 100, ma_nha_xe: maNhaXe }),
-    adminApi.getTickets({ per_page: 100, ma_nha_xe: maNhaXe })
-  ])
-
-  const trips = extractListFromAnyResponse(tripRes)
-  const tickets = extractListFromAnyResponse(ticketRes)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const isRelatedToOperator = (item) => {
-    const itemMaNhaXe = item?.ma_nha_xe || item?.nha_xe?.ma_nha_xe || item?.chuyen_xe?.ma_nha_xe
-    return itemMaNhaXe === maNhaXe
-  }
-
-  const isFutureAndNotDone = (item, statusField) => {
-    if (!isRelatedToOperator(item)) return false
-    const status = item?.[statusField]
-    const doneStatuses = new Set(['hoan_thanh', 'da_hoan_thanh', 'huy'])
-    if (doneStatuses.has(status)) return false
-    const date = parseDateFromItem(item)
-    if (!date) return true
-    return date >= today
-  }
-
-  const hasTrip = trips.some((trip) => isFutureAndNotDone(trip, 'trang_thai'))
-  const hasTicket = tickets.some((ticket) => isFutureAndNotDone(ticket, 'tinh_trang'))
-  return hasTrip || hasTicket
-}
-
+/**
+ * Mở modal xác nhận hành động (duyệt / đổi trạng thái / xóa)
+ * @param {'approve'|'toggle'|'delete'} action - Loại hành động
+ * @param {Object} item - Nhà xe mục tiêu
+ */
 const openConfirm = (action, item) => {
-  confirmAction.value = action
-  confirmTarget.value = item
+  confirmAction.value = action; confirmTarget.value = item;
+  confirmTitle.value = { approve: 'Duyệt tham gia', toggle: 'Đổi trạng thái', delete: 'Xóa nhà xe' }[action]
+  confirmMessage.value = `Thực hiện ${confirmTitle.value} cho "${item.ten_nha_xe}"?`
   confirmModalInstance?.show()
-  if (action === 'approve') {
-    confirmTitle.value = 'Duyệt tham gia hệ thống'
-    confirmMessage.value = `Duyệt nhà xe "${item.ten_nha_xe}" tham gia hệ thống?`
-    return
-  }
-  if (action === 'toggle') {
-    const isActive = getStatusKey(item.tinh_trang) === 'hoat_dong'
-    confirmTitle.value = isActive ? 'Khóa nhà xe' : 'Kích hoạt nhà xe'
-    confirmMessage.value = isActive
-      ? `Bạn muốn khóa nhà xe "${item.ten_nha_xe}"?`
-      : `Bạn muốn kích hoạt nhà xe "${item.ten_nha_xe}"?`
-    return
-  }
-  confirmTitle.value = 'Xóa nhà xe'
-  confirmMessage.value = `Bạn chắc chắn muốn xóa nhà xe "${item.ten_nha_xe}"?`
 }
 
+/**
+ * Thực thi hành động sau khi người dùng xác nhận trong modal:
+ * - approve: duyệt nhà xe (yêu cầu có tuyến được duyệt)
+ * - toggle: kích hoạt/khóa nhà xe (kích hoạt cũng yêu cầu có tuyến)
+ * - delete: xóa nhà xe
+ */
 const executeConfirm = async () => {
-  if (!confirmTarget.value) return
   confirmLoading.value = true
   try {
-    const item = confirmTarget.value
-    if (confirmAction.value === 'approve') {
-      const hasApprovedRoute = await hasAtLeastOneApprovedRoute(item)
-      if (!hasApprovedRoute) {
-        showToast('Không thể duyệt kích hoạt: nhà xe chưa có tuyến đường được duyệt.', 'error')
-        return
-      }
-      await adminApi.toggleOperatorStatus(item.id)
-      showToast('Đã duyệt nhà xe thành công.', 'success')
-    } else if (confirmAction.value === 'toggle') {
-      const targetStatus = getStatusKey(item.tinh_trang) === 'hoat_dong' ? 'khoa' : 'hoat_dong'
-      if (targetStatus === 'hoat_dong') {
-        const hasApprovedRoute = await hasAtLeastOneApprovedRoute(item)
-        if (!hasApprovedRoute) {
-          showToast('Không thể kích hoạt: nhà xe chưa có tuyến đường được duyệt.', 'error')
-          return
-        }
-      }
-      await adminApi.toggleOperatorStatus(item.id)
-      showToast('Cập nhật trạng thái nhà xe thành công.', 'success')
-    } else if (confirmAction.value === 'delete') {
-      const blocked = await hasFutureIncompleteRecords(item)
-      if (blocked) {
-        showToast('Không thể xóa: nhà xe còn chuyến xe/vé chưa hoàn thành trong tương lai.', 'error')
-        return
-      }
-      await adminApi.deleteOperator(item.id)
-      showToast('Đã xóa nhà xe.', 'success')
+    const { action, target } = { action: confirmAction.value, target: confirmTarget.value }
+    if (action === 'approve' || (action === 'toggle' && getStatusKey(target.tinh_trang) === 'khoa')) {
+      if (!(await checkRoutes(target))) return showToast('Nhà xe chưa có tuyến đường được duyệt.', 'error')
     }
-    confirmModalInstance?.hide()
-    await fetchOperators(filters.page)
-  } catch (error) {
-    console.error('Lỗi thao tác nhà xe:', error)
-    showToast(error?.response?.data?.message || 'Thao tác thất bại.', 'error')
-  } finally {
-    confirmLoading.value = false
-  }
+    action === 'delete' ? await adminApi.deleteOperator(target.id) : await adminApi.toggleOperatorStatus(target.id)
+    showToast('Thao tác thành công.')
+    confirmModalInstance?.hide(); fetchOperators(filters.page)
+  } catch (e) { showToast('Thao tác thất bại.', 'error') } finally { confirmLoading.value = false }
 }
 
+/** Áp dụng bộ lọc và tải lại từ trang 1 */
 const submitFilter = () => fetchOperators(1)
 
+/** Khởi tạo Bootstrap Modal instances và tải dữ liệu nhà xe lần đầu */
 onMounted(async () => {
   await nextTick()
-  formModalInstance = new Modal(formModalRef.value, { backdrop: 'static', keyboard: false })
-  confirmModalInstance = new Modal(confirmModalRef.value, { backdrop: 'static', keyboard: false })
+  formModalInstance = new Modal(formModalRef.value, { backdrop: 'static' })
+  confirmModalInstance = new Modal(confirmModalRef.value, { backdrop: 'static' })
   fetchOperators()
 })
 </script>
@@ -416,6 +331,7 @@ onMounted(async () => {
   <div class="admin-page">
     <div v-if="toast.visible" class="custom-toast" :class="toast.type">{{ toast.message }}</div>
 
+    <!-- header -->
     <div class="page-header">
       <div class="header-left">
         <div class="header-icon-wrap">
@@ -437,6 +353,7 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- grid stats nhà xe -->
     <div class="stats-grid">
       <div class="stat-card">
         <p class="label">Tổng nhà xe</p>
@@ -457,6 +374,7 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- filter card -->
     <div class="filter-card">
       <div class="tab-row">
         <button class="tab-btn" :class="{ active: activeTab === 'all' }" @click="activeTab = 'all'">Tất cả</button>
@@ -489,6 +407,7 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- table list nha xe -->
     <div class="table-card">
       <div class="table-responsive">
         <table class="data-table">
@@ -599,6 +518,7 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- modal form add/edit nha xe -->
     <div ref="formModalRef" class="modal fade" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -658,6 +578,7 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- modal confirm -->
     <div ref="confirmModalRef" class="modal fade" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">

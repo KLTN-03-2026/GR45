@@ -14,7 +14,7 @@ class KhachHangSeeder extends Seeder
             [
                 'email'          => 'khach1@gmail.com',
                 'ho_va_ten'      => 'Nguyễn Thị An',
-                'password'       => Hash::make('123456'),
+                'password'       => Hash::make('12345678'),
                 'so_dien_thoai'  => '0912345001',
                 'dia_chi'        => '12 Lê Lợi, Quận 1, TP.HCM',
                 'ngay_sinh'      => '1998-03-15',
@@ -25,7 +25,7 @@ class KhachHangSeeder extends Seeder
             [
                 'email'          => 'khach2@gmail.com',
                 'ho_va_ten'      => 'Trần Văn Bình',
-                'password'       => Hash::make('123456'),
+                'password'       => Hash::make('12345678'),
                 'so_dien_thoai'  => '0912345002',
                 'dia_chi'        => '45 Nguyễn Huệ, Hà Nội',
                 'ngay_sinh'      => '1995-07-22',
@@ -36,7 +36,7 @@ class KhachHangSeeder extends Seeder
             [
                 'email'          => 'khach3@gmail.com',
                 'ho_va_ten'      => 'Lê Thị Cẩm',
-                'password'       => Hash::make('123456'),
+                'password'       => Hash::make('12345678'),
                 'so_dien_thoai'  => '0912345003',
                 'dia_chi'        => '78 Trần Phú, Đà Nẵng',
                 'ngay_sinh'      => '2000-11-08',
@@ -47,7 +47,7 @@ class KhachHangSeeder extends Seeder
             [
                 'email'          => 'khach4@gmail.com',
                 'ho_va_ten'      => 'Phạm Minh Đức',
-                'password'       => Hash::make('123456'),
+                'password'       => Hash::make('12345678'),
                 'so_dien_thoai'  => '0912345004',
                 'dia_chi'        => '33 Hùng Vương, Huế',
                 'ngay_sinh'      => '1993-01-30',
@@ -58,7 +58,7 @@ class KhachHangSeeder extends Seeder
             [
                 'email'          => 'khach5@gmail.com',
                 'ho_va_ten'      => 'Hoàng Thị Em',
-                'password'       => Hash::make('123456'),
+                'password'       => Hash::make('12345678'),
                 'so_dien_thoai'  => '0912345005',
                 'dia_chi'        => '9 Đinh Tiên Hoàng, Cần Thơ',
                 'ngay_sinh'      => '1997-06-12',

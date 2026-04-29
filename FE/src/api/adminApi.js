@@ -23,6 +23,7 @@ const adminApi = {
 
   // --- QUẢN LÝ NHÀ XE ---
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
+
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
   createOperator: (data) => axiosClient.post('/v1/admin/nha-xe', data),
   updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
@@ -31,14 +32,15 @@ const adminApi = {
 
   // --- QUẢN LÝ TÀI XẾ ---
   getDrivers: (params) => axiosClient.get('/v1/admin/tai-xe', { params }),
+  getDriversPublic: (params) => axiosClient.get('/v1/tai-xe/public', { params }),
   getDriverDetails: (id) => axiosClient.get(`/v1/admin/tai-xe/${id}`),
-  createDriver: (data) => axiosClient.post('/v1/admin/tai-xe', data),
+  createDriver: (data) => axiosClient.post('/v1/admin/tai-xe', data, { timeout: 60000 }),
   updateDriver: (id, data) => {
     if (data instanceof FormData) {
       if (!data.has('_method')) data.append('_method', 'PUT');
-      return axiosClient.post(`/v1/admin/tai-xe/${id}`, data);
+      return axiosClient.post(`/v1/admin/tai-xe/${id}`, data, { timeout: 60000 });
     }
-    return axiosClient.put(`/v1/admin/tai-xe/${id}`, data);
+    return axiosClient.put(`/v1/admin/tai-xe/${id}`, data, { timeout: 60000 });
   },
   toggleDriverStatus: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/trang-thai`),
   approveDriver: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/duyet`),
@@ -46,6 +48,7 @@ const adminApi = {
 
   // --- QUẢN LÝ XE ---
   getVehicles: (params) => axiosClient.get('/v1/admin/xe', { params }),
+  getVehiclesPublic: (params) => axiosClient.get('/v1/xe/public', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/admin/xe/${id}`),
   createVehicle: (data) => axiosClient.post('/v1/admin/xe', data),
   updateVehicle: (id, data) => axiosClient.put(`/v1/admin/xe/${id}`, data),
@@ -86,10 +89,13 @@ const adminApi = {
   toggleTripStatus: (id) => axiosClient.patch(`/v1/admin/chuyen-xe/${id}/trang-thai`),
   deleteTrip: (id) => axiosClient.delete(`/v1/admin/chuyen-xe/${id}`),
   getTripSeats: (id) => axiosClient.get(`/v1/admin/chuyen-xe/${id}/so-do-ghe`),
+  getTripStops: (id) => axiosClient.get(`/v1/chuyen-xe/${id}/tram-dung`),
   changeTripBus: (id, data) => axiosClient.put(`/v1/admin/chuyen-xe/${id}/doi-xe`, data),
   getTripTrackingHistory: (id, params) =>
     axiosClient.get(`/v1/admin/chuyen-xe/${id}/tracking`, { params }),
   getTripTrackingLive: (id) => axiosClient.get(`/v1/admin/chuyen-xe/${id}/tracking/live`),
+  getActiveTrips: () => axiosClient.get('/v1/admin/chuyen-xe/dang-chay'),
+  getCompletedTrips: (params) => axiosClient.get('/v1/admin/chuyen-xe/da-hoan-thanh', { params }),
 
   // --- QUẢN LÝ VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),
