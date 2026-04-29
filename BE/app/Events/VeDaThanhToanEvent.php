@@ -34,17 +34,17 @@ class VeDaThanhToanEvent implements ShouldBroadcastNow
      */
     public function broadcastOn()
     {
+        $channels = [
+            new Channel('ve.' . $this->ve->ma_ve)
+        ];
+
         // Gửi qua kênh riêng biệt của đúng nhà xe đăng tải chuyến xe mà vé này đặt
-        $maNhaXe = null;
         if ($this->ve->chuyenXe && $this->ve->chuyenXe->tuyenDuong) {
             $maNhaXe = $this->ve->chuyenXe->tuyenDuong->ma_nha_xe;
+            $channels[] = new PrivateChannel('nha-xe.' . $maNhaXe);
         }
 
-        if ($maNhaXe) {
-            return new PrivateChannel('nha-xe.' . $maNhaXe);
-        }
-
-        return [];
+        return $channels;
     }
 
     /**
