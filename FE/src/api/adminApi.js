@@ -34,13 +34,13 @@ const adminApi = {
   getDrivers: (params) => axiosClient.get('/v1/admin/tai-xe', { params }),
   getDriversPublic: (params) => axiosClient.get('/v1/tai-xe/public', { params }),
   getDriverDetails: (id) => axiosClient.get(`/v1/admin/tai-xe/${id}`),
-  createDriver: (data) => axiosClient.post('/v1/admin/tai-xe', data),
+  createDriver: (data) => axiosClient.post('/v1/admin/tai-xe', data, { timeout: 60000 }),
   updateDriver: (id, data) => {
     if (data instanceof FormData) {
       if (!data.has('_method')) data.append('_method', 'PUT');
-      return axiosClient.post(`/v1/admin/tai-xe/${id}`, data);
+      return axiosClient.post(`/v1/admin/tai-xe/${id}`, data, { timeout: 60000 });
     }
-    return axiosClient.put(`/v1/admin/tai-xe/${id}`, data);
+    return axiosClient.put(`/v1/admin/tai-xe/${id}`, data, { timeout: 60000 });
   },
   toggleDriverStatus: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/trang-thai`),
   approveDriver: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/duyet`),

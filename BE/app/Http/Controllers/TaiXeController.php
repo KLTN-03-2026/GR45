@@ -206,8 +206,9 @@ class TaiXeController extends Controller
 
         try {
             $taiXe = $this->service->create($data);
-            return response()->json(['success' => true, 'message' => 'Tạo tài xế thành công.', 'data' => $taiXe], 201);
+            return response()->json(['success' => true, 'message' => 'Tạo tài xế thành công.', 'data' => null]);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Loi khi tao tai xe: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['success' => false, 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
         }
     }
@@ -234,8 +235,9 @@ class TaiXeController extends Controller
 
         try {
             $taiXe = $this->service->update($id, $data);
-            return response()->json(['success' => true, 'message' => 'Cập nhật tài xế thành công.', 'data' => new TaiXeResource($taiXe)]);
+            return response()->json(['success' => true, 'message' => 'Cập nhật tài xế thành công.', 'data' => null]);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Loi khi cap nhat tai xe: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response()->json(['success' => false, 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
         }
     }
