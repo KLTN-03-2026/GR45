@@ -168,11 +168,11 @@ class TaiXeService
      * Tao tai xe moi (Admin/NhaXe).
      * @throws ValidationException
      */
-    public function create(array $data): TaiXeResource
+    public function create(array $data): \App\Models\TaiXe
     {
         return \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
             // Handle file uploads
-            $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau'];
+            $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau', 'anh_gplx', 'anh_gplx_mat_sau'];
             foreach ($imageFields as $field) {
                 if (isset($data[$field]) && $data[$field] instanceof \Illuminate\Http\UploadedFile) {
                     $data[$field] = $this->uploadToCloudinary($data[$field]);
@@ -193,28 +193,30 @@ class TaiXeService
 
             // 2. Tạo hồ sơ chi tiết (ho_so_tai_xes)
             $hoSoData = [
-                'id_tai_xe'         => $taiXe->id,
-                'ma_nha_xe'         => $data['ma_nha_xe'],
-                'ho_va_ten'         => $data['ho_va_ten'] ?? $data['email'],
-                'email'             => $data['email'],
-                'so_dien_thoai'     => $data['so_dien_thoai'] ?? null,
-                'so_cccd'           => $data['cccd'],
-                'ngay_sinh'         => $data['ngay_sinh'] ?? null,
-                'dia_chi'           => $data['dia_chi'] ?? null,
-                'avatar'            => $data['avatar'] ?? null,
-                'so_gplx'           => $data['so_gplx'] ?? null,
-                'hang_bang_lai'     => $this->normalizeLicenseClass($data['hang_bang_lai'] ?? null),
-                'ngay_cap_gplx'     => $data['ngay_cap_gplx'] ?? null,
+                'id_tai_xe' => $taiXe->id,
+                'ma_nha_xe' => $data['ma_nha_xe'],
+                'ho_va_ten' => $data['ho_va_ten'] ?? $data['email'],
+                'email' => $data['email'],
+                'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
+                'so_cccd' => $data['cccd'],
+                'ngay_sinh' => $data['ngay_sinh'] ?? null,
+                'dia_chi' => $data['dia_chi'] ?? null,
+                'avatar' => $data['avatar'] ?? null,
+                'so_gplx' => $data['so_gplx'] ?? null,
+                'hang_bang_lai' => $this->normalizeLicenseClass($data['hang_bang_lai'] ?? null),
+                'ngay_cap_gplx' => $data['ngay_cap_gplx'] ?? null,
                 'ngay_het_han_gplx' => $data['ngay_het_han_gplx'] ?? null,
-                'trang_thai_duyet'  => 'pending',
-                'nguoi_tao_id'      => auth()->id(),
+                'trang_thai_duyet' => 'pending',
+                'nguoi_tao_id' => auth('sanctum')->id() ?? auth()->id(),
                 'anh_cccd_mat_truoc' => $data['anh_cccd_mat_truoc'] ?? null,
-                'anh_cccd_mat_sau'   => $data['anh_cccd_mat_sau'] ?? null,
+                'anh_cccd_mat_sau' => $data['anh_cccd_mat_sau'] ?? null,
+                'anh_gplx' => $data['anh_gplx'] ?? null,
+                'anh_gplx_mat_sau' => $data['anh_gplx_mat_sau'] ?? null,
             ];
 
             $this->repo->createHoSo($hoSoData);
 
-            return new TaiXeResource($taiXe->load('hoSo'));
+            return $taiXe;
         });
     }
 
@@ -224,7 +226,7 @@ class TaiXeService
     public function update(int $id, array $data): ?TaiXe
     {
         return \Illuminate\Support\Facades\DB::transaction(function () use ($id, $data) {
-            $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau'];
+            $imageFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau', 'anh_gplx', 'anh_gplx_mat_sau'];
             foreach ($imageFields as $field) {
                 if (isset($data[$field]) && $data[$field] instanceof \Illuminate\Http\UploadedFile) {
                     $data[$field] = $this->uploadToCloudinary($data[$field]);
@@ -295,7 +297,7 @@ class TaiXeService
             $statusMap = [
                 'cho_duyet' => 'pending',
                 'hoat_dong' => 'approved',
-                'khoa'      => 'rejected'
+                'khoa' => 'rejected'
             ];
             $taiXe->hoSo->update(['trang_thai_duyet' => $statusMap[$status] ?? 'pending']);
         }

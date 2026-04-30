@@ -1,919 +1,385 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
 import {
-  Siren,
-  ShieldAlert,
-  BusFront,
-  MapPin,
-  BellRing,
-  TriangleAlert,
-  Activity,
-  Clock3,
-  Radio,
-  ArrowRight,
+  DollarSign, Ticket, ShieldAlert, BusFront, Users, TrendingUp,
+  Siren, MapPin, BellRing, Activity, Clock3, Radio, ArrowRight,
+  TriangleAlert, Building2, Route, CreditCard, IdCard, AlertCircle
 } from 'lucide-vue-next'
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement,
+  LineElement, ArcElement, Title, Tooltip, Legend, Filler
+} from 'chart.js'
+import { Line, Doughnut } from 'vue-chartjs'
+import adminApi from '@/api/adminApi'
 import { useAdminStore } from '@/stores/adminStore.js'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
 
 const adminStore = useAdminStore()
 const now = ref(new Date())
-const feedLimit = 12
-const trackLimit = 10
-const alarmLimit = 8
-
-const systemState = ref('Đang giám sát')
-const aiBlinkMessage = ref('')
+const loading = ref(true)
 const aiBlinkVisible = ref(false)
+const aiBlinkMessage = ref('')
 const aiBlinkTimeout = ref(null)
-const hasRealtimeConnection = ref(false)
-
-const trackingEvents = ref([
-  {
-    id: 1,
-    bienSo: '51B-01234',
-    tenTaiXe: 'Nguyễn Thanh Bình',
-    loaiSuCo: 'Dừng khẩn trên cao tốc',
-    capDo: 'critical',
-    viDo: 10.90911,
-    kinhDo: 106.74421,
-    khuVuc: 'QL1A - Km 182',
-    tocDo: 0,
-    thoiGian: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 2,
-    bienSo: '30F-77588',
-    tenTaiXe: 'Trần Minh Châu',
-    loaiSuCo: 'Mất tín hiệu camera trong cabin',
-    capDo: 'warning',
-    viDo: 21.03548,
-    kinhDo: 105.86141,
-    khuVuc: 'Vành đai 3 - Hà Nội',
-    tocDo: 28,
-    thoiGian: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-  },
-])
-
-const violationFeed = ref([
-  {
-    id: 101,
-    loai: 'ngu_gat',
-    bienSo: '43A-22391',
-    tenTaiXe: 'Lê Văn Hưng',
-    moTa: 'Phát hiện mắt nhắm liên tục > 2 giây',
-    capDo: 'critical',
-    viDo: 16.05166,
-    kinhDo: 108.21986,
-    thoiGian: new Date(Date.now() - 90 * 1000).toISOString(),
-  },
-  {
-    id: 102,
-    loai: 'hanh_vi',
-    bienSo: '29H-65211',
-    tenTaiXe: 'Phạm Quốc Anh',
-    moTa: 'Không thắt dây an toàn khi xe đang chạy',
-    capDo: 'warning',
-    viDo: 20.99567,
-    kinhDo: 105.79811,
-    thoiGian: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-  },
-])
-
-const emergencyAlarms = ref([])
-const vehicleRegistry = ref(new Map())
+const hasWs = ref(false)
 let echoInstance = null
 let clockTicker = null
-let mockTicker = null
-let localSeed = 200
 
-const dashboardDateText = computed(() =>
-  now.value.toLocaleString('vi-VN', {
-    weekday: 'long',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }),
-)
+// KPI Data
+const kd = ref({ doanh_thu_hom_nay: 0, doanh_thu_thang_nay: 0, tong_ve_da_ban_hom_nay: 0, ty_le_lap_day_ghe: 0, khach_hang_moi_24h: 0, doanh_thu_7_ngay: [] })
+const at = ref({ so_sos_chua_xu_ly: 0, vi_pham_ai_24h: { ngu_gat: 0, su_dung_dien_thoai: 0, hut_thuoc: 0, khac: 0 }, tai_xe_nguy_co: [], su_co_moi_nhat: [] })
+const vh = ref({ chuyen_xe_dang_chay: 0, nha_xe_cho_duyet: 0, tuyen_duong_cho_duyet: 0, tai_xe_bang_lai_sap_het_han: 0 })
+const tc = ref({ tong_quy_ky_quy: 0, yeu_cau_rut_tien_cho: 0, khieu_nai_chua_giai_quyet: 0 })
 
-const totals = computed(() => {
-  const trackCount = trackingEvents.value.length
-  const criticalEvents = violationFeed.value.filter((item) => item.capDo === 'critical').length
-  const warningEvents = violationFeed.value.filter((item) => item.capDo === 'warning').length
-  const activeVehicles = vehicleRegistry.value.size || new Set(trackingEvents.value.map((item) => item.bienSo)).size
-  return {
-    trackCount,
-    criticalEvents,
-    warningEvents,
-    activeVehicles,
-  }
+const tongViPham24h = computed(() => {
+  const v = at.value.vi_pham_ai_24h
+  return (v.ngu_gat || 0) + (v.su_dung_dien_thoai || 0) + (v.hut_thuoc || 0) + (v.khac || 0)
 })
 
-const orderedTracking = computed(() =>
-  [...trackingEvents.value]
-    .sort((a, b) => new Date(b.thoiGian).getTime() - new Date(a.thoiGian).getTime())
-    .slice(0, trackLimit),
-)
+const dateText = computed(() => now.value.toLocaleString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
 
-const orderedViolations = computed(() =>
-  [...violationFeed.value]
-    .sort((a, b) => new Date(b.thoiGian).getTime() - new Date(a.thoiGian).getTime())
-    .slice(0, feedLimit),
-)
+const fmt = (n) => { if (!n) return '0 đ'; if (n >= 1e9) return (n/1e9).toFixed(2)+' tỷ'; if (n >= 1e6) return (n/1e6).toFixed(1)+' tr'; return n.toLocaleString('vi-VN')+' đ' }
+const fmtFull = (n) => (n ?? 0).toLocaleString('vi-VN') + ' ₫'
+const fmtTime = (t) => t ? new Date(t).toLocaleTimeString('vi-VN') : '--:--'
+const fmtDate = (t) => t ? new Date(t).toLocaleDateString('vi-VN') : '--'
 
-const orderedAlarms = computed(() =>
-  [...emergencyAlarms.value]
-    .sort((a, b) => new Date(b.thoiGian).getTime() - new Date(a.thoiGian).getTime())
-    .slice(0, alarmLimit),
-)
+const loaiBaoDongLabel = (l) => {
+  const m = { ngu_gat:'Ngủ gật', su_dung_dien_thoai:'Dùng ĐT', hut_thuoc:'Hút thuốc', qua_toc_do:'Quá tốc độ', phanh_gap:'Phanh gấp', bao_dong_khan_cap:'SOS', vi_pham_khac:'Khác', khong_quan_sat:'Không quan sát' }
+  return m[l] || l
+}
+const mucDoClass = (m) => { if (m==='khan_cap') return 'badge-red'; if (m==='nguy_hiem') return 'badge-orange'; if (m==='canh_bao') return 'badge-yellow'; return 'badge-blue' }
+const mucDoLabel = (m) => { if (m==='khan_cap') return 'Khẩn cấp'; if (m==='nguy_hiem') return 'Nguy hiểm'; if (m==='canh_bao') return 'Cảnh báo'; return 'Thông tin' }
 
-const liveConnectionStatus = computed(() =>
-  hasRealtimeConnection.value ? 'Kết nối WebSocket realtime' : 'Chế độ mô phỏng cục bộ',
-)
-
-const normalizeEventPayload = (payload = {}) => {
-  const bienSo = payload.bien_so || payload.bienSo || payload.license_plate || 'Chưa rõ biển số'
-  const tenTaiXe = payload.ten_tai_xe || payload.tenTaiXe || payload.driver_name || 'Chưa rõ tài xế'
-  const loaiRaw = payload.loai || payload.type || payload.violation_type || 'hanh_vi'
-  const loai = String(loaiRaw).toLowerCase()
-  const moTa = payload.mo_ta || payload.message || payload.description || 'Nhận tín hiệu vi phạm từ AI'
-  const viDo = Number(payload.vi_do ?? payload.lat ?? payload.latitude ?? 0)
-  const kinhDo = Number(payload.kinh_do ?? payload.lng ?? payload.longitude ?? 0)
-  const khuVuc = payload.khu_vuc || payload.area || payload.zone || 'Chưa xác định khu vực'
-  const tocDo = Number(payload.toc_do ?? payload.speed ?? 0)
-  const capDo = payload.cap_do || payload.level || (loai.includes('ngu_gat') ? 'critical' : 'warning')
-  const thoiGian = payload.thoi_gian || payload.time || new Date().toISOString()
+// Charts
+const lineData = computed(() => {
+  const d7 = kd.value.doanh_thu_7_ngay || []
   return {
-    id: payload.id || Date.now() + Math.floor(Math.random() * 1000),
-    bienSo,
-    tenTaiXe,
-    loai,
-    moTa,
-    viDo,
-    kinhDo,
-    khuVuc,
-    tocDo,
-    capDo,
-    thoiGian,
+    labels: d7.map(i => { const d = new Date(i.ngay); return `${d.getDate()}/${d.getMonth()+1}` }),
+    datasets: [{
+      label: 'Doanh thu (triệu đ)', data: d7.map(i => +(Number(i.doanh_thu)/1e6).toFixed(1)),
+      borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.08)',
+      borderWidth: 3, pointRadius: 5, pointHoverRadius: 8, tension: 0.4, fill: true
+    }]
   }
+})
+const lineOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(15,23,42,0.9)', titleColor: '#f8fafc', bodyColor: '#cbd5e1', padding: 10, cornerRadius: 8 } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } } }
+
+const pieData = computed(() => {
+  const v = at.value.vi_pham_ai_24h
+  return {
+    labels: ['Ngủ gật', 'Dùng ĐT', 'Hút thuốc', 'Khác'],
+    datasets: [{ data: [v.ngu_gat||0, v.su_dung_dien_thoai||0, v.hut_thuoc||0, v.khac||0], backgroundColor: ['#ef4444','#f59e0b','#8b5cf6','#64748b'], borderWidth: 0 }]
+  }
+})
+const pieOpts = { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, pointStyle: 'circle' } } } }
+
+// Fetch data
+const fetchKpis = async () => {
+  loading.value = true
+  try {
+    const res = await adminApi.getDashboardKpis()
+    const d = res?.data?.data ?? res?.data ?? {}
+    if (d.kinh_doanh) kd.value = { ...kd.value, ...d.kinh_doanh }
+    if (d.an_toan) at.value = { ...at.value, ...d.an_toan }
+    if (d.van_hanh) vh.value = { ...vh.value, ...d.van_hanh }
+    if (d.tai_chinh) tc.value = { ...tc.value, ...d.tai_chinh }
+  } catch (e) { console.warn('Dashboard KPIs error:', e?.message) }
+  loading.value = false
 }
 
-const formatClock = (isoTime) => {
-  if (!isoTime) return '--:--:--'
-  return new Date(isoTime).toLocaleTimeString('vi-VN')
-}
-
-const formatLocation = (lat, lng) => {
-  if (!lat && !lng) return 'GPS chưa có'
-  return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`
-}
-
-const getBadgeClass = (level) => {
-  if (level === 'critical') return 'badge-critical'
-  if (level === 'warning') return 'badge-warning'
-  return 'badge-info'
-}
-
-const getLevelText = (level) => {
-  if (level === 'critical') return 'Khẩn cấp'
-  if (level === 'warning') return 'Cảnh báo'
-  return 'Thông tin'
-}
-
-const triggerDrowsyBlink = (plate) => {
-  aiBlinkMessage.value = `Xe ${plate} - Tài xế có dấu hiệu ngủ gật`
-  aiBlinkVisible.value = true
+// WebSocket realtime
+const triggerBlink = (msg) => {
+  aiBlinkMessage.value = msg; aiBlinkVisible.value = true
   clearTimeout(aiBlinkTimeout.value)
-  aiBlinkTimeout.value = setTimeout(() => {
-    aiBlinkVisible.value = false
-  }, 10000)
+  aiBlinkTimeout.value = setTimeout(() => { aiBlinkVisible.value = false }, 8000)
 }
 
-const pushTrackingEvent = (eventData) => {
-  trackingEvents.value.unshift({
-    id: eventData.id,
-    bienSo: eventData.bienSo,
-    tenTaiXe: eventData.tenTaiXe,
-    loaiSuCo: eventData.moTa,
-    capDo: eventData.capDo,
-    viDo: eventData.viDo,
-    kinhDo: eventData.kinhDo,
-    khuVuc: eventData.khuVuc,
-    tocDo: eventData.tocDo,
-    thoiGian: eventData.thoiGian,
-  })
-  trackingEvents.value = trackingEvents.value.slice(0, trackLimit + 4)
-}
-
-const pushViolationEvent = (eventData) => {
-  violationFeed.value.unshift({
-    id: eventData.id,
-    loai: eventData.loai,
-    bienSo: eventData.bienSo,
-    tenTaiXe: eventData.tenTaiXe,
-    moTa: eventData.moTa,
-    capDo: eventData.capDo,
-    viDo: eventData.viDo,
-    kinhDo: eventData.kinhDo,
-    thoiGian: eventData.thoiGian,
-  })
-  violationFeed.value = violationFeed.value.slice(0, feedLimit + 6)
-}
-
-const pushAlarm = (eventData) => {
-  emergencyAlarms.value.unshift({
-    id: `${eventData.id}-alarm`,
-    tieuDe: `Tín hiệu ${getLevelText(eventData.capDo).toLowerCase()} từ AI`,
-    noiDung: `${eventData.bienSo} • ${eventData.tenTaiXe} • ${eventData.moTa}`,
-    thoiGian: eventData.thoiGian,
-    capDo: eventData.capDo,
-  })
-  emergencyAlarms.value = emergencyAlarms.value.slice(0, alarmLimit + 4)
-}
-
-const updateVehicleRegistry = (eventData) => {
-  const nextMap = new Map(vehicleRegistry.value)
-  nextMap.set(eventData.bienSo, {
-    bienSo: eventData.bienSo,
-    tenTaiXe: eventData.tenTaiXe,
-    viDo: eventData.viDo,
-    kinhDo: eventData.kinhDo,
-    tocDo: eventData.tocDo,
-    thoiGian: eventData.thoiGian,
-    capDo: eventData.capDo,
-  })
-  vehicleRegistry.value = nextMap
-}
-
-const receiveRealtimeEvent = (payload) => {
-  const parsed = normalizeEventPayload(payload)
-  updateVehicleRegistry(parsed)
-  pushTrackingEvent(parsed)
-  pushViolationEvent(parsed)
-  pushAlarm(parsed)
-  if (parsed.loai.includes('ngu_gat') || parsed.moTa.toLowerCase().includes('ngủ gật')) {
-    triggerDrowsyBlink(parsed.bienSo)
+const onRealtimeViolation = (payload) => {
+  const loai = payload?.loai_bao_dong || payload?.loai || ''
+  const bien = payload?.bien_so || 'N/A'
+  const ten = payload?.ten_tai_xe || payload?.ho_va_ten || ''
+  // Update AI violation counts
+  const v = { ...at.value.vi_pham_ai_24h }
+  if (loai === 'ngu_gat') v.ngu_gat = (v.ngu_gat||0)+1
+  else if (loai === 'su_dung_dien_thoai') v.su_dung_dien_thoai = (v.su_dung_dien_thoai||0)+1
+  else if (loai === 'hut_thuoc') v.hut_thuoc = (v.hut_thuoc||0)+1
+  else v.khac = (v.khac||0)+1
+  at.value.vi_pham_ai_24h = v
+  // Push to incidents
+  at.value.su_co_moi_nhat = [{ id: Date.now(), loai_bao_dong: loai, muc_do: payload?.muc_do||'canh_bao', trang_thai:'moi', ten_tai_xe: ten, bien_so: bien, created_at: new Date().toISOString() }, ...at.value.su_co_moi_nhat].slice(0,5)
+  if (loai === 'ngu_gat' || loai === 'bao_dong_khan_cap') {
+    triggerBlink(`⚠ ${bien} — ${ten || 'Tài xế'}: ${loaiBaoDongLabel(loai)}`)
+    if (loai === 'bao_dong_khan_cap') at.value.so_sos_chua_xu_ly++
   }
 }
 
-const subscribeEchoChannel = (channel, eventNames = []) => {
-  if (!channel || !Array.isArray(eventNames) || !eventNames.length) return
-  eventNames.forEach((eventName) => {
-    channel.listen(eventName, (eventPayload) => {
-      receiveRealtimeEvent(eventPayload)
-    })
-  })
-}
-
-const initWebSocket = () => {
+const initWs = () => {
   if (!adminStore.token) return
   try {
-    const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY
-    const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER
-    if (!pusherKey || !pusherCluster) return
-
+    const key = import.meta.env.VITE_PUSHER_APP_KEY
+    const cluster = import.meta.env.VITE_PUSHER_APP_CLUSTER
+    if (!key || !cluster) return
     window.Pusher = Pusher
-    let apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/'
-    if (!apiUrl.endsWith('/')) apiUrl += '/'
-    echoInstance = new Echo({
-      broadcaster: 'pusher',
-      key: pusherKey,
-      cluster: pusherCluster,
-      forceTLS: true,
-      authEndpoint: `${apiUrl}v1/admin/broadcasting/auth`,
-      auth: {
-        headers: {
-          Authorization: `Bearer ${adminStore.token}`,
-          Accept: 'application/json',
-        },
-      },
-    })
-
-    const adminId = adminStore.user?.id || adminStore.user?.ma_admin || 'global'
-    const privateChannel = echoInstance.private(`admin.${adminId}`)
-    const systemChannel = echoInstance.channel('he-thong.giam-sat')
-
-    subscribeEchoChannel(privateChannel, ['.bao-dong.vi-pham', '.ai.canh-bao', '.tracking.khan-cap'])
-    subscribeEchoChannel(systemChannel, ['.bao-dong.vi-pham', '.ai.canh-bao', '.tracking.khan-cap'])
-    hasRealtimeConnection.value = true
-  } catch (error) {
-    console.warn('Không khởi tạo được WebSocket admin:', error?.message || error)
-    echoInstance = null
-    hasRealtimeConnection.value = false
-  }
+    let url = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/'
+    if (!url.endsWith('/')) url += '/'
+    echoInstance = new Echo({ broadcaster:'pusher', key, cluster, forceTLS:true, authEndpoint:`${url}v1/admin/broadcasting/auth`, auth:{ headers:{ Authorization:`Bearer ${adminStore.token}`, Accept:'application/json' } } })
+    const ch = echoInstance.channel('he-thong.giam-sat')
+    ch.listen('.bao-dong.vi-pham', onRealtimeViolation)
+    ch.listen('.ai.canh-bao', onRealtimeViolation)
+    hasWs.value = true
+  } catch (e) { console.warn('WS init failed:', e?.message); hasWs.value = false }
 }
 
-const startMockRealtime = () => {
-  const mockPlates = ['51B-99123', '77B-12888', '29H-77777', '43A-55661']
-  const mockDrivers = ['Đặng Minh Quân', 'Ngô Thị Hạnh', 'Trịnh Văn Sơn', 'Lý Minh Tú']
-  const mockAreas = ['Cao tốc Trung Lương', 'QL14 - Đắk Lắk', 'Nút giao Cầu Giẽ', 'Đèo Hải Vân']
-  const mockViolations = ['ngu_gat', 'hanh_vi', 'hanh_vi', 'ngu_gat']
-  const mockMessages = [
-    'Tài xế có dấu hiệu ngủ gật liên tục',
-    'Sử dụng điện thoại khi điều khiển xe',
-    'Không giữ khoảng cách an toàn',
-    'Phát hiện ngủ gật qua camera cabin',
-  ]
-
-  mockTicker = setInterval(() => {
-    localSeed += 1
-    const index = Math.floor(Math.random() * mockPlates.length)
-    const payload = {
-      id: localSeed,
-      bien_so: mockPlates[index],
-      ten_tai_xe: mockDrivers[index],
-      loai: mockViolations[index],
-      message: mockMessages[index],
-      level: mockViolations[index] === 'ngu_gat' ? 'critical' : 'warning',
-      vi_do: 10 + Math.random() * 12,
-      kinh_do: 105 + Math.random() * 5,
-      khu_vuc: mockAreas[index],
-      toc_do: Math.floor(Math.random() * 90),
-      thoi_gian: new Date().toISOString(),
-    }
-    receiveRealtimeEvent(payload)
-  }, 9000)
-}
-
-onMounted(() => {
-  systemState.value = 'Hệ thống đang hoạt động'
-  clockTicker = setInterval(() => {
-    now.value = new Date()
-  }, 1000)
-
-  initWebSocket()
-  if (!hasRealtimeConnection.value) {
-    startMockRealtime()
-  }
+onMounted(async () => {
+  clockTicker = setInterval(() => { now.value = new Date() }, 1000)
+  await fetchKpis()
+  initWs()
 })
-
 onUnmounted(() => {
-  clearInterval(clockTicker)
-  clearInterval(mockTicker)
-  clearTimeout(aiBlinkTimeout.value)
-
-  if (echoInstance) {
-    const adminId = adminStore.user?.id || adminStore.user?.ma_admin || 'global'
-    echoInstance.leave(`private-admin.${adminId}`)
-    echoInstance.leave('he-thong.giam-sat')
-  }
+  clearInterval(clockTicker); clearTimeout(aiBlinkTimeout.value)
+  if (echoInstance) echoInstance.leave('he-thong.giam-sat')
 })
 </script>
 
 <template>
-  <section class="admin-dashboard-page">
-    <header class="dashboard-head glass-panel">
-      <div class="head-left">
-        <div class="head-icon-wrap">
-          <Siren class="head-icon" />
-        </div>
+  <section class="adm-dash">
+    <!-- HEADER -->
+    <header class="dash-head glass">
+      <div class="head-l">
+        <div class="head-ico"><Siren :size="26" /></div>
         <div>
-          <h1 class="head-title">Dashboard Quản trị An toàn Nhà xe</h1>
-          <p class="head-sub">
-            Giám sát sự cố khẩn cấp, tiếp nhận cảnh báo AI và theo dõi vi phạm tài xế theo thời gian thực.
-          </p>
+          <h1>Dashboard Quản trị Hệ thống</h1>
+          <p class="sub">Trung tâm giám sát kinh doanh, an toàn AI, vận hành và tài chính.</p>
         </div>
       </div>
-      <div class="head-right">
-        <div class="status-pill">
-          <Radio class="status-icon" />
-          <span>{{ systemState }}</span>
-        </div>
-        <p class="time-text">{{ dashboardDateText }}</p>
-        <p class="conn-text">{{ liveConnectionStatus }}</p>
+      <div class="head-r">
+        <div class="ws-pill"><Radio :size="14" /> {{ hasWs ? 'Realtime WebSocket' : 'Đang kết nối...' }}</div>
+        <p class="time-txt">{{ dateText }}</p>
       </div>
     </header>
 
-    <div v-if="aiBlinkVisible" class="ai-blink-alert" role="alert">
-      <TriangleAlert class="blink-icon" />
-      <p>{{ aiBlinkMessage }}</p>
+    <!-- AI BLINK ALERT -->
+    <div v-if="aiBlinkVisible" class="ai-blink" role="alert">
+      <TriangleAlert :size="20" /> <span>{{ aiBlinkMessage }}</span>
     </div>
 
-    <div class="overview-grid">
-      <article class="overview-card primary">
-        <div class="overview-top">
-          <Activity class="overview-icon" />
-          <span>Live Tracking Sự cố</span>
-        </div>
-        <h3>{{ totals.trackCount }}</h3>
-        <p>Sự cố đang hiển thị trên trung tâm điều hành</p>
+    <!-- TOP 4 KPI CARDS -->
+    <div class="kpi-grid">
+      <article class="kpi-card grad-green">
+        <div class="kpi-top"><DollarSign :size="18" /> Doanh thu hôm nay</div>
+        <h3>{{ fmt(kd.doanh_thu_hom_nay) }}</h3>
+        <p>Tháng: {{ fmt(kd.doanh_thu_thang_nay) }}</p>
       </article>
-
-      <article class="overview-card danger">
-        <div class="overview-top">
-          <ShieldAlert class="overview-icon" />
-          <span>Vi phạm nguy hiểm</span>
-        </div>
-        <h3>{{ totals.criticalEvents }}</h3>
-        <p>Trường hợp khẩn cấp cần ưu tiên xử lý ngay</p>
+      <article class="kpi-card grad-blue">
+        <div class="kpi-top"><Ticket :size="18" /> Vé đã bán hôm nay</div>
+        <h3>{{ kd.tong_ve_da_ban_hom_nay }}</h3>
+        <p>Lấp đầy: {{ kd.ty_le_lap_day_ghe }}%</p>
       </article>
-
-      <article class="overview-card warning">
-        <div class="overview-top">
-          <BellRing class="overview-icon" />
-          <span>Cảnh báo mức trung bình</span>
-        </div>
-        <h3>{{ totals.warningEvents }}</h3>
-        <p>Vi phạm hành vi và tín hiệu AI cần theo dõi</p>
+      <article class="kpi-card grad-red">
+        <div class="kpi-top"><ShieldAlert :size="18" /> SOS khẩn cấp</div>
+        <h3>{{ at.so_sos_chua_xu_ly }}</h3>
+        <p>Vi phạm AI 24h: {{ tongViPham24h }}</p>
       </article>
-
-      <article class="overview-card success">
-        <div class="overview-top">
-          <BusFront class="overview-icon" />
-          <span>Xe đang online</span>
-        </div>
-        <h3>{{ totals.activeVehicles }}</h3>
-        <p>Phương tiện có dữ liệu GPS cập nhật mới nhất</p>
+      <article class="kpi-card grad-teal">
+        <div class="kpi-top"><BusFront :size="18" /> Xe đang chạy</div>
+        <h3>{{ vh.chuyen_xe_dang_chay }}</h3>
+        <p>KH mới 24h: {{ kd.khach_hang_moi_24h }}</p>
       </article>
     </div>
 
-    <div class="main-grid">
-      <article class="glass-panel panel">
-        <div class="panel-header">
-          <h2>
-            <MapPin class="panel-icon" />
-            Giám sát sự cố khẩn cấp (Live Tracking)
-          </h2>
-          <RouterLink class="panel-link" to="/admin/tracking">
-            Mở trung tâm tracking
-            <ArrowRight class="panel-link-icon" />
+    <!-- ROW 2: LINE CHART + PIE CHART -->
+    <div class="row2">
+      <article class="glass panel chart-line-wrap">
+        <div class="panel-hd"><h2><TrendingUp :size="18" /> Doanh thu 7 ngày gần nhất</h2></div>
+        <div class="chart-box" v-if="kd.doanh_thu_7_ngay.length"><Line :data="lineData" :options="lineOpts" /></div>
+        <p v-else class="empty-msg">Chưa có dữ liệu doanh thu.</p>
+      </article>
+      <article class="glass panel chart-pie-wrap">
+        <div class="panel-hd"><h2><ShieldAlert :size="18" class="txt-red" /> Vi phạm AI (24h)</h2></div>
+        <div class="chart-box" v-if="tongViPham24h > 0"><Doughnut :data="pieData" :options="pieOpts" /></div>
+        <p v-else class="empty-msg">Chưa có vi phạm trong 24h qua.</p>
+        <div class="pie-stats">
+          <span class="pie-tag red">Ngủ gật: {{ at.vi_pham_ai_24h.ngu_gat }}</span>
+          <span class="pie-tag yellow">ĐT: {{ at.vi_pham_ai_24h.su_dung_dien_thoai }}</span>
+          <span class="pie-tag purple">Thuốc: {{ at.vi_pham_ai_24h.hut_thuoc }}</span>
+          <span class="pie-tag gray">Khác: {{ at.vi_pham_ai_24h.khac }}</span>
+        </div>
+      </article>
+    </div>
+
+    <!-- ROW 3: HIGH-RISK DRIVERS + LATEST INCIDENTS -->
+    <div class="row3">
+      <article class="glass panel">
+        <div class="panel-hd">
+          <h2><AlertCircle :size="18" class="txt-orange" /> Tài xế nguy cơ cao</h2>
+        </div>
+        <table class="mini-tbl" v-if="at.tai_xe_nguy_co.length">
+          <thead><tr><th>#</th><th>Tài xế</th><th>Biển số</th><th>Vi phạm</th></tr></thead>
+          <tbody>
+            <tr v-for="(tx, i) in at.tai_xe_nguy_co" :key="tx.id">
+              <td>{{ i+1 }}</td><td>{{ tx.ho_va_ten }}</td><td>{{ tx.bien_so }}</td>
+              <td><span class="badge-red">{{ tx.so_vi_pham }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="empty-msg">Không có tài xế vi phạm trong 24h.</p>
+      </article>
+      <article class="glass panel">
+        <div class="panel-hd">
+          <h2><BellRing :size="18" class="txt-red" /> 5 sự cố AI mới nhất</h2>
+          <RouterLink class="panel-link" to="/admin/tracking">Tracking <ArrowRight :size="14" /></RouterLink>
+        </div>
+        <table class="mini-tbl" v-if="at.su_co_moi_nhat.length">
+          <thead><tr><th>Loại</th><th>Mức độ</th><th>Tài xế</th><th>BSX</th><th>Thời gian</th></tr></thead>
+          <tbody>
+            <tr v-for="sc in at.su_co_moi_nhat" :key="sc.id">
+              <td>{{ loaiBaoDongLabel(sc.loai_bao_dong) }}</td>
+              <td><span :class="mucDoClass(sc.muc_do)" class="badge-sm">{{ mucDoLabel(sc.muc_do) }}</span></td>
+              <td>{{ sc.ten_tai_xe || '—' }}</td>
+              <td>{{ sc.bien_so || '—' }}</td>
+              <td>{{ fmtTime(sc.created_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="empty-msg">Chưa có sự cố AI.</p>
+      </article>
+    </div>
+
+    <!-- ROW 4: OPERATIONS + FINANCIAL -->
+    <div class="row4">
+      <article class="glass panel">
+        <div class="panel-hd"><h2><Activity :size="18" /> Quản trị Vận hành</h2></div>
+        <div class="ops-grid">
+          <RouterLink to="/admin/chuyen-xe" class="ops-item">
+            <BusFront :size="22" class="txt-blue" />
+            <div><span class="ops-num">{{ vh.chuyen_xe_dang_chay }}</span><span class="ops-lbl">Chuyến đang chạy</span></div>
+          </RouterLink>
+          <RouterLink to="/admin/nha-xe" class="ops-item">
+            <Building2 :size="22" class="txt-purple" />
+            <div><span class="ops-num">{{ vh.nha_xe_cho_duyet }}</span><span class="ops-lbl">NX chờ duyệt</span></div>
+          </RouterLink>
+          <RouterLink to="/admin/tuyen-duong" class="ops-item">
+            <Route :size="22" class="txt-teal" />
+            <div><span class="ops-num">{{ vh.tuyen_duong_cho_duyet }}</span><span class="ops-lbl">Tuyến chờ duyệt</span></div>
+          </RouterLink>
+          <RouterLink to="/admin/tai-xe" class="ops-item">
+            <IdCard :size="22" class="txt-orange" />
+            <div><span class="ops-num">{{ vh.tai_xe_bang_lai_sap_het_han }}</span><span class="ops-lbl">GPLX sắp hết hạn</span></div>
           </RouterLink>
         </div>
-        <div class="tracking-list">
-          <div
-            v-for="item in orderedTracking"
-            :key="item.id"
-            class="tracking-item"
-            :class="getBadgeClass(item.capDo)"
-          >
-            <div class="tracking-main">
-              <p class="tracking-title">{{ item.bienSo }} • {{ item.tenTaiXe }}</p>
-              <p class="tracking-meta">{{ item.loaiSuCo }}</p>
-              <p class="tracking-meta">
-                GPS: {{ formatLocation(item.viDo, item.kinhDo) }} • {{ item.khuVuc }} • {{ item.tocDo }} km/h
-              </p>
-            </div>
-            <div class="tracking-side">
-              <span class="level-badge" :class="getBadgeClass(item.capDo)">{{ getLevelText(item.capDo) }}</span>
-              <span class="time-badge">{{ formatClock(item.thoiGian) }}</span>
-            </div>
-          </div>
-        </div>
       </article>
-
-      <article class="glass-panel panel">
-        <div class="panel-header">
-          <h2>
-            <ShieldAlert class="panel-icon danger-icon" />
-            Trợ lý lái xe an toàn (WebSocket)
-          </h2>
-        </div>
-        <p class="panel-description">
-          Mọi vi phạm từ camera AI trong xe (ngủ gật, hành vi) được đẩy về dashboard ngay lập tức kèm tọa độ GPS.
-        </p>
-        <div class="feed-list">
-          <div
-            v-for="item in orderedViolations"
-            :key="item.id"
-            class="feed-item"
-            :class="getBadgeClass(item.capDo)"
-          >
-            <div class="feed-item-top">
-              <p class="feed-title">{{ item.bienSo }} - {{ item.tenTaiXe }}</p>
-              <span class="level-badge" :class="getBadgeClass(item.capDo)">{{ getLevelText(item.capDo) }}</span>
-            </div>
-            <p class="feed-message">{{ item.moTa }}</p>
-            <p class="feed-meta">
-              <Clock3 class="feed-meta-icon" />
-              {{ formatClock(item.thoiGian) }}
-              <span>•</span>
-              <MapPin class="feed-meta-icon" />
-              {{ formatLocation(item.viDo, item.kinhDo) }}
-            </p>
+      <article class="glass panel">
+        <div class="panel-hd"><h2><CreditCard :size="18" /> Sức khỏe Tài chính</h2></div>
+        <div class="fin-list">
+          <div class="fin-row">
+            <span class="fin-lbl">Tổng quỹ ký quỹ (Escrow)</span>
+            <span class="fin-val txt-green">{{ fmt(tc.tong_quy_ky_quy) }}</span>
+          </div>
+          <div class="fin-row">
+            <span class="fin-lbl">Yêu cầu rút tiền chờ duyệt</span>
+            <span class="fin-val txt-orange">{{ tc.yeu_cau_rut_tien_cho }}</span>
+          </div>
+          <div class="fin-row">
+            <span class="fin-lbl">Khiếu nại chưa giải quyết</span>
+            <span class="fin-val txt-red">{{ tc.khieu_nai_chua_giai_quyet }}</span>
           </div>
         </div>
       </article>
     </div>
-
-    <article class="glass-panel panel alarm-panel">
-      <div class="panel-header">
-        <h2>
-          <BellRing class="panel-icon danger-icon" />
-          Tiếp nhận cảnh báo AI
-        </h2>
-      </div>
-      <div class="alarm-list">
-        <div
-          v-for="alarm in orderedAlarms"
-          :key="alarm.id"
-          class="alarm-item"
-          :class="getBadgeClass(alarm.capDo)"
-        >
-          <p class="alarm-title">{{ alarm.tieuDe }}</p>
-          <p class="alarm-content">{{ alarm.noiDung }}</p>
-          <p class="alarm-time">{{ formatClock(alarm.thoiGian) }}</p>
-        </div>
-        <p v-if="!orderedAlarms.length" class="alarm-empty">
-          Chưa có cảnh báo mới. Hệ thống sẽ tự động cập nhật khi nhận tín hiệu AI từ xe.
-        </p>
-      </div>
-    </article>
   </section>
 </template>
 
 <style scoped>
-.admin-dashboard-page {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  color: #0f172a;
-}
+.adm-dash { display:flex; flex-direction:column; gap:18px; color:#0f172a; min-height:100%; }
+.glass { background:rgba(255,255,255,.82); border:1px solid rgba(226,232,240,.95); border-radius:16px; box-shadow:0 12px 32px rgba(15,23,42,.07); backdrop-filter:blur(6px); }
+.panel { padding:18px; }
 
-.glass-panel {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  border-radius: 18px;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(7px);
-}
+/* Header */
+.dash-head { padding:18px 22px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.head-l { display:flex; gap:12px; align-items:center; }
+.head-ico { width:50px; height:50px; border-radius:14px; background:linear-gradient(135deg,#2563eb,#0ea5e9); display:flex; align-items:center; justify-content:center; color:#fff; }
+.dash-head h1 { margin:0 0 4px; font-size:1.3rem; font-weight:800; }
+.sub { margin:0; color:#475569; font-size:.88rem; }
+.head-r { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.ws-pill { display:inline-flex; align-items:center; gap:5px; font-weight:700; font-size:.82rem; border-radius:999px; border:1px solid #bfdbfe; background:#eff6ff; padding:5px 12px; color:#1e40af; }
+.time-txt { margin:0; color:#64748b; font-size:.8rem; }
 
-.dashboard-head {
-  padding: 20px 22px;
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-}
+/* AI Blink */
+.ai-blink { display:flex; align-items:center; gap:10px; border-radius:14px; background:#ef4444; color:#fff; padding:12px 16px; font-weight:800; font-size:.95rem; animation:blink-d 1s infinite; }
+@keyframes blink-d { 0%,100%{opacity:1;box-shadow:0 0 0 rgba(239,68,68,.8)} 50%{opacity:.5;box-shadow:0 0 20px rgba(239,68,68,.5)} }
 
-.head-left {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
+/* KPI Grid */
+.kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+.kpi-card { padding:16px; border-radius:16px; color:#fff; box-shadow:0 10px 24px rgba(15,23,42,.12); }
+.kpi-card h3 { font-size:2rem; margin:8px 0 4px; line-height:1; }
+.kpi-card p { margin:0; font-size:.82rem; opacity:.9; }
+.kpi-top { display:flex; gap:6px; align-items:center; font-weight:700; font-size:.84rem; }
+.grad-green { background:linear-gradient(135deg,#16a34a,#22c55e); }
+.grad-blue { background:linear-gradient(135deg,#2563eb,#3b82f6); }
+.grad-red { background:linear-gradient(135deg,#dc2626,#f97316); }
+.grad-teal { background:linear-gradient(135deg,#0d9488,#14b8a6); }
 
-.head-icon-wrap {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #2563eb, #0ea5e9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-}
+/* Row layouts */
+.row2 { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; }
+.row3,.row4 { display:grid; grid-template-columns:1fr 1.3fr; gap:16px; }
+.chart-box { height:220px; position:relative; }
+.chart-line-wrap .chart-box { height:240px; }
 
-.head-icon {
-  width: 26px;
-  height: 26px;
-}
+/* Panel header */
+.panel-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.panel-hd h2 { margin:0; font-size:.95rem; font-weight:800; display:flex; align-items:center; gap:6px; }
+.panel-link { display:inline-flex; align-items:center; gap:3px; text-decoration:none; color:#2563eb; font-size:.82rem; font-weight:700; }
 
-.head-title {
-  margin: 0 0 6px 0;
-  font-size: 1.35rem;
-  font-weight: 800;
-}
+/* Mini table */
+.mini-tbl { width:100%; border-collapse:collapse; font-size:.84rem; }
+.mini-tbl th { text-align:left; padding:8px 6px; border-bottom:2px solid #e2e8f0; color:#64748b; font-weight:700; font-size:.78rem; text-transform:uppercase; letter-spacing:.3px; }
+.mini-tbl td { padding:8px 6px; border-bottom:1px solid #f1f5f9; }
+.mini-tbl tr:hover td { background:rgba(59,130,246,.04); }
 
-.head-sub {
-  margin: 0;
-  color: #475569;
-  font-size: 0.92rem;
-}
+/* Badges */
+.badge-sm { padding:2px 8px; border-radius:6px; font-size:.75rem; font-weight:700; }
+.badge-red { background:#fef2f2; color:#dc2626; }
+.badge-orange { background:#fff7ed; color:#ea580c; }
+.badge-yellow { background:#fefce8; color:#ca8a04; }
+.badge-blue { background:#eff6ff; color:#2563eb; }
 
-.head-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
+/* Pie stats */
+.pie-stats { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.pie-tag { padding:3px 10px; border-radius:8px; font-size:.78rem; font-weight:700; }
+.pie-tag.red { background:#fef2f2; color:#dc2626; }
+.pie-tag.yellow { background:#fefce8; color:#ca8a04; }
+.pie-tag.purple { background:#f5f3ff; color:#7c3aed; }
+.pie-tag.gray { background:#f1f5f9; color:#475569; }
 
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #0f172a;
-  font-weight: 700;
-  border-radius: 999px;
-  border: 1px solid #bfdbfe;
-  background: #eff6ff;
-  padding: 6px 12px;
-}
+/* Operations */
+.ops-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.ops-item { display:flex; gap:10px; align-items:center; padding:14px; border-radius:12px; border:1px solid #e2e8f0; text-decoration:none; color:#0f172a; transition:all .2s; background:#fff; }
+.ops-item:hover { border-color:#3b82f6; box-shadow:0 4px 12px rgba(59,130,246,.1); transform:translateY(-1px); }
+.ops-num { font-size:1.4rem; font-weight:800; display:block; line-height:1; }
+.ops-lbl { font-size:.78rem; color:#64748b; }
 
-.status-icon {
-  width: 15px;
-  height: 15px;
-}
+/* Financial */
+.fin-list { display:flex; flex-direction:column; gap:14px; }
+.fin-row { display:flex; justify-content:space-between; align-items:center; padding:14px; border-radius:12px; border:1px solid #e2e8f0; background:#fff; }
+.fin-lbl { font-size:.88rem; color:#334155; font-weight:600; }
+.fin-val { font-size:1.2rem; font-weight:800; }
 
-.time-text,
-.conn-text {
-  margin: 0;
-  color: #64748b;
-  font-size: 0.82rem;
-}
+/* Utility colors */
+.txt-red { color:#dc2626; }
+.txt-orange { color:#ea580c; }
+.txt-green { color:#16a34a; }
+.txt-blue { color:#2563eb; }
+.txt-purple { color:#7c3aed; }
+.txt-teal { color:#0d9488; }
 
-.ai-blink-alert {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: 14px;
-  border: 1px solid #fecaca;
-  background: #ef4444;
-  color: #ffffff;
-  padding: 12px 16px;
-  font-size: 1rem;
-  font-weight: 800;
-  animation: blink-danger 1s infinite;
-}
+.empty-msg { text-align:center; color:#94a3b8; padding:24px 0; font-size:.88rem; }
 
-.blink-icon {
-  width: 21px;
-  height: 21px;
-  flex-shrink: 0;
-}
-
-@keyframes blink-danger {
-  0% {
-    opacity: 1;
-    box-shadow: 0 0 0 rgba(239, 68, 68, 0.8);
-  }
-  50% {
-    opacity: 0.45;
-    box-shadow: 0 0 24px rgba(239, 68, 68, 0.6);
-  }
-  100% {
-    opacity: 1;
-    box-shadow: 0 0 0 rgba(239, 68, 68, 0.8);
-  }
-}
-
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.overview-card {
-  padding: 16px;
-  border-radius: 16px;
-  color: #ffffff;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.14);
-}
-
-.overview-card.primary {
-  background: linear-gradient(135deg, #2563eb, #0ea5e9);
-}
-
-.overview-card.danger {
-  background: linear-gradient(135deg, #dc2626, #f97316);
-}
-
-.overview-card.warning {
-  background: linear-gradient(135deg, #d97706, #f59e0b);
-}
-
-.overview-card.success {
-  background: linear-gradient(135deg, #16a34a, #10b981);
-}
-
-.overview-top {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-  font-weight: 700;
-  font-size: 0.86rem;
-}
-
-.overview-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.overview-card h3 {
-  font-size: 2rem;
-  margin: 10px 0 6px;
-  line-height: 1;
-}
-
-.overview-card p {
-  margin: 0;
-  font-size: 0.84rem;
-  opacity: 0.93;
-}
-
-.main-grid {
-  display: grid;
-  grid-template-columns: 1.45fr 1fr;
-  gap: 16px;
-}
-
-.panel {
-  padding: 16px;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.panel-header h2 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.panel-icon {
-  width: 18px;
-  height: 18px;
-  color: #2563eb;
-}
-
-.danger-icon {
-  color: #dc2626;
-}
-
-.panel-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  text-decoration: none;
-  color: #2563eb;
-  font-size: 0.84rem;
-  font-weight: 700;
-}
-
-.panel-link-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.panel-description {
-  margin: 0 0 12px;
-  color: #475569;
-  font-size: 0.86rem;
-}
-
-.tracking-list,
-.feed-list,
-.alarm-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.tracking-item,
-.feed-item,
-.alarm-item {
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  padding: 11px 12px;
-  background: #ffffff;
-}
-
-.tracking-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.tracking-main {
-  min-width: 0;
-}
-
-.tracking-title,
-.feed-title,
-.alarm-title {
-  margin: 0 0 4px;
-  font-size: 0.9rem;
-  font-weight: 800;
-}
-
-.tracking-meta,
-.feed-message,
-.alarm-content {
-  margin: 0;
-  font-size: 0.82rem;
-  color: #475569;
-}
-
-.tracking-side {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.time-badge,
-.alarm-time {
-  color: #64748b;
-  font-size: 0.76rem;
-  margin: 0;
-}
-
-.feed-item-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: center;
-}
-
-.feed-meta {
-  margin: 6px 0 0;
-  color: #64748b;
-  font-size: 0.78rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.feed-meta-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.level-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 3px 10px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  border: 1px solid transparent;
-}
-
-.badge-critical {
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.level-badge.badge-critical {
-  color: #b91c1c;
-  background: #fee2e2;
-}
-
-.badge-warning {
-  border-color: #fde68a;
-  background: #fffbeb;
-}
-
-.level-badge.badge-warning {
-  color: #92400e;
-  background: #fef3c7;
-}
-
-.badge-info {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-}
-
-.level-badge.badge-info {
-  color: #1d4ed8;
-  background: #dbeafe;
-}
-
-.alarm-panel {
-  margin-bottom: 8px;
-}
-
-.alarm-empty {
-  margin: 0;
-  padding: 10px 2px;
-  font-size: 0.85rem;
-  color: #64748b;
-}
-
-@media (max-width: 1280px) {
-  .overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .main-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-  .head-right {
-    align-items: flex-start;
-  }
-  .tracking-item {
-    flex-direction: column;
-  }
-  .tracking-side {
-    align-items: flex-start;
-  }
+@media (max-width:900px) {
+  .kpi-grid { grid-template-columns:repeat(2,1fr); }
+  .row2,.row3,.row4 { grid-template-columns:1fr; }
+  .ops-grid { grid-template-columns:1fr; }
 }
 </style>

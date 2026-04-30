@@ -50,8 +50,8 @@ class UpdateTaiXeRequest extends FormRequest
             'ho_va_ten'         => 'sometimes|required|string|max:255',
             'ngay_sinh'         => 'nullable|date',
             'dia_chi'           => 'nullable|string|max:255',
-            'so_gplx'           => 'sometimes|required|string|max:50',
-            'hang_bang_lai'     => 'sometimes|required|string|max:10|in:B1,B2,C,D,E,FB2,FC,FD,FE',
+            'so_gplx'           => 'nullable|string|max:50',
+            'hang_bang_lai'     => 'nullable|string|max:10|in:B1,B2,C,D,E,FB2,FC,FD,FE',
             'ngay_cap_gplx'     => 'nullable|date',
             'ngay_het_han_gplx' => 'nullable|date',
 
@@ -59,6 +59,8 @@ class UpdateTaiXeRequest extends FormRequest
             'avatar'             => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'anh_cccd_mat_truoc' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
             'anh_cccd_mat_sau'   => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'anh_gplx'           => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+            'anh_gplx_mat_sau'   => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
         ];
     }
 

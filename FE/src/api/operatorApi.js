@@ -6,6 +6,7 @@ const operatorApi = {
   changePassword: (data) => axiosClient.post('/v1/nha-xe/doi-mat-khau', data),
 
   // --- THỐNG KÊ NHÀ XE ---
+  getDashboardKpis: () => axiosClient.get('/v1/nha-xe/dashboard-kpis'),
   getStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke', { params }),
   getStatisticsByRoute: (params) => axiosClient.get('/v1/nha-xe/thong-ke/theo-tuyen', { params }),
   getStatisticsTicketStatus: (params) => axiosClient.get('/v1/nha-xe/thong-ke/trang-thai-ve', { params }),
@@ -73,13 +74,13 @@ const operatorApi = {
   // --- TÀI XẾ ---
   getDrivers: (params) => axiosClient.get('/v1/nha-xe/tai-xe', { params }),
   getDriverDetails: (id) => axiosClient.get(`/v1/nha-xe/tai-xe/${id}`),
-  createDriver: (data) => axiosClient.post('/v1/nha-xe/tai-xe', data),
+  createDriver: (data) => axiosClient.post('/v1/nha-xe/tai-xe', data, { timeout: 60000 }),
   updateDriver: (id, data) => {
     if (data instanceof FormData) {
       if (!data.has('_method')) data.append('_method', 'PUT');
-      return axiosClient.post(`/v1/nha-xe/tai-xe/${id}`, data);
+      return axiosClient.post(`/v1/nha-xe/tai-xe/${id}`, data, { timeout: 60000 });
     }
-    return axiosClient.put(`/v1/nha-xe/tai-xe/${id}`, data);
+    return axiosClient.put(`/v1/nha-xe/tai-xe/${id}`, data, { timeout: 60000 });
   },
   toggleDriverStatus: (id) => axiosClient.patch(`/v1/nha-xe/tai-xe/${id}/trang-thai`),
   deleteDriver: (id) => axiosClient.delete(`/v1/nha-xe/tai-xe/${id}`),
@@ -91,6 +92,12 @@ const operatorApi = {
 
   // --- ĐÁNH GIÁ CHUYẾN XE ---
   getRatings: (params) => axiosClient.get('/v1/nha-xe/ratings', { params }),
+
+  // --- VÍ NHÀ XE ---
+  getWalletInfo: () => axiosClient.get('/v1/nha-xe/vi-nha-xe'),
+  updateBankInfo: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/update-bank', data),
+  requestTopup: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/topup', data),
+  requestWithdraw: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/withdraw', data),
 };
 
 export default operatorApi;

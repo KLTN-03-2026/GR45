@@ -104,6 +104,15 @@ const driverApi = {
   getCauHinhAi() {
     const url = '/v1/tai-xe/cau-hinh-ai';
     return axiosClient.get(url);
+  },
+
+  /**
+   * Gửi tín hiệu SOS khẩn cấp
+   * @param {Object} data - { id_chuyen_xe }
+   */
+  postSOS(data) {
+    const url = '/v1/tai-xe/sos';
+    return axiosClient.post(url, data);
   }
 };
 

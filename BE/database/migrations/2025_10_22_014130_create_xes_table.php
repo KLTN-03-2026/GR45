@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedBigInteger('id_nhan_vien_quan_ly')->nullable();
             $table->unsignedBigInteger('id_tai_xe_chinh')->nullable();
             $table->string('bien_nhan_dang')->nullable();
-            $table->enum('trang_thai', ['bao_tri', 'hoat_dong', 'cho_duyet'])->default('cho_duyet'); // 1=hoạt động, 0=bảo trì
+            $table->enum('trang_thai', ['bao_tri', 'hoat_dong', 'cho_duyet', 'ngung_su_dung'])->default('cho_duyet'); // 1=hoạt động, 0=bảo trì
             $table->integer('so_ghe_thuc_te')->nullable();
             $table->timestamps();
             $table->foreign('ma_nha_xe')->references('ma_nha_xe')->on('nha_xes')->onDelete('cascade');

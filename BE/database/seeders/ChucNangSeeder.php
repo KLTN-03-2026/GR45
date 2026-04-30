@@ -70,6 +70,8 @@ class ChucNangSeeder extends Seeder
             ['ten_chuc_nang' => 'Duyệt voucher', 'slug' => 'duyet-voucher', 'tinh_trang' => 'hoat_dong'],
         ];
 
-        DB::table('chuc_nangs')->insert($chucNangs);
+        foreach ($chucNangs as $cn) {
+            DB::table('chuc_nangs')->updateOrInsert(['slug' => $cn['slug']], $cn);
+        }
     }
 }

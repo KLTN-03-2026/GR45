@@ -172,6 +172,11 @@ const router = createRouter({
           name: 'admin-cai-dat',
           component: () => import('../views/admin/cai-dat/CaiDatView.vue'),
         },
+        {
+          path: 'vi-nha-xe',
+          name: 'admin-vi-nha-xe',
+          component: () => import('../views/admin/vi-nha-xe/AdminViNhaXeView.vue'),
+        },
       ],
     },
 
@@ -259,6 +264,11 @@ const router = createRouter({
           path: 'cai-dat',
           name: 'operator-cai-dat',
           component: () => import('../views/operator/cai-dat/CaiDatView.vue'),
+        },
+        {
+          path: 'vi-nha-xe',
+          name: 'operator-vi-nha-xe',
+          component: () => import('../views/operator/vi-nha-xe/ViNhaXeView.vue'),
         },
       ],
     },

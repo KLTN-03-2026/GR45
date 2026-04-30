@@ -16,6 +16,7 @@ use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\VeController;
 use App\Http\Controllers\XeController;
 use App\Http\Controllers\BaoDongController;
+use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\MapProxyController;
 use App\Http\Controllers\LoaiXeController;
 use App\Http\Controllers\LoaiGheController;
@@ -84,6 +85,7 @@ Route::prefix('v1')->group(function () {
             Route::post('doi-mat-khau', [TaiXeController::class, 'doiMatKhau']);
 
             Route::post('bao-dong', [BaoDongController::class, 'store']);
+            Route::post('sos', [BaoDongController::class, 'sos']);
             Route::get('cau-hinh-ai', [BaoDongController::class, 'getCauHinhAi']);
 
             Route::get('chuyen-xe/lich-trinh-ca-nhan', [ChuyenXeController::class, 'getLichTrinhCaNhan']);
@@ -175,6 +177,15 @@ Route::prefix('v1')->group(function () {
             Route::get('thong-ke/theo-tuyen', [BaoCaoController::class, 'theoTuyenDuong']);
             Route::get('thong-ke/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe']);
             Route::get('thong-ke/export', [BaoCaoController::class, 'export']);
+
+            // Dashboard KPIs tổng hợp
+            Route::get('dashboard-kpis', [\App\Http\Controllers\OperatorDashboardController::class, 'index']);
+
+            // Ví nhà xe
+            Route::get('vi-nha-xe', [\App\Http\Controllers\ViNhaXeController::class, 'getWalletInfo']);
+            Route::post('vi-nha-xe/update-bank', [\App\Http\Controllers\ViNhaXeController::class, 'updateBankInfo']);
+            Route::post('vi-nha-xe/withdraw', [\App\Http\Controllers\ViNhaXeController::class, 'requestWithdraw']);
+            Route::post('vi-nha-xe/topup', [\App\Http\Controllers\ViNhaXeController::class, 'requestTopup']);
         });
     });
 
@@ -292,6 +303,21 @@ Route::prefix('v1')->group(function () {
 
             // Auto generate
             Route::post('xe/auto-generate-seats', [AdminController::class, 'generateSeatsForVehicles'])->middleware('permission:auto-generate-ghe-xe');
+
+            // Dashboard KPIs tổng hợp
+            Route::get('dashboard-kpis', [AdminDashboardController::class, 'index']);
+
+            // Báo cáo (tái sử dụng BaoCaoController)
+            Route::get('bao-cao/dashboard', [BaoCaoController::class, 'dashboard']);
+            Route::get('bao-cao/theo-tuyen', [BaoCaoController::class, 'theoTuyenDuong']);
+            Route::get('bao-cao/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe']);
+
+            // Quản lý ví nhà xe
+            Route::get('vi-nha-xe', [\App\Http\Controllers\AdminViNhaXeController::class, 'index']);
+            Route::get('vi-nha-xe/yeu-cau-rut-tien', [\App\Http\Controllers\AdminViNhaXeController::class, 'danhSachYeuCauRutTien']);
+            Route::get('vi-nha-xe/{id}', [\App\Http\Controllers\AdminViNhaXeController::class, 'show']);
+            Route::patch('vi-nha-xe/yeu-cau-rut-tien/{id}/duyet', [\App\Http\Controllers\AdminViNhaXeController::class, 'duyetRutTien']);
+            Route::patch('vi-nha-xe/yeu-cau-rut-tien/{id}/tu-choi', [\App\Http\Controllers\AdminViNhaXeController::class, 'tuChoiRutTien']);
         });
     });
 });

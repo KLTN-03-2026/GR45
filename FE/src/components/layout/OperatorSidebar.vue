@@ -1,6 +1,6 @@
 <script setup>
-import { inject, ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { inject, ref, computed } from "vue";
+import { useRoute } from "vue-router";
 import {
   LayoutDashboard,
   Ticket,
@@ -20,125 +20,131 @@ import {
   FileText,
   Clock,
   BarChart2,
-  Gift
-} from 'lucide-vue-next'
+  Gift,
+  Wallet,
+} from "lucide-vue-next";
 
 // Inject từ OperatorLayout
-const isSidebarOpen = inject('isSidebarOpen')
-const closeSidebar = inject('closeSidebar')
-const route = useRoute()
+const isSidebarOpen = inject("isSidebarOpen");
+const closeSidebar = inject("closeSidebar");
+const route = useRoute();
 
 // State mở dropdown menu
-const activeDropdown = ref(null)
+const activeDropdown = ref(null);
 
 const toggleDropdown = (menuName) => {
-  activeDropdown.value = activeDropdown.value === menuName ? null : menuName
-}
+  activeDropdown.value = activeDropdown.value === menuName ? null : menuName;
+};
 
 // Kiểm tra route con có nằm trong dropdown không
 const isChildActive = (paths) => {
-  return paths.some(p => route.path.includes(p))
-}
+  return paths.some((p) => route.path.includes(p));
+};
 
 // Danh sách menu đầy đủ cho Nhà Xe
 const menuList = [
   {
-    id: 'dashboard',
-    name: 'Tổng quan',
-    path: '/nha-xe/dashboard',
-    icon: LayoutDashboard
+    id: "dashboard",
+    name: "Tổng quan",
+    path: "/nha-xe/dashboard",
+    icon: LayoutDashboard,
   },
 
   // --- Vận hành ---
   {
-    id: 'tuyen-duong',
-    name: 'Tuyến đường',
-    path: '/nha-xe/tuyen-duong',
-    icon: Map
+    id: "tuyen-duong",
+    name: "Tuyến đường",
+    path: "/nha-xe/tuyen-duong",
+    icon: Map,
   },
   {
-    id: 'chuyen-xe',
-    name: 'Chuyến xe',
-    path: '/nha-xe/chuyen-xe',
-    icon: BusFront
+    id: "chuyen-xe",
+    name: "Chuyến xe",
+    path: "/nha-xe/chuyen-xe",
+    icon: BusFront,
   },
   {
-    id: 'tracking',
-    name: 'Giám sát xe',
+    id: "tracking",
+    name: "Giám sát xe",
     icon: Map,
     children: [
-      { name: '📡 Live Tracking', path: '/nha-xe/live-tracking', icon: Map },
-      { name: '📋 Lịch sử hành trình', path: '/nha-xe/lich-su-hanh-trinh', icon: Map },
+      { name: "📡 Live Tracking", path: "/nha-xe/live-tracking", icon: Map },
+      {
+        name: "📋 Lịch sử hành trình",
+        path: "/nha-xe/lich-su-hanh-trinh",
+        icon: Map,
+      },
     ],
-    paths: ['/nha-xe/live-tracking', '/nha-xe/lich-su-hanh-trinh'],
+    paths: ["/nha-xe/live-tracking", "/nha-xe/lich-su-hanh-trinh"],
   },
   {
-    id: 've',
-    name: 'Quản lý vé',
-    path: '/nha-xe/ve',
-    icon: Ticket
+    id: "ve",
+    name: "Quản lý vé",
+    path: "/nha-xe/ve",
+    icon: Ticket,
   },
   {
-    id: 'voucher',
-    name: 'Voucher',
-    path: '/nha-xe/voucher',
-    icon: Gift
+    id: "voucher",
+    name: "Voucher",
+    path: "/nha-xe/voucher",
+    icon: Gift,
   },
   {
-    id: 'danh-gia',
-    name: 'Đánh giá chuyến xe',
-    path: '/nha-xe/danh-gia',
+    id: "danh-gia",
+    name: "Đánh giá chuyến xe",
+    path: "/nha-xe/danh-gia",
     icon: Star,
   },
 
   // --- Nhân sự ---
   {
-    id: 'nhan-su',
-    name: 'Nhân sự',
+    id: "nhan-su",
+    name: "Nhân sự",
     icon: Users,
     children: [
-      { name: 'Tài xế', path: '/nha-xe/tai-xe', icon: Car },
-      { name: 'Xe & Phương tiện', path: '/nha-xe/phuong-tien', icon: Bus },
+      { name: "Tài xế", path: "/nha-xe/tai-xe", icon: Car },
+      { name: "Xe & Phương tiện", path: "/nha-xe/phuong-tien", icon: Bus },
     ],
-    paths: ['/nha-xe/tai-xe', '/nha-xe/phuong-tien']
+    paths: ["/nha-xe/tai-xe", "/nha-xe/phuong-tien"],
   },
 
   // --- Giám sát ---
   {
-    id: 'canh-bao',
-    name: 'Cảnh báo AI',
-    path: '/nha-xe/canh-bao',
-    icon: AlertTriangle
+    id: "canh-bao",
+    name: "Cảnh báo AI",
+    path: "/nha-xe/canh-bao",
+    icon: AlertTriangle,
   },
 
   // --- Dịch vụ ---
   {
-    id: 'ho-tro',
-    name: 'Hỗ trợ khách hàng',
-    path: '/nha-xe/ho-tro',
-    icon: LifeBuoy
+    id: "ho-tro",
+    name: "Hỗ trợ khách hàng",
+    path: "/nha-xe/ho-tro",
+    icon: LifeBuoy,
   },
 
   // --- Báo cáo ---
   {
-    id: 'thong-ke',
-    name: 'Thống kê & Báo cáo',
-    path: '/nha-xe/thong-ke',
-    icon: TrendingUp
+    id: "thong-ke",
+    name: "Thống kê & Báo cáo",
+    path: "/nha-xe/thong-ke",
+    icon: TrendingUp,
   },
 
   // --- Quản trị ---
   {
-    id: 'he-thong',
-    name: 'Hệ thống',
+    id: "he-thong",
+    name: "Hệ thống",
     icon: Settings,
     children: [
-      { name: 'Phân quyền', path: '/nha-xe/phan-quyen', icon: ShieldCheck },
-      { name: 'Cài đặt hệ thống', path: '/nha-xe/cai-dat', icon: Settings },
+      { name: "Phân quyền", path: "/nha-xe/phan-quyen", icon: ShieldCheck },
+      { name: "Cài đặt hệ thống", path: "/nha-xe/cai-dat", icon: Settings },
+      { name: "Ví nhà xe", path: "/nha-xe/vi-nha-xe", icon: Wallet },
     ],
-    paths: ['/nha-xe/phan-quyen', '/nha-xe/cai-dat']
+    paths: ["/nha-xe/phan-quyen", "/nha-xe/cai-dat", "/nha-xe/vi-nha-xe"],
   },
-]
+];
 </script>
 
 <template>
@@ -198,7 +204,10 @@ const menuList = [
         <div v-else class="menu-dropdown">
           <button
             class="menu-item"
-            :class="{ 'dropdown-active': activeDropdown === item.id || isChildActive(item.paths) }"
+            :class="{
+              'dropdown-active':
+                activeDropdown === item.id || isChildActive(item.paths),
+            }"
             @click="toggleDropdown(item.id)"
           >
             <component :is="item.icon" class="menu-icon" />
@@ -209,7 +218,10 @@ const menuList = [
             />
           </button>
 
-          <div class="submenu" :class="{ 'submenu-open': activeDropdown === item.id }">
+          <div
+            class="submenu"
+            :class="{ 'submenu-open': activeDropdown === item.id }"
+          >
             <RouterLink
               v-for="sub in item.children"
               :key="sub.path"
@@ -253,19 +265,21 @@ const menuList = [
 }
 
 /* Scrollbar tuỳ chỉnh */
-.scrollable-custom::-webkit-scrollbar { width: 5px; }
+.scrollable-custom::-webkit-scrollbar {
+  width: 5px;
+}
 .scrollable-custom::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
 }
 .scrollable-custom:hover::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.4);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* Header sidebar */
 .sidebar-header {
   padding: 28px 24px 20px 24px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .brand-logo {
   display: flex;
@@ -301,7 +315,7 @@ const menuList = [
 }
 .brand-sub {
   font-size: 11px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.5);
   font-weight: 400;
   letter-spacing: 0.3px;
 }
@@ -310,7 +324,7 @@ const menuList = [
 .menu-section-label {
   font-size: 10px;
   font-weight: 700;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255, 255, 255, 0.35);
   letter-spacing: 1.5px;
   padding: 16px 24px 8px 24px;
 }
@@ -319,7 +333,7 @@ const menuList = [
 .menu-section-divider {
   font-size: 10px;
   font-weight: 700;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255, 255, 255, 0.35);
   letter-spacing: 1.5px;
   padding: 16px 24px 6px 20px;
   display: flex;
@@ -327,10 +341,10 @@ const menuList = [
   gap: 8px;
 }
 .menu-section-divider::after {
-  content: '';
+  content: "";
   flex: 1;
   height: 1px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* Nav menu */
@@ -351,7 +365,7 @@ const menuList = [
   border-radius: 10px;
   border: none;
   background: transparent;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255, 255, 255, 0.65);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -361,12 +375,16 @@ const menuList = [
   text-decoration: none;
 }
 .menu-item:hover {
-  background: rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
 .menu-item.active,
 .menu-item.dropdown-active {
-  background: linear-gradient(135deg, rgba(34,197,94,0.25) 0%, rgba(22,163,74,0.15) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.25) 0%,
+    rgba(22, 163, 74, 0.15) 100%
+  );
   color: #4ade80;
   font-weight: 700;
   box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.2);
@@ -391,7 +409,9 @@ const menuList = [
 .submenu {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.4s ease, opacity 0.3s ease;
+  transition:
+    max-height 0.4s ease,
+    opacity 0.3s ease;
   opacity: 0;
   display: flex;
   flex-direction: column;
@@ -409,7 +429,7 @@ const menuList = [
   gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255, 255, 255, 0.5);
   font-size: 13px;
   font-weight: 500;
   text-decoration: none;
@@ -424,8 +444,8 @@ const menuList = [
   flex-shrink: 0;
 }
 .submenu-item:hover {
-  color: rgba(255,255,255,0.9);
-  background: rgba(255,255,255,0.06);
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.06);
 }
 .submenu-item.sub-active {
   color: #4ade80;
@@ -440,15 +460,19 @@ const menuList = [
 /* Footer sidebar */
 .sidebar-footer {
   padding: 20px 16px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .footer-card {
-  background: linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(16,185,129,0.1) 100%);
-  border: 1px solid rgba(74,222,128,0.15);
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.2) 0%,
+    rgba(16, 185, 129, 0.1) 100%
+  );
+  border: 1px solid rgba(74, 222, 128, 0.15);
   border-radius: 14px;
   padding: 16px;
   text-align: center;
-  color: rgba(255,255,255,0.85);
+  color: rgba(255, 255, 255, 0.85);
 }
 .footer-icon {
   font-size: 28px;
@@ -462,7 +486,7 @@ const menuList = [
 }
 .footer-card p {
   font-size: 11px;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255, 255, 255, 0.4);
   margin: 0;
 }
 

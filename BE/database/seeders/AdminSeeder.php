@@ -15,7 +15,7 @@ class AdminSeeder extends Seeder
             [
                 'email'       => 'superadmin@xekhachu.vn',
                 'ho_va_ten'   => 'Nguyễn Văn Hệ Thống',
-                'password'    => Hash::make('Admin@123456'),
+                'password'    => Hash::make('12345678'),
                 'so_dien_thoai' => '0901000001',
                 'dia_chi'     => 'Hà Nội',
                 'ngay_sinh'   => '1990-01-01',
@@ -29,7 +29,7 @@ class AdminSeeder extends Seeder
             [
                 'email'       => 'quanly@xekhachu.vn',
                 'ho_va_ten'   => 'Trần Thị Quản Lý',
-                'password'    => Hash::make('Admin@123456'),
+                'password'    => Hash::make('12345678'),
                 'so_dien_thoai' => '0901000002',
                 'dia_chi'     => 'TP. Hồ Chí Minh',
                 'ngay_sinh'   => '1992-05-15',
@@ -43,7 +43,7 @@ class AdminSeeder extends Seeder
             [
                 'email'       => 'hotro@xekhachu.vn',
                 'ho_va_ten'   => 'Lê Văn Hỗ Trợ',
-                'password'    => Hash::make('Admin@123456'),
+                'password'    => Hash::make('12345678'),
                 'so_dien_thoai' => '0901000003',
                 'dia_chi'     => 'Đà Nẵng',
                 'ngay_sinh'   => '1995-08-20',
@@ -57,7 +57,7 @@ class AdminSeeder extends Seeder
             [
                 'email'       => 'ketoan@xekhachu.vn',
                 'ho_va_ten'   => 'Phạm Thị Kế Toán',
-                'password'    => Hash::make('Admin@123456'),
+                'password'    => Hash::make('12345678'),
                 'so_dien_thoai' => '0901000004',
                 'dia_chi'     => 'Hà Nội',
                 'ngay_sinh'   => '1993-03-10',

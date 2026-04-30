@@ -202,4 +202,48 @@ class BaoDongController extends Controller
             'data'    => $trangThai,
         ]);
     }
+
+    /**
+     * POST /v1/tai-xe/sos
+     *
+     * Tài xế nhấn nút SOS khẩn cấp.
+     */
+    public function sos(Request $request): JsonResponse
+    {
+        $request->validate([
+            'id_chuyen_xe'    => 'required|integer|exists:chuyen_xes,id',
+            'vi_do_luc_bao'   => 'nullable|numeric',
+            'kinh_do_luc_bao' => 'nullable|numeric',
+        ]);
+
+        $chuyenXeId = $request->input('id_chuyen_xe');
+        $coords = [
+            'lat' => $request->input('vi_do_luc_bao'),
+            'lng' => $request->input('kinh_do_luc_bao'),
+        ];
+        
+        $baoDong = $this->baoDongRepo->baoDongKhanCap($chuyenXeId, $coords);
+
+        if (!$baoDong) {
+            return response()->json(['success' => false, 'message' => 'Không thể tạo báo động SOS.'], 500);
+        }
+
+        // Broadcast realtime đến Nhà xe
+        try {
+            $taiXe = auth()->user();
+            $maNhaXe = $taiXe->ma_nha_xe;
+            if ($maNhaXe) {
+                event(new BaoDongViPhamEvent($baoDong, $maNhaXe));
+                $baoDong->update(['da_thong_bao_nha_xe' => true]);
+            }
+        } catch (\Exception $e) {
+            Log::warning('Broadcast SOS failed: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã gửi tín hiệu SOS khẩn cấp!',
+            'data'    => $baoDong,
+        ]);
+    }
 }

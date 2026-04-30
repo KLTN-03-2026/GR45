@@ -32,12 +32,43 @@ class UploadViolationImageJob implements ShouldQueue
 
     public function handle(): void
     {
-        $cloudName = env('CLOUDINARY_CLOUD_NAME');
-        $apiKey    = env('CLOUDINARY_API_KEY');
-        $apiSecret = env('CLOUDINARY_API_SECRET');
+        $cloudName = config('services.cloudinary.cloud_name');
+        $apiKey    = config('services.cloudinary.api_key');
+        $apiSecret = config('services.cloudinary.api_secret');
 
         if (!$cloudName || !$apiKey || !$apiSecret) {
             Log::error("UploadViolationImageJob: Cloudinary chưa cấu hình.");
+            return;
+        }
+
+        $baoDong = NhatKyBaoDong::find($this->baoDongId);
+        if (!$baoDong) {
+            return;
+        }
+
+        // --- Logic Throttling (Giới hạn tần suất upload) ---
+        // Nếu trong vòng 60 giây trước đó đã có một báo động cùng loại cho tài xế này
+        // và đã có ảnh (anh_url), thì ta tái sử dụng ảnh đó, không cần upload cái mới.
+        $throttleSeconds = 60;
+        $recentAlert = NhatKyBaoDong::where('id_tai_xe', $this->driverId)
+            ->where('loai_bao_dong', $baoDong->loai_bao_dong)
+            ->where('id', '!=', $this->baoDongId)
+            ->where('created_at', '>=', now()->subSeconds($throttleSeconds))
+            ->whereNotNull('anh_url')
+            ->latest()
+            ->first();
+
+        if ($recentAlert) {
+            Log::info("Throttling: Bỏ qua upload Cloudinary cho báo động #{$this->baoDongId} vì đã có ảnh cùng loại gần đây (#{$recentAlert->id}).");
+            $baoDong->update(['anh_url' => $recentAlert->anh_url]);
+            
+            // Cập nhật cả trong JSON dữ liệu phát hiện
+            $duLieu = $baoDong->du_lieu_phat_hien ?? [];
+            $duLieu['anh_url_reused'] = true;
+            $duLieu['anh_url'] = $recentAlert->anh_url;
+            $baoDong->du_lieu_phat_hien = $duLieu;
+            $baoDong->save();
+            
             return;
         }
 

@@ -40,6 +40,8 @@ return new class extends Migration
 
             // ------ Bằng lái GPLX ------
             $table->string('so_gplx')->nullable();
+            $table->string('anh_gplx')->nullable();
+            $table->string('anh_gplx_mat_sau')->nullable();
             $table->string('hang_bang_lai')->nullable();
             $table->date('ngay_cap_gplx')->nullable();
             $table->date('ngay_het_han_gplx')->nullable();
