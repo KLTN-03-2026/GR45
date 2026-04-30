@@ -76,17 +76,23 @@ export const useOperatorStore = defineStore('operator', () => {
     }
   }
 
+  function markNotificationRead(id) {
+    const note = notifications.value.find(n => n.id === id);
+    if (note) {
+      note.read = true;
+    }
+  }
+
   function logout() {
     token.value = null;
     user.value = null;
     isTokenVerified.value = false;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    localStorage.removeItem('auth.active_role');
   }
 
   return {
     token, user, loading, error, isTokenVerified, isLoggedIn,
-    notifications, login, logout, addNotification
+    notifications, login, logout, addNotification, markNotificationRead
   };
 });

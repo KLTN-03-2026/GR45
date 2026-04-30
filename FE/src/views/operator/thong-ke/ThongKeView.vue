@@ -69,7 +69,7 @@ const showToast = (message, type = 'success', duration = 4000) => {
 const removeToast = (id) => { toasts.value = toasts.value.filter(t => t.id !== id) }
 const removeToastByType = (type) => { toasts.value = toasts.value.filter(t => t.type !== type) }
 
-const MONTHS = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']
+const MONTHS = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12']
 const revenueByTime = ref(Array(12).fill(0))
 const ticketsByTime = ref(Array(12).fill(0))
 const revenueByRoute = ref([])
@@ -82,11 +82,11 @@ const activeChartTab = ref('revenue')
 
 const fmt = (n) => {
   n = Number(n) || 0
-  if (n >= 1e9) return (n/1e9).toFixed(2) + ' tỷ'
-  if (n >= 1e6) return (n/1e6).toFixed(1) + ' tr'
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + ' tỷ'
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + ' tr'
   return n.toLocaleString('vi-VN') + ' đ'
 }
-const fmtFull = (n) => (Number(n)||0).toLocaleString('vi-VN') + ' ₫'
+const fmtFull = (n) => (Number(n) || 0).toLocaleString('vi-VN') + ' ₫'
 const fmtDate = (d) => d ? new Date(d).toLocaleString('vi-VN') : '—'
 
 // ── Fetch thống kê ────────────────────────────────────────────────
@@ -128,8 +128,11 @@ const fetchStats = async () => {
 
     topTrips.value = Array.isArray(data.top_chuyen_xe) ? data.top_chuyen_xe : []
     topCustomers.value = Array.isArray(data.top_khach_hang) ? data.top_khach_hang : []
+
+    showToast('Tải dữ liệu thành công', 'success')
   } catch (e) {
     console.error('[ThongKe Operator] lỗi:', e)
+    showToast('Mất kết nối với db', 'error')
   } finally {
     isLoading.value = false
   }
@@ -144,7 +147,7 @@ const handleApply = () => {
 const fetchAllTicketsForExport = async () => {
   const params = buildParams()
   const fromMs = params.tu_ngay ? new Date(params.tu_ngay).getTime() : null
-  const toMs   = params.den_ngay ? new Date(params.den_ngay + 'T23:59:59').getTime() : null
+  const toMs = params.den_ngay ? new Date(params.den_ngay + 'T23:59:59').getTime() : null
 
   const acc = []
   let page = 1
@@ -170,7 +173,7 @@ const fetchAllTicketsForExport = async () => {
     const d = new Date(raw).getTime()
     if (isNaN(d)) return true
     if (fromMs && d < fromMs) return false
-    if (toMs   && d > toMs)   return false
+    if (toMs && d > toMs) return false
     return true
   })
 }
@@ -269,10 +272,10 @@ const exportExcel = async () => {
     const totalRev = revenueByTime.value.reduce((a, b) => a + b, 0)
     const totalTkt = ticketsByTime.value.reduce((a, b) => a + b, 0)
     MONTHS.forEach((m, i) => {
-      s2.push([m, revenueByTime.value[i], ticketsByTime.value[i], +(revenueByTime.value[i]/1e6).toFixed(3)])
+      s2.push([m, revenueByTime.value[i], ticketsByTime.value[i], +(revenueByTime.value[i] / 1e6).toFixed(3)])
     })
     s2.push([])
-    s2.push(['TỔNG CỘNG', totalRev, totalTkt, +(totalRev/1e6).toFixed(3)])
+    s2.push(['TỔNG CỘNG', totalRev, totalTkt, +(totalRev / 1e6).toFixed(3)])
 
     // Sheet 3: Doanh thu theo tuyến
     const s3 = [
@@ -526,11 +529,11 @@ const exportPdf = async () => {
 }
 
 // ── Chart data ────────────────────────────────────────────────────
-const lineData = computed(() => ({ labels: MONTHS, datasets: [{ label: 'Doanh thu (triệu đ)', data: revenueByTime.value.map(v => +(v/1e6).toFixed(1)), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)', fill: true, tension: 0.4 }] }))
+const lineData = computed(() => ({ labels: MONTHS, datasets: [{ label: 'Doanh thu (triệu đ)', data: revenueByTime.value.map(v => +(v / 1e6).toFixed(1)), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.12)', fill: true, tension: 0.4 }] }))
 const lineOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
 const barData = computed(() => ({ labels: MONTHS, datasets: [{ label: 'Số vé', data: ticketsByTime.value, backgroundColor: 'rgba(59,130,246,0.8)', borderRadius: 8, borderSkipped: false }] }))
 const barOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-const donutData = computed(() => ({ labels: ['Hoàn thành', 'Đã huỷ', 'Đang chờ'], datasets: [{ data: pieBreakdown.value, backgroundColor: ['#22c55e','#ef4444','#f59e0b'] }] }))
+const donutData = computed(() => ({ labels: ['Hoàn thành', 'Đã huỷ', 'Đang chờ'], datasets: [{ data: pieBreakdown.value, backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'] }] }))
 const donutOpts = { responsive: true, maintainAspectRatio: false, cutout: '68%' }
 
 onMounted(() => { fetchStats() })
@@ -543,13 +546,7 @@ onMounted(() => { fetchStats() })
     <teleport to="body">
       <div class="toast-container">
         <transition-group name="toast-slide" tag="div">
-          <div
-            v-for="t in toasts"
-            :key="t.id"
-            class="toast-item"
-            :class="`toast-${t.type}`"
-            @click="removeToast(t.id)"
-          >
+          <div v-for="t in toasts" :key="t.id" class="toast-item" :class="`toast-${t.type}`" @click="removeToast(t.id)">
             <span class="toast-msg">{{ t.message }}</span>
             <button class="toast-close" @click.stop="removeToast(t.id)">×</button>
           </div>
@@ -560,14 +557,18 @@ onMounted(() => { fetchStats() })
     <!-- Header -->
     <div class="tk-header">
       <div class="tk-header-left">
-        <div class="tk-icon-wrap"><TrendingUp class="tk-icon" /></div>
+        <div class="tk-icon-wrap">
+          <TrendingUp class="tk-icon" />
+        </div>
         <div>
           <h1 class="tk-title">Thống Kê &amp; Báo Cáo Doanh Thu</h1>
           <p class="tk-subtitle">Phân tích hiệu quả kinh doanh của nhà xe</p>
         </div>
       </div>
       <div class="tk-header-actions">
-        <button class="btn-icon-only" :class="{ spinning: isLoading }" @click="handleApply" title="Làm mới"><RefreshCw class="ic16" /></button>
+        <button class="btn-icon-only" :class="{ spinning: isLoading }" @click="handleApply" title="Làm mới">
+          <RefreshCw class="ic16" />
+        </button>
         <button class="btn-export btn-export-pdf" :disabled="exportLoading" @click="exportPdf" id="btn-export-pdf">
           <FileText class="ic16" />
           {{ exportLoading ? 'Đang xử lý...' : 'Xuất PDF' }}
@@ -582,7 +583,8 @@ onMounted(() => { fetchStats() })
     <!-- Bộ lọc -->
     <div class="filter-card">
       <div class="filter-tabs">
-        <button v-for="tab in filterTabs" :key="tab.key" class="filter-tab" :class="{ active: filterType === tab.key }" @click="filterType = tab.key">
+        <button v-for="tab in filterTabs" :key="tab.key" class="filter-tab" :class="{ active: filterType === tab.key }"
+          @click="filterType = tab.key">
           <Calendar class="ic14" /> {{ tab.label }}
         </button>
       </div>
@@ -598,18 +600,31 @@ onMounted(() => { fetchStats() })
         <template v-if="filterType === 'quarter'">
           <div class="fg"><label>Chọn quý</label>
             <div class="qwrap">
-              <select v-model="selectedQuarterYear" class="fi qsel"><option v-for="y in [2026,2025,2024,2023]" :key="y" :value="String(y)">{{ y }}</option></select>
+              <select v-model="selectedQuarterYear" class="fi qsel">
+                <option v-for="y in [2026, 2025, 2024, 2023]" :key="y" :value="String(y)">{{ y }}</option>
+              </select>
               <span class="fsep">–</span>
-              <select v-model="selectedQuarterNum" class="fi qsel"><option value="1">Quý 1</option><option value="2">Quý 2</option><option value="3">Quý 3</option><option value="4">Quý 4</option></select>
+              <select v-model="selectedQuarterNum" class="fi qsel">
+                <option value="1">Quý 1</option>
+                <option value="2">Quý 2</option>
+                <option value="3">Quý 3</option>
+                <option value="4">Quý 4</option>
+              </select>
             </div>
           </div>
         </template>
         <template v-if="filterType === 'year'">
-          <div class="fg year-field"><label>Chọn năm</label><select v-model="selectedYear" class="fi year-select"><option v-for="y in [2026,2025,2024,2023]" :key="y" :value="String(y)">{{ y }}</option></select></div>
+          <div class="fg year-field"><label>Chọn năm</label><select v-model="selectedYear" class="fi year-select">
+              <option v-for="y in [2026, 2025, 2024, 2023]" :key="y" :value="String(y)">{{ y }}</option>
+            </select></div>
         </template>
         <button class="btn-apply" :disabled="isLoading" @click="handleApply">
-          <template v-if="isLoading"><div class="bspinner"></div> Đang tải...</template>
-          <template v-else><Filter class="ic16" /> Áp dụng</template>
+          <template v-if="isLoading">
+            <div class="bspinner"></div> Đang tải...
+          </template>
+          <template v-else>
+            <Filter class="ic16" /> Áp dụng
+          </template>
         </button>
       </div>
     </div>
@@ -617,70 +632,127 @@ onMounted(() => { fetchStats() })
     <!-- KPI -->
     <div class="kpi-grid">
       <div class="kpi-card kc-green">
-        <div class="kpi-top"><div class="kpi-icon-w kig-green"><DollarSign class="kpi-ic" /></div><span class="kbadge up"><ArrowUpRight class="ic12"/>+0%</span></div>
-        <p class="kpi-label">Doanh Thu</p><h2 class="kpi-val">{{ fmt(kpi.tongDoanhThu) }}</h2><p class="kpi-sub">{{ fmtFull(kpi.tongDoanhThu) }}</p>
+        <div class="kpi-top">
+          <div class="kpi-icon-w kig-green">
+            <DollarSign class="kpi-ic" />
+          </div><span class="kbadge up">
+            <ArrowUpRight class="ic12" />+0%
+          </span>
+        </div>
+        <p class="kpi-label">Doanh Thu</p>
+        <h2 class="kpi-val">{{ fmt(kpi.tongDoanhThu) }}</h2>
+        <p class="kpi-sub">{{ fmtFull(kpi.tongDoanhThu) }}</p>
       </div>
       <div class="kpi-card kc-blue">
-        <div class="kpi-top"><div class="kpi-icon-w kig-blue"><Ticket class="kpi-ic" /></div></div>
-        <p class="kpi-label">Tổng Vé Bán</p><h2 class="kpi-val">{{ kpi.tongVe.toLocaleString() }}</h2><p class="kpi-sub">Vé trong kỳ lọc</p>
+        <div class="kpi-top">
+          <div class="kpi-icon-w kig-blue">
+            <Ticket class="kpi-ic" />
+          </div>
+        </div>
+        <p class="kpi-label">Tổng Vé Bán</p>
+        <h2 class="kpi-val">{{ kpi.tongVe.toLocaleString() }}</h2>
+        <p class="kpi-sub">Vé trong kỳ lọc</p>
       </div>
       <div class="kpi-card kc-indigo">
-        <div class="kpi-top"><div class="kpi-icon-w kig-indigo"><BusFront class="kpi-ic" /></div></div>
-        <p class="kpi-label">Chuyến Xe</p><h2 class="kpi-val">{{ kpi.tongChuyenXe.toLocaleString() }}</h2><p class="kpi-sub">Tổng chuyến có vé</p>
+        <div class="kpi-top">
+          <div class="kpi-icon-w kig-indigo">
+            <BusFront class="kpi-ic" />
+          </div>
+        </div>
+        <p class="kpi-label">Chuyến Xe</p>
+        <h2 class="kpi-val">{{ kpi.tongChuyenXe.toLocaleString() }}</h2>
+        <p class="kpi-sub">Tổng chuyến có vé</p>
       </div>
       <div class="kpi-card kc-orange">
-        <div class="kpi-top"><div class="kpi-icon-w kig-orange"><Users class="kpi-ic" /></div></div>
-        <p class="kpi-label">Khách Hàng</p><h2 class="kpi-val">{{ kpi.tongKhachHang.toLocaleString() }}</h2><p class="kpi-sub">Khách đặt vé kỳ này</p>
+        <div class="kpi-top">
+          <div class="kpi-icon-w kig-orange">
+            <Users class="kpi-ic" />
+          </div>
+        </div>
+        <p class="kpi-label">Khách Hàng</p>
+        <h2 class="kpi-val">{{ kpi.tongKhachHang.toLocaleString() }}</h2>
+        <p class="kpi-sub">Khách đặt vé kỳ này</p>
       </div>
     </div>
 
     <!-- Chart -->
     <div class="chart-card">
-      <div class="chart-header"><h3 class="panel-title"><TrendingUp class="panel-ic" /> Biểu đồ phân tích</h3></div>
+      <div class="chart-header">
+        <h3 class="panel-title">
+          <TrendingUp class="panel-ic" /> Biểu đồ phân tích
+        </h3>
+      </div>
       <div class="chart-body">
         <div class="chart-main">
           <div class="chart-tabs">
-            <button class="ctab" :class="{ active: activeChartTab==='revenue' }" @click="activeChartTab='revenue'">Doanh thu</button>
-            <button class="ctab" :class="{ active: activeChartTab==='tickets' }" @click="activeChartTab='tickets'">Số vé</button>
+            <button class="ctab" :class="{ active: activeChartTab === 'revenue' }" @click="activeChartTab = 'revenue'">Doanh
+              thu</button>
+            <button class="ctab" :class="{ active: activeChartTab === 'tickets' }" @click="activeChartTab = 'tickets'">Số
+              vé</button>
           </div>
           <div class="chart-wrap">
-            <Line v-if="activeChartTab==='revenue'" :data="lineData" :options="lineOpts" />
+            <Line v-if="activeChartTab === 'revenue'" :data="lineData" :options="lineOpts" />
             <Bar v-else :data="barData" :options="barOpts" />
           </div>
         </div>
-        <div class="chart-side"><p class="side-title">Tỉ lệ vé</p><div class="donut-wrap"><Doughnut :data="donutData" :options="donutOpts" /></div></div>
+        <div class="chart-side">
+          <p class="side-title">Tỉ lệ vé</p>
+          <div class="donut-wrap">
+            <Doughnut :data="donutData" :options="donutOpts" />
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Bottom grid: tuyến + top -->
     <div class="bottom-grid">
       <div class="panel">
-        <div class="panel-hd"><h3 class="panel-title"><MapPin class="panel-ic" /> Doanh Thu Theo Tuyến</h3></div>
+        <div class="panel-hd">
+          <h3 class="panel-title">
+            <MapPin class="panel-ic" /> Doanh Thu Theo Tuyến
+          </h3>
+        </div>
         <div class="route-list">
           <div v-if="revenueByRoute.length === 0" class="empty-state">Chưa có dữ liệu</div>
           <div v-for="(r, idx) in revenueByRoute" :key="r.ten_tuyen_duong" class="route-item">
-            <div class="route-rank" :class="idx===0?'gold':idx===1?'silver':idx===2?'bronze':''">{{ idx+1 }}</div>
+            <div class="route-rank" :class="idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? 'bronze' : ''">{{ idx + 1 }}</div>
             <div class="route-info">
               <p class="route-name">{{ r.ten_tuyen_duong }}</p>
-              <div class="route-bar-wrap"><div class="route-bar" :style="{width: Math.min(r.doanh_thu/(revenueByRoute[0]?.doanh_thu||1)*100,100)+'%'}"></div></div>
+              <div class="route-bar-wrap">
+                <div class="route-bar"
+                  :style="{ width: Math.min(r.doanh_thu / (revenueByRoute[0]?.doanh_thu || 1) * 100, 100) + '%' }"></div>
+              </div>
             </div>
-            <div class="route-nums"><p class="rn-rev">{{ fmt(r.doanh_thu) }}</p><p class="rn-tkt">{{ r.so_ve }} vé</p></div>
+            <div class="route-nums">
+              <p class="rn-rev">{{ fmt(r.doanh_thu) }}</p>
+              <p class="rn-tkt">{{ r.so_ve }} vé</p>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panel-hd"><h3 class="panel-title"><Star class="panel-ic" /> Top Chuyến Xe / Khách Hàng</h3></div>
+        <div class="panel-hd">
+          <h3 class="panel-title">
+            <Star class="panel-ic" /> Top Chuyến Xe / Khách Hàng
+          </h3>
+        </div>
         <div class="driver-list">
           <p class="driver-title">Top chuyến xe</p>
           <div v-for="d in topTrips" :key="d.id_chuyen_xe" class="driver-row">
             <div class="driver-avatar">{{ String(d.id_chuyen_xe).charAt(0) }}</div>
-            <div class="driver-info"><p class="driver-name">{{ d.ten_tuyen_duong || ('Chuyến #' + d.id_chuyen_xe) }}</p><p class="driver-sub">{{ d.so_ve }} vé · {{ fmt(d.tong_doanh_thu) }}</p></div>
+            <div class="driver-info">
+              <p class="driver-name">{{ d.ten_tuyen_duong || ('Chuyến #' + d.id_chuyen_xe) }}</p>
+              <p class="driver-sub">{{ d.so_ve }} vé · {{ fmt(d.tong_doanh_thu) }}</p>
+            </div>
           </div>
           <p class="driver-title">Top khách hàng</p>
           <div v-for="c in topCustomers" :key="c.id_khach_hang" class="driver-row">
             <div class="driver-avatar">{{ (c.ten_khach_hang ?? '?').charAt(0) }}</div>
-            <div class="driver-info"><p class="driver-name">{{ c.ten_khach_hang }}</p><p class="driver-sub">{{ c.so_ve }} vé · {{ fmt(c.tong_doanh_thu) }}</p></div>
+            <div class="driver-info">
+              <p class="driver-name">{{ c.ten_khach_hang }}</p>
+              <p class="driver-sub">{{ c.so_ve }} vé · {{ fmt(c.tong_doanh_thu) }}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -692,89 +764,648 @@ onMounted(() => { fetchStats() })
 
 <style scoped>
 /* ── Base ── */
-.tk-page{padding:8px 0 40px;font-family:'Inter',system-ui,sans-serif}
-.tk-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
-.tk-header-left{display:flex;align-items:center;gap:16px}
-.tk-icon-wrap{width:52px;height:52px;background:linear-gradient(135deg,#22c55e,#15803d);border-radius:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(34,197,94,.35)}
-.tk-icon{width:26px;height:26px;color:white}
-.tk-title{font-size:24px;font-weight:800;color:#0d4f35;margin:0}
-.tk-subtitle{font-size:13px;color:#64748b;margin:4px 0 0}
-.tk-header-actions{display:flex;gap:10px;align-items:center}
-.btn-icon-only{width:40px;height:40px;border-radius:10px;border:1.5px solid #e2e8f0;background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;color:#475569}
-.btn-export{display:flex;align-items:center;gap:6px;padding:0 18px;height:40px;border-radius:10px;background:linear-gradient(135deg,#22c55e,#15803d);color:white;font-weight:700;font-size:13px;border:none;cursor:pointer;transition:opacity .2s}
-.btn-export:disabled{opacity:.6;cursor:not-allowed}
-.btn-export-pdf{background:linear-gradient(135deg,#f97316,#c2410c)}
+.tk-page {
+  padding: 8px 0 40px;
+  font-family: 'Inter', system-ui, sans-serif
+}
+
+.tk-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px
+}
+
+.tk-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px
+}
+
+.tk-icon-wrap {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 20px rgba(34, 197, 94, .35)
+}
+
+.tk-icon {
+  width: 26px;
+  height: 26px;
+  color: white
+}
+
+.tk-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #0d4f35;
+  margin: 0
+}
+
+.tk-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0 0
+}
+
+.tk-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center
+}
+
+.btn-icon-only {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .2s;
+  color: #475569
+}
+
+.btn-export {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  transition: opacity .2s
+}
+
+.btn-export:disabled {
+  opacity: .6;
+  cursor: not-allowed
+}
+
+.btn-export-pdf {
+  background: linear-gradient(135deg, #f97316, #c2410c)
+}
+
 /* Cards */
-.filter-card,.chart-card,.panel{background:white;border-radius:16px;padding:20px 24px;margin-bottom:24px;box-shadow:0 2px 12px rgba(0,0,0,.05);border:1px solid #f1f5f9}
+.filter-card,
+.chart-card,
+.panel {
+  background: white;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .05);
+  border: 1px solid #f1f5f9
+}
+
 /* Filter */
-.filter-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
-.filter-tab,.ctab{padding:8px 16px;border-radius:10px;border:1.5px solid #e2e8f0;background:white;color:#64748b;font-size:13px;font-weight:500;cursor:pointer}
-.filter-tab.active,.ctab.active{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-color:#22c55e;color:#15803d;font-weight:700}
-.filter-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.fi{height:40px;padding:0 14px;border-radius:10px;border:1.5px solid #e2e8f0;font-size:14px;color:#374151;background:#f8fafc;outline:none;min-width:160px}
-.fg{display:flex;flex-direction:column;gap:4px}.fg label{font-size:12px;color:#64748b;font-weight:600}
-.fsep{color:#94a3b8;font-weight:600;padding:0 4px}
-.qwrap{display:flex;align-items:center;gap:6px}.qsel{min-width:100px}
-.btn-apply,.btn-apply-sm{display:flex;align-items:center;gap:6px;padding:0 22px;height:40px;border-radius:10px;background:linear-gradient(135deg,#22c55e,#15803d);color:white;border:none;cursor:pointer;font-weight:600;font-size:13px}
-.btn-apply-sm{padding:0 16px;height:36px;font-size:12px}
+.filter-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap
+}
+
+.filter-tab,
+.ctab {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer
+}
+
+.filter-tab.active,
+.ctab.active {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border-color: #22c55e;
+  color: #15803d;
+  font-weight: 700
+}
+
+.filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap
+}
+
+.fi {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  font-size: 14px;
+  color: #374151;
+  background: #f8fafc;
+  outline: none;
+  min-width: 160px
+}
+
+.fg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px
+}
+
+.fg label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600
+}
+
+.fsep {
+  color: #94a3b8;
+  font-weight: 600;
+  padding: 0 4px
+}
+
+.qwrap {
+  display: flex;
+  align-items: center;
+  gap: 6px
+}
+
+.qsel {
+  min-width: 100px
+}
+
+.btn-apply,
+.btn-apply-sm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 22px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #22c55e, #15803d);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px
+}
+
+.btn-apply-sm {
+  padding: 0 16px;
+  height: 36px;
+  font-size: 12px
+}
+
 /* KPI */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:24px}
-.kpi-card{padding:20px;border-radius:16px;background:white;border:1px solid #f1f5f9;box-shadow:0 2px 8px rgba(0,0,0,.04)}
-.kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.kpi-icon-w{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center}
-.kig-green{background:linear-gradient(135deg,#22c55e,#15803d)}.kig-blue{background:linear-gradient(135deg,#3b82f6,#1d4ed8)}.kig-indigo{background:linear-gradient(135deg,#6366f1,#4338ca)}.kig-orange{background:linear-gradient(135deg,#f59e0b,#d97706)}
-.kpi-ic{width:22px;height:22px;color:white}.kpi-label{font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;margin:0 0 6px}.kpi-val{font-size:26px;font-weight:800;color:#0f172a;margin:0 0 4px}.kpi-sub{font-size:12px;color:#94a3b8;margin:0}
-.kbadge{font-size:11px;font-weight:700;display:flex;align-items:center;gap:2px}.kbadge.up{color:#16a34a}
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 24px
+}
+
+.kpi-card {
+  padding: 20px;
+  border-radius: 16px;
+  background: white;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .04)
+}
+
+.kpi-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px
+}
+
+.kpi-icon-w {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+
+.kig-green {
+  background: linear-gradient(135deg, #22c55e, #15803d)
+}
+
+.kig-blue {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8)
+}
+
+.kig-indigo {
+  background: linear-gradient(135deg, #6366f1, #4338ca)
+}
+
+.kig-orange {
+  background: linear-gradient(135deg, #f59e0b, #d97706)
+}
+
+.kpi-ic {
+  width: 22px;
+  height: 22px;
+  color: white
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin: 0 0 6px
+}
+
+.kpi-val {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px
+}
+
+.kpi-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0
+}
+
+.kbadge {
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 2px
+}
+
+.kbadge.up {
+  color: #16a34a
+}
+
 /* Chart */
-.chart-header{margin-bottom:16px}
-.chart-body{display:grid;grid-template-columns:2fr 1fr;gap:20px}
-.chart-main{display:flex;flex-direction:column}
-.chart-wrap{height:280px}
-.chart-tabs{display:flex;gap:8px;margin-bottom:12px}
-.chart-side{display:flex;flex-direction:column;align-items:center}
-.side-title{font-size:13px;font-weight:600;color:#64748b;margin-bottom:8px}
-.donut-wrap{height:220px;width:100%}
+.chart-header {
+  margin-bottom: 16px
+}
+
+.chart-body {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px
+}
+
+.chart-main {
+  display: flex;
+  flex-direction: column
+}
+
+.chart-wrap {
+  height: 280px
+}
+
+.chart-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px
+}
+
+.chart-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center
+}
+
+.side-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px
+}
+
+.donut-wrap {
+  height: 220px;
+  width: 100%
+}
+
 /* Bottom grid */
-.bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
-.panel-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f8fafc}
-.panel-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:#0f172a;margin:0}
-.panel-ic{width:18px;height:18px;color:#22c55e}
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px
+}
+
+.panel-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f8fafc
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0
+}
+
+.panel-ic {
+  width: 18px;
+  height: 18px;
+  color: #22c55e
+}
+
 /* Route list */
-.route-list,.driver-list{padding:12px 20px 20px}
-.route-item,.driver-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f8fafc}
-.route-rank,.driver-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:#f1f5f9;color:#64748b;flex-shrink:0}
-.gold{background:linear-gradient(135deg,#fbbf24,#d97706);color:white}.silver{background:linear-gradient(135deg,#94a3b8,#64748b);color:white}.bronze{background:linear-gradient(135deg,#d97706,#92400e);color:white}
-.route-info,.driver-info{flex:1;min-width:0}
-.route-name,.driver-name{font-size:13px;font-weight:600;color:#1e293b;margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.route-bar-wrap{height:5px;background:#f1f5f9;border-radius:10px;overflow:hidden}
-.route-bar{height:100%;border-radius:10px;transition:width .5s ease;background:#22c55e}
-.route-nums{text-align:right;flex-shrink:0}
-.rn-rev{font-size:13px;font-weight:700;color:#15803d;margin:0 0 2px}.rn-tkt,.driver-sub{font-size:11px;color:#94a3b8;margin:0}
-.driver-title{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding:12px 0 6px}
-.empty-state,.state-wrap{text-align:center;padding:32px;color:#94a3b8}
-.spinner,.bspinner{width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#22c55e;border-radius:50%;animation:spin .8s linear infinite}
+.route-list,
+.driver-list {
+  padding: 12px 20px 20px
+}
+
+.route-item,
+.driver-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f8fafc
+}
+
+.route-rank,
+.driver-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: #f1f5f9;
+  color: #64748b;
+  flex-shrink: 0
+}
+
+.gold {
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  color: white
+}
+
+.silver {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  color: white
+}
+
+.bronze {
+  background: linear-gradient(135deg, #d97706, #92400e);
+  color: white
+}
+
+.route-info,
+.driver-info {
+  flex: 1;
+  min-width: 0
+}
+
+.route-name,
+.driver-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+
+.route-bar-wrap {
+  height: 5px;
+  background: #f1f5f9;
+  border-radius: 10px;
+  overflow: hidden
+}
+
+.route-bar {
+  height: 100%;
+  border-radius: 10px;
+  transition: width .5s ease;
+  background: #22c55e
+}
+
+.route-nums {
+  text-align: right;
+  flex-shrink: 0
+}
+
+.rn-rev {
+  font-size: 13px;
+  font-weight: 700;
+  color: #15803d;
+  margin: 0 0 2px
+}
+
+.rn-tkt,
+.driver-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0
+}
+
+.driver-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 12px 0 6px
+}
+
+.empty-state,
+.state-wrap {
+  text-align: center;
+  padding: 32px;
+  color: #94a3b8
+}
+
+.spinner,
+.bspinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #22c55e;
+  border-radius: 50%;
+  animation: spin .8s linear infinite
+}
+
 /* Icons */
-.ic12{width:12px;height:12px}.ic14{width:14px;height:14px}.ic16{width:16px;height:16px}.ic24{width:24px;height:24px}
+.ic12 {
+  width: 12px;
+  height: 12px
+}
+
+.ic14 {
+  width: 14px;
+  height: 14px
+}
+
+.ic16 {
+  width: 16px;
+  height: 16px
+}
+
+.ic24 {
+  width: 24px;
+  height: 24px
+}
+
 /* Misc */
-.year-field{min-width:200px}.year-select{min-width:200px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.btn-icon-only.spinning .ic16{animation:spin .8s linear infinite}
+.year-field {
+  min-width: 200px
+}
+
+.year-select {
+  min-width: 200px
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg)
+  }
+}
+
+.btn-icon-only.spinning .ic16 {
+  animation: spin .8s linear infinite
+}
 
 /* ── Toast ── */
-.toast-container{position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
-.toast-item{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:300px;max-width:440px;padding:14px 18px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.15);pointer-events:all;cursor:pointer;transition:all .3s}
-.toast-success{background:linear-gradient(135deg,#166534,#15803d);color:white;border:1px solid #22c55e}
-.toast-error{background:linear-gradient(135deg,#7f1d1d,#dc2626);color:white;border:1px solid #ef4444}
-.toast-warning{background:linear-gradient(135deg,#78350f,#d97706);color:white;border:1px solid #f59e0b}
-.toast-msg{flex:1}
-.toast-close{background:none;border:none;color:inherit;font-size:18px;line-height:1;cursor:pointer;opacity:.8;padding:0;flex-shrink:0}
-.toast-close:hover{opacity:1}
-.toast-slide-enter-active,.toast-slide-leave-active{transition:all .35s ease}
-.toast-slide-enter-from{opacity:0;transform:translateX(40px)}
-.toast-slide-leave-to{opacity:0;transform:translateX(60px)}
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none
+}
+
+.toast-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 300px;
+  max-width: 440px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .15);
+  pointer-events: all;
+  cursor: pointer;
+  transition: all .3s
+}
+
+.toast-success {
+  background: linear-gradient(135deg, #166534, #15803d);
+  color: white;
+  border: 1px solid #22c55e
+}
+
+.toast-error {
+  background: linear-gradient(135deg, #7f1d1d, #dc2626);
+  color: white;
+  border: 1px solid #ef4444
+}
+
+.toast-warning {
+  background: linear-gradient(135deg, #78350f, #d97706);
+  color: white;
+  border: 1px solid #f59e0b
+}
+
+.toast-msg {
+  flex: 1
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: .8;
+  padding: 0;
+  flex-shrink: 0
+}
+
+.toast-close:hover {
+  opacity: 1
+}
+
+.toast-slide-enter-active,
+.toast-slide-leave-active {
+  transition: all .35s ease
+}
+
+.toast-slide-enter-from {
+  opacity: 0;
+  transform: translateX(40px)
+}
+
+.toast-slide-leave-to {
+  opacity: 0;
+  transform: translateX(60px)
+}
 
 /* ── Responsive ── */
-@media (max-width:1280px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.chart-body{grid-template-columns:1fr}.bottom-grid{grid-template-columns:1fr}}
-@media (max-width:768px){.kpi-grid{grid-template-columns:1fr 1fr}.fi{min-width:130px}}
-@media (max-width:480px){.kpi-grid{grid-template-columns:1fr}.tk-title{font-size:18px}}
+@media (max-width:1280px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr)
+  }
+
+  .chart-body {
+    grid-template-columns: 1fr
+  }
+
+  .bottom-grid {
+    grid-template-columns: 1fr
+  }
+}
+
+@media (max-width:768px) {
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr
+  }
+
+  .fi {
+    min-width: 130px
+  }
+}
+
+@media (max-width:480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr
+  }
+
+  .tk-title {
+    font-size: 18px
+  }
+}
 </style>

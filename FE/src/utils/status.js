@@ -40,3 +40,18 @@ export const getStaffStatus = (status) => {
     default:           return { text: 'Không rõ', class: '' };
   }
 };
+
+export const getOperatorStatusKey = (status) => {
+  if (status === 'hoat_dong' || status === 1) return 'hoat_dong'
+  if (status === 'cho_duyet') return 'cho_duyet'
+  if (status === 'khoa' || status === 0) return 'khoa'
+  return 'unknown'
+}
+
+export const getOperatorStatusMeta = (status) => {
+  const key = getOperatorStatusKey(status)
+  if (key === 'hoat_dong') return { text: 'Hoạt động', cls: 'badge-green' }
+  if (key === 'cho_duyet') return { text: 'Chờ duyệt', cls: 'badge-yellow' }
+  if (key === 'khoa') return { text: 'Đã khóa', cls: 'badge-red' }
+  return { text: 'Không rõ', cls: 'badge-gray' }
+}

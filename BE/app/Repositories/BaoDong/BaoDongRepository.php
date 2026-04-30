@@ -126,4 +126,25 @@ class BaoDongRepository implements BaoDongRepositoryInterface
 
         return $baoDong;
     }
+
+    public function baoDongKhanCap(int $chuyenXeId, array $coords = [])
+    {
+        $chuyenXe = \App\Models\ChuyenXe::find($chuyenXeId);
+        if (!$chuyenXe) {
+            return null;
+        }
+
+        return $this->model->create([
+            'id_chuyen_xe' => $chuyenXeId,
+            'id_tai_xe'    => $chuyenXe->id_tai_xe,
+            'id_xe'        => $chuyenXe->id_xe,
+            'loai_bao_dong'=> 'bao_dong_khan_cap', // Có thể dùng loại này cho SOS
+            'muc_do'       => 'khan_cap',
+            'trang_thai'   => 'moi',
+            'da_canh_bao_tai_xe' => true,
+            'vi_do_luc_bao' => $coords['lat'] ?? null,
+            'kinh_do_luc_bao' => $coords['lng'] ?? null,
+            'du_lieu_phat_hien' => ['type' => 'SOS_MANUAL'],
+        ]);
+    }
 }

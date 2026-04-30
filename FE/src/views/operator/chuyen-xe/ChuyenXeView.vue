@@ -1,6 +1,12 @@
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, computed } from "vue";
-import { Armchair, Edit, ArrowRightLeft, StepForward, Trash2 } from "lucide-vue-next";
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from "vue";
+import {
+  Armchair,
+  Edit,
+  ArrowRightLeft,
+  StepForward,
+  Trash2,
+} from "lucide-vue-next";
 import operatorApi from "@/api/operatorApi";
 import BaseTable from "@/components/common/BaseTable.vue";
 import BaseButton from "@/components/common/BaseButton.vue";
@@ -212,6 +218,15 @@ const openChangeBusModal = (trip) => {
   changeBusId.value = trip.id;
   newBusId.value = "";
   isChangeBusModal.value = true;
+
+  const route =
+    routesList.value.find((r) => r.value === trip.id_tuyen_duong) ||
+    trip.tuyen_duong;
+  if (route && route.ma_nha_xe) {
+    fetchVehiclesList(route.ma_nha_xe);
+  } else {
+    vehiclesList.value = [];
+  }
 };
 const submitChangeBus = async () => {
   try {
@@ -259,9 +274,9 @@ const openSeatModal = async (trip) => {
   try {
     const [seatRes, stopRes] = await Promise.all([
       operatorApi.getTripSeats(trip.id),
-      operatorApi.getTripStops(trip.id)
+      operatorApi.getTripStops(trip.id),
     ]);
-    
+
     // Xử lý dữ liệu ghế
     const rawSeats = seatRes.data?.data ?? seatRes.data;
     seatList.value = Array.isArray(rawSeats) ? rawSeats : [];
@@ -278,13 +293,14 @@ const openSeatModal = async (trip) => {
       : Array.isArray(stopsPayload?.data?.tram_tra)
         ? stopsPayload.data.tram_tra
         : [];
-    
+
     // Tự động chọn trạm đầu của danh sách đón và trạm cuối của danh sách trả
     if (pickupStops.value.length > 0) {
       bookFormTrip.id_tram_don = pickupStops.value[0].id;
     }
     if (dropoffStops.value.length > 0) {
-      bookFormTrip.id_tram_tra = dropoffStops.value[dropoffStops.value.length - 1].id;
+      bookFormTrip.id_tram_tra =
+        dropoffStops.value[dropoffStops.value.length - 1].id;
     }
   } catch (e) {
     showToast("Không thể tải thông tin chuyến xe!", "error");
@@ -319,7 +335,7 @@ const seatsByFloor = computed(() => {
     .map(([floor, seats]) => ({
       floor: Number(floor),
       seats: [...seats].sort((x, y) =>
-        String(x.ma_ghe || "").localeCompare(String(y.ma_ghe || ""))
+        String(x.ma_ghe || "").localeCompare(String(y.ma_ghe || "")),
       ),
     }));
 });
@@ -332,7 +348,8 @@ const seatStats = computed(() => {
 
 // Toggle chọn ghế
 const toggleSeat = (seat) => {
-  if (seat.trang_thai === "da_dat" || seat.trang_thai === "bao_tri_hoac_khoa") return;
+  if (seat.trang_thai === "da_dat" || seat.trang_thai === "bao_tri_hoac_khoa")
+    return;
   const idx = selectedSeats.value.indexOf(seat.ma_ghe);
   if (idx === -1) {
     selectedSeats.value.push(seat.ma_ghe);
@@ -424,10 +441,86 @@ const openDetailModal = async (id) => {
   }
 };
 
+const routesList = ref([]);
+const fetchRoutesList = async () => {
+  try {
+    const res = await operatorApi.getRoutes({ per_page: 999 });
+    let dataArr =
+      res.data?.data?.data?.data ||
+      res.data?.data?.data ||
+      res.data?.data ||
+      [];
+    if (Array.isArray(dataArr)) {
+      routesList.value = dataArr.map((r) => ({
+        value: r.id,
+        label: `${r.id} - ${r.ten_tuyen_duong || r.diem_bat_dau + " -> " + r.diem_ket_thuc}`,
+        ma_nha_xe: r.ma_nha_xe,
+      }));
+    }
+  } catch (error) {
+    console.error("Lỗi tải danh sách tuyến đường", error);
+  }
+};
+
+const vehiclesList = ref([]);
+const fetchVehiclesList = async (ma_nha_xe) => {
+  if (!ma_nha_xe) {
+    vehiclesList.value = [];
+    return;
+  }
+  try {
+    const res = await operatorApi.getVehicles({ per_page: 999, ma_nha_xe });
+    let dataArr =
+      res.data?.data?.data?.data ||
+      res.data?.data?.data ||
+      res.data?.data ||
+      [];
+    vehiclesList.value = Array.isArray(dataArr) ? dataArr : [];
+  } catch (error) {
+    console.error("Lỗi tải danh sách xe", error);
+  }
+};
+
+const driversList = ref([]);
+const fetchDriversList = async (ma_nha_xe) => {
+  if (!ma_nha_xe) {
+    driversList.value = [];
+    return;
+  }
+  try {
+    const res = await operatorApi.getDrivers({ per_page: 999, ma_nha_xe });
+    let dataArr =
+      res.data?.data?.data?.data ||
+      res.data?.data?.data ||
+      res.data?.data ||
+      [];
+    driversList.value = Array.isArray(dataArr) ? dataArr : [];
+  } catch (error) {
+    console.error("Lỗi tải danh sách tài xế", error);
+  }
+};
+
+watch(
+  () => formData.id_tuyen_duong,
+  (newId) => {
+    if (newId) {
+      const route = routesList.value.find((r) => r.value === newId);
+      if (route && route.ma_nha_xe) {
+        fetchVehiclesList(route.ma_nha_xe);
+        fetchDriversList(route.ma_nha_xe);
+        return;
+      }
+    }
+    vehiclesList.value = [];
+    driversList.value = [];
+  },
+);
+
 // (Removed dropdown logic)
 
 onMounted(() => {
-  fetchTrips();
+  fetchRoutesList();
+  fetchTrips(1);
 });
 </script>
 
@@ -647,37 +740,49 @@ onMounted(() => {
     >
       <form @submit.prevent="submitForm" class="form-grid-2">
         <div class="form-group full-width">
-          <label class="form-label">ID Tuyến Đường *</label>
-          <input
-            type="number"
+          <label class="form-label">Tuyến Đường *</label>
+          <select
             v-model="formData.id_tuyen_duong"
-            class="custom-input"
-            min="1"
+            class="custom-select"
             required
-            placeholder="Nhập ID tuyến đường..."
-          />
+          >
+            <option value="" disabled>-- Chọn Tuyến Đường --</option>
+            <option
+              v-for="route in routesList"
+              :key="route.value"
+              :value="route.value"
+            >
+              {{ route.label }}
+            </option>
+          </select>
         </div>
         <div class="form-group">
-          <label class="form-label">ID Xe *</label>
-          <input
-            type="number"
-            v-model="formData.id_xe"
-            class="custom-input"
-            min="1"
-            required
-            placeholder="Nhập ID xe..."
-          />
+          <label class="form-label">Xe *</label>
+          <select v-model="formData.id_xe" class="custom-select" required>
+            <option value="" disabled>-- Chọn Xe --</option>
+            <option
+              v-for="vehicle in vehiclesList"
+              :key="vehicle.id"
+              :value="vehicle.id"
+            >
+              #{{ vehicle.id }} - {{ vehicle.ten_xe }} ({{ vehicle.bien_so }})
+            </option>
+          </select>
         </div>
         <div class="form-group">
-          <label class="form-label">ID Tài Xế *</label>
-          <input
-            type="number"
-            v-model="formData.id_tai_xe"
-            class="custom-input"
-            min="1"
-            required
-            placeholder="Nhập ID tài xế..."
-          />
+          <label class="form-label">Tài Xế *</label>
+          <select v-model="formData.id_tai_xe" class="custom-select" required>
+            <option value="" disabled>-- Chọn Tài Xế --</option>
+            <option
+              v-for="driver in driversList"
+              :key="driver.id"
+              :value="driver.id"
+            >
+              #{{ driver.id }} -
+              {{ driver.ho_ten || driver.ho_va_ten || "Không tên" }} -
+              {{ driver.so_dien_thoai || "Không SĐT" }}
+            </option>
+          </select>
         </div>
         <div class="form-group">
           <label class="form-label">Ngày Khởi Hành *</label>
@@ -761,14 +866,17 @@ onMounted(() => {
         mới.
       </div>
       <div class="form-group" style="margin-top: 12px">
-        <label class="form-label">ID Xe Mới *</label>
-        <input
-          type="number"
-          v-model="newBusId"
-          class="custom-input"
-          min="1"
-          placeholder="Nhập ID xe muốn thay..."
-        />
+        <label class="form-label">Chọn xe mới *</label>
+        <select v-model="newBusId" class="custom-select" required>
+          <option value="" disabled>-- Chọn Xe --</option>
+          <option
+            v-for="vehicle in vehiclesList"
+            :key="vehicle.id"
+            :value="vehicle.id"
+          >
+            #{{ vehicle.id }} - {{ vehicle.ten_xe }} ({{ vehicle.bien_so }})
+          </option>
+        </select>
       </div>
       <template #footer>
         <BaseButton variant="secondary" @click="isChangeBusModal = false"
@@ -1031,7 +1139,10 @@ onMounted(() => {
               :key="seat.id_ghe || seat.ma_ghe"
               type="button"
               class="seat-tile"
-              :disabled="seat.trang_thai === 'da_dat' || seat.trang_thai === 'bao_tri_hoac_khoa'"
+              :disabled="
+                seat.trang_thai === 'da_dat' ||
+                seat.trang_thai === 'bao_tri_hoac_khoa'
+              "
               :class="{
                 booked: seat.trang_thai === 'da_dat',
                 blocked: seat.trang_thai === 'bao_tri_hoac_khoa',
@@ -1047,9 +1158,11 @@ onMounted(() => {
         <div class="booked-note">
           <span>
             Ghế đã chọn:
-            <strong>{{ selectedSeats.length ? selectedSeats.join(", ") : "Chưa chọn" }}</strong>
+            <strong>{{
+              selectedSeats.length ? selectedSeats.join(", ") : "Chưa chọn"
+            }}</strong>
           </span>
-            </div>
+        </div>
 
         <!-- Panel đặt vé (hiện khi chọn >= 1 ghế) -->
         <transition name="slide-down">
@@ -1071,11 +1184,14 @@ onMounted(() => {
               <div class="book-form-grid">
                 <div class="form-group">
                   <label class="form-label">Trạm Đón *</label>
-                  <select v-model="bookFormTrip.id_tram_don" class="custom-select">
+                  <select
+                    v-model="bookFormTrip.id_tram_don"
+                    class="custom-select"
+                  >
                     <option value="" disabled>-- Chọn trạm đón --</option>
-                    <option 
-                      v-for="stop in pickupStops" 
-                      :key="stop.id" 
+                    <option
+                      v-for="stop in pickupStops"
+                      :key="stop.id"
                       :value="stop.id"
                     >
                       {{ stop.ten_tram }} ({{ stop.dia_chi }})
@@ -1084,11 +1200,14 @@ onMounted(() => {
                 </div>
                 <div class="form-group">
                   <label class="form-label">Trạm Trả *</label>
-                  <select v-model="bookFormTrip.id_tram_tra" class="custom-select">
+                  <select
+                    v-model="bookFormTrip.id_tram_tra"
+                    class="custom-select"
+                  >
                     <option value="" disabled>-- Chọn trạm trả --</option>
-                    <option 
-                      v-for="stop in dropoffStops" 
-                      :key="stop.id" 
+                    <option
+                      v-for="stop in dropoffStops"
+                      :key="stop.id"
                       :value="stop.id"
                     >
                       {{ stop.ten_tram }} ({{ stop.dia_chi }})

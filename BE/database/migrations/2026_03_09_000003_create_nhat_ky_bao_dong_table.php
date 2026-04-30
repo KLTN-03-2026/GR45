@@ -40,7 +40,7 @@ return new class extends Migration
                 'mang_vu_khi',         // Tai xe mang vu khi
                 'vi_pham_khac',        // Tai xe vi pham khac
                 'khong_quan_sat',      // Tai xe khong quan sat
-
+                'bao_dong_khan_cap',   // Tai xe gui bao dong khan cap
             ]);
             $table->enum('muc_do', ['thong_tin', 'canh_bao', 'nguy_hiem', 'khan_cap'])->default('canh_bao');
             $table->enum('trang_thai', ['moi', 'da_xem', 'da_xu_ly', 'bo_qua'])->default('moi');

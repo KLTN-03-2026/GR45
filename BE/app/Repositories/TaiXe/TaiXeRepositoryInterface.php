@@ -5,6 +5,9 @@ namespace App\Repositories\TaiXe;
 interface TaiXeRepositoryInterface
 {
     public function getAll(array $filters = []);
+
+    public function getAllPublic(array $filters = []);
+
     public function getById(int $id);
     public function findByEmail(string $email);
     public function findByCccd(string $cccd);

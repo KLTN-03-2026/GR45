@@ -14,11 +14,11 @@ import driverApi from '@/api/driverApi';
 const DEFAULT_CONFIG = {
   modelPath: '/models/yolo-violations.onnx',  // Đường dẫn model ONNX trong public/
   inputSize: 640,                              // Kích thước input model (640x640)
-  confidenceThreshold: 0.45,                   // Ngưỡng confidence tối thiểu
+  confidenceThreshold: 0.65,                   // Ngưỡng confidence tối thiểu (nâng cao để giảm false positive)
   iouThreshold: 0.5,                           // Ngưỡng IOU cho NMS
   snapshotWidth: 640,
   snapshotHeight: 480,
-  cooldownMs: 15000,                           // 15s giữa các lần gửi vi phạm cùng loại
+  cooldownMs: 30000,                           // 30s giữa các lần gửi vi phạm cùng loại
   detectIntervalMs: 200,                       // Chạy detect mỗi 200ms (~5fps) để giảm tải CPU/GPU
 };
 
@@ -32,29 +32,31 @@ const CLASS_NAMES = [
   'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
   'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
   'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
-  'hair drier', 'toothbrush'
+  'hair drier', 'toothbrush', 'smoking'
 ];
 
 // ===== Mapping class → loại báo động API =====
-// Để demo, map knife -> dao, person -> vi_pham_khac (để test dễ), cell phone -> hut_thuoc (giả sử đt là thuốc lá để test)
+// Chỉ map những class thật sự là vi phạm. Bỏ "person" vì tài xế luôn có trong khung hình.
 const CLASS_TO_BAO_DONG = {
   knife: 'phat_hien_dao',
-  'cell phone': 'hut_thuoc',
-  person: 'vi_pham_khac',
+  scissors: 'phat_hien_dao',
+  'cell phone': 'su_dung_dien_thoai',
+  'smoking': 'hut_thuoc',
 };
 
 // ===== Mapping class → label hiển thị tiếng Việt =====
 const CLASS_LABELS = {
   knife: '🔪 Dao / Vật sắc nhọn',
-  'cell phone': '🚬 Hút thuốc (demo=điện thoại)',
-  person: '⚠️ Có Người (demo=vi phạm)',
+  scissors: '✂️ Kéo / Vật sắc nhọn',
+  'cell phone': '📱 Sử dụng điện thoại',
+  'smoking': '🚬 Hút thuốc',
 };
 
 // ===== Mapping class → màu bounding box =====
 const CLASS_COLORS = {
   knife: '#ef4444',       // Đỏ
+  scissors: '#ef4444',    // Đỏ
   'cell phone': '#f59e0b', // Cam
-  person: '#8b5cf6',   // Tím
 };
 
 /**
@@ -255,14 +257,18 @@ export class ViolationDetectionAgent {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this._drawDetections(detections);
 
-    // 5. Xử lý vi phạm nếu có detection
-    if (detections.length > 0) {
-      this.onStatusChange?.('violation', detections);
-      this.onDetection?.(detections);
-      this._handleDetections(detections);
+    // 5. Xử lý vi phạm nếu có detection thuộc danh sách vi phạm
+    const violationDetections = detections.filter(
+      (d) => CLASS_TO_BAO_DONG[d.className] != null
+    );
+
+    if (violationDetections.length > 0) {
+      this.onStatusChange?.('violation', violationDetections);
+      this.onDetection?.(detections); // Trả về toàn bộ detections cho UI
+      this._handleDetections(violationDetections); // Chỉ gửi API cho vi phạm thực sự
     } else {
       this.onStatusChange?.('detecting', null);
-      this.onDetection?.([]);
+      this.onDetection?.(detections); // Vẫn trả detections cho UI vẽ bbox
     }
   }
 

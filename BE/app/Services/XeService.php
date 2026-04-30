@@ -19,6 +19,7 @@ use App\Models\Ve;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use App\Http\Resources\XeResourceShow;
 
 class XeService
 {
@@ -40,6 +41,11 @@ class XeService
         return null;
     }
 
+    public function getAllPublic(array $filters = [])
+    {
+        return XeResourceShow::collection($this->xeRepo->getAllPublic($filters));
+    }
+
     public function getById(int $id)
     {
         $xe = $this->xeRepo->getById($id);
@@ -59,7 +65,7 @@ class XeService
     public function create(array $data)
     {
         $user = Auth::user();
-        
+
         if ($user instanceof NhaXe) {
             $data['ma_nha_xe'] = $user->ma_nha_xe;
             $data['trang_thai'] = 'cho_duyet'; // Luôn chờ duyệt nếu là Nhà xe
