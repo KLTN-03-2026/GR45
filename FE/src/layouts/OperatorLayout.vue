@@ -66,6 +66,7 @@ onMounted(() => {
         headers: {
           Authorization: `Bearer ${operatorStore.token}`,
           Accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
       },
     });

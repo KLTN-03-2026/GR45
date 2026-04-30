@@ -125,7 +125,7 @@ const initWs = () => {
     window.Pusher = Pusher
     let url = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/'
     if (!url.endsWith('/')) url += '/'
-    echoInstance = new Echo({ broadcaster:'pusher', key, cluster, forceTLS:true, authEndpoint:`${url}v1/admin/broadcasting/auth`, auth:{ headers:{ Authorization:`Bearer ${adminStore.token}`, Accept:'application/json' } } })
+    echoInstance = new Echo({ broadcaster:'pusher', key, cluster, forceTLS:true, authEndpoint:`${url}v1/admin/broadcasting/auth`, auth:{ headers:{ Authorization:`Bearer ${adminStore.token}`, Accept:'application/json', 'ngrok-skip-browser-warning':'true' } } })
     const ch = echoInstance.channel('he-thong.giam-sat')
     ch.listen('.bao-dong.vi-pham', onRealtimeViolation)
     ch.listen('.ai.canh-bao', onRealtimeViolation)

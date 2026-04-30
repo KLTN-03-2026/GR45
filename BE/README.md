@@ -56,3 +56,40 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+# Lệnh chạy Queue (Background Jobs)
+
+php artisan queue:work --queue=tracking,default
+
+# Lệnh restart queue
+
+php artisan queue:restart
+
+# Làm mới toàn bộ Cache, Config, Route
+
+php artisan optimize:clear
+
+# Làm mới Database
+
+php artisan migrate:refresh --seed
+
+# Lệnh chạy tunnel pinggy (FE)
+
+pinggy tunnel 5173
+
+# Lệnh chạy ngrok (BE)
+
+ngrok http 8000
+
+# giới hạn của pinggy:
+
+    - tối đa 50 kết nối đồng thời.
+    - thời gian sử dụng: 60 phút.
+    - không hỗ trợ TCP
+
+# giới hạn của ngrok:
+
+    - 40 kết nối đồng thời.
+    - 1G băng thông.
+    - không hỗ trợ TCP
+    - thời gian sử dụng: không giới hạn
