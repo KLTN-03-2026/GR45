@@ -127,6 +127,24 @@ const adminApi = {
 
   // --- TIỆN ÍCH ---
   autoGenerateSeats: () => axiosClient.post('/v1/admin/xe/auto-generate-seats'),
+
+  // --- DASHBOARD KPIs ---
+  getDashboardKpis: () => axiosClient.get('/v1/admin/dashboard-kpis'),
+
+  // --- BÁO CÁO (BaoCaoController) ---
+  getBaoCaoDashboard: (params) => axiosClient.get('/v1/admin/bao-cao/dashboard', { params }),
+  getBaoCaoTheoTuyenDuong: (params) => axiosClient.get('/v1/admin/bao-cao/theo-tuyen', { params }),
+  getBaoCaoTrangThaiVe: (params) => axiosClient.get('/v1/admin/bao-cao/trang-thai-ve', { params }),
+
+  // --- BÁO ĐỘNG ---
+  getAlerts: (params) => axiosClient.get('/v1/admin/bao-dong', { params }),
+
+  // --- QUẢN LÝ VÍ NHÀ XE ---
+  getOperatorWallets: (params) => axiosClient.get('/v1/admin/vi-nha-xe', { params }),
+  getOperatorWalletDetail: (id) => axiosClient.get(`/v1/admin/vi-nha-xe/${id}`),
+  getWithdrawRequests: (params) => axiosClient.get('/v1/admin/vi-nha-xe/yeu-cau-rut-tien', { params }),
+  approveWithdraw: (id) => axiosClient.patch(`/v1/admin/vi-nha-xe/yeu-cau-rut-tien/${id}/duyet`),
+  rejectWithdraw: (id, data) => axiosClient.patch(`/v1/admin/vi-nha-xe/yeu-cau-rut-tien/${id}/tu-choi`, data),
 };
 
 export default adminApi;
