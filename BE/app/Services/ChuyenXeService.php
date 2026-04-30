@@ -78,4 +78,9 @@ class ChuyenXeService
     {
         return $this->chuyenXeRepo->autoGenerate();
     }
+
+    public function hoanThanh(int $id)
+    {
+        return $this->chuyenXeRepo->hoanThanh($id);
+    }
 }

@@ -5,12 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-/**
- * Diem Thanh Vien - He thong tich diem don gian (khong blockchain).
- *
- * Moi khach hang co dung 1 vi diem (1-1).
- * Diem tich luy quyet dinh hang thanh vien.
- */
 class DiemThanhVien extends Model
 {
     use HasFactory;
@@ -19,20 +13,16 @@ class DiemThanhVien extends Model
 
     protected $fillable = [
         'id_khach_hang',
+        'diem_hien_tai',
         'tong_diem_tich_luy',
-        'diem_kha_dung',
-        'diem_da_su_dung',
-        'diem_het_han',
-        'hang_thanh_vien',      // dong | bac | vang | bach_kim
-        'ngay_len_hang',
+        'hang_thanh_vien',
+        'ngay_cap_nhat_hang',
     ];
 
     protected $casts = [
+        'diem_hien_tai'      => 'integer',
         'tong_diem_tich_luy' => 'integer',
-        'diem_kha_dung'      => 'integer',
-        'diem_da_su_dung'    => 'integer',
-        'diem_het_han'       => 'integer',
-        'ngay_len_hang'      => 'date',
+        'ngay_cap_nhat_hang' => 'date',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────
@@ -44,7 +34,7 @@ class DiemThanhVien extends Model
 
     public function lichSuDiem()
     {
-        return $this->hasMany(LichSuDiem::class, 'id_diem_thanh_vien')
+        return $this->hasMany(LichSuDungDiem::class, 'id_khach_hang', 'id_khach_hang')
             ->orderByDesc('created_at');
     }
 
@@ -62,50 +52,45 @@ class DiemThanhVien extends Model
 
         if ($hang !== $this->hang_thanh_vien) {
             $this->update([
-                'hang_thanh_vien' => $hang,
-                'ngay_len_hang'   => now()->toDateString(),
+                'hang_thanh_vien'    => $hang,
+                'ngay_cap_nhat_hang' => now()->toDateString(),
             ]);
         }
     }
 
-    /** Cong diem khi mua ve */
-    public function congDiem(int $diem, string $moTa, ?string $maThamChieu = null): LichSuDiem
+    /** Cong diem (Tich diem / Hoan diem) */
+    public function thayDoiDiem(int $diem, string $loai, string $ghiChu, ?string $maThamChieu = null): LichSuDungDiem
     {
-        $truoc = $this->diem_kha_dung;
-        $this->increment('diem_kha_dung', $diem);
-        $this->increment('tong_diem_tich_luy', $diem);
-        $this->capNhatHang();
+        $truoc = $this->diem_hien_tai;
+        $sau = $truoc + $diem;
 
-        return $this->lichSuDiem()->create([
-            'id_khach_hang'    => $this->id_khach_hang,
-            'loai'             => 'tich_diem',
-            'so_diem'          => $diem,
-            'diem_truoc'       => $truoc,
-            'diem_sau'         => $truoc + $diem,
-            'ma_tham_chieu'    => $maThamChieu,
-            'mo_ta'            => $moTa,
+        // Cap nhat balance
+        $this->diem_hien_tai = $sau;
+        if ($diem > 0 && $loai === 'tich_diem') {
+            $this->tong_diem_tich_luy += $diem;
+            $this->capNhatHang();
+        }
+        $this->save();
+
+        // Ghi lich su
+        return LichSuDungDiem::create([
+            'id_khach_hang'  => $this->id_khach_hang,
+            'loai_giao_dich' => $loai,
+            'so_diem'        => $diem,
+            'diem_truoc'     => $truoc,
+            'diem_sau'       => $sau,
+            'ma_tham_chieu'  => $maThamChieu,
+            'ghi_chu'        => $ghiChu,
         ]);
     }
 
-    /** Tru diem khi su dung / doi qua */
-    public function suDungDiem(int $diem, string $moTa, ?string $maThamChieu = null): LichSuDiem
+    /** Su dung diem */
+    public function suDungDiem(int $diem, string $ghiChu, ?string $maThamChieu = null): LichSuDungDiem
     {
-        if ($this->diem_kha_dung < $diem) {
-            throw new \RuntimeException("Khong du diem (can $diem, co {$this->diem_kha_dung})");
+        if ($this->diem_hien_tai < $diem) {
+            throw new \RuntimeException("Khong du diem (can $diem, co {$this->diem_hien_tai})");
         }
 
-        $truoc = $this->diem_kha_dung;
-        $this->decrement('diem_kha_dung', $diem);
-        $this->increment('diem_da_su_dung', $diem);
-
-        return $this->lichSuDiem()->create([
-            'id_khach_hang'    => $this->id_khach_hang,
-            'loai'             => 'su_dung_diem',
-            'so_diem'          => -$diem,
-            'diem_truoc'       => $truoc,
-            'diem_sau'         => $truoc - $diem,
-            'ma_tham_chieu'    => $maThamChieu,
-            'mo_ta'            => $moTa,
-        ]);
+        return $this->thayDoiDiem(-$diem, 'su_dung', $ghiChu, $maThamChieu);
     }
 }

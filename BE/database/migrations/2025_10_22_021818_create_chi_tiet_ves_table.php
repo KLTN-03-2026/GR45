@@ -28,7 +28,7 @@ return new class extends Migration
 
             $table->text('ghi_chu')->nullable();
             $table->decimal('gia_ve', 10, 2);
-            $table->enum('tinh_trang', ['dang_cho', 'da_thanh_toan'])->default('dang_cho'); // 0=đặt chờ, 1=đã thanh toán
+            $table->enum('tinh_trang', ['dang_cho', 'da_thanh_toan', 'huy', 'da_hoan_thanh'])->default('dang_cho'); // 0=đặt chờ, 1=đã thanh toán, 2=hủy
 
             $table->foreign('ma_ve')
                 ->references('ma_ve')->on('ves')->cascadeOnDelete();

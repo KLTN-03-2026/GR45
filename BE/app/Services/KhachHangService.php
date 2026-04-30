@@ -536,4 +536,32 @@ class KhachHangService
             }
         );
     }
+
+    // ── DIEM THANH VIEN ──────────────────────────────────────────────
+    
+    /**
+     * Lay thong tin diem hien tai va hang thanh vien.
+     */
+    public function getDiemThanhVien(KhachHang $khachHang)
+    {
+        // Load or create if not exists
+        $diem = $khachHang->diemThanhVien ?: \App\Models\DiemThanhVien::create([
+            'id_khach_hang'      => $khachHang->id,
+            'diem_hien_tai'      => 0,
+            'tong_diem_tich_luy' => 0,
+            'hang_thanh_vien'    => 'dong',
+        ]);
+
+        return $diem;
+    }
+
+    /**
+     * Lay lich su bien dong diem.
+     */
+    public function getLichSuDiem(KhachHang $khachHang, array $params = [])
+    {
+        return \App\Models\LichSuDungDiem::where('id_khach_hang', $khachHang->id)
+            ->orderByDesc('created_at')
+            ->paginate($params['per_page'] ?? 10);
+    }
 }

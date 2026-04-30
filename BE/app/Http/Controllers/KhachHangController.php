@@ -365,4 +365,24 @@ class KhachHangController extends Controller
             'data' => $this->service->getVoucherCongKhai($request->all()),
         ]);
     }
+
+    // ── DIEM THANH VIEN ──────────────────────────────────────────────
+
+    public function getDiemThanhVien(Request $request): JsonResponse
+    {
+        $data = $this->service->getDiemThanhVien($request->user('sanctum'));
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    public function getLichSuDiem(Request $request): JsonResponse
+    {
+        $data = $this->service->getLichSuDiem($request->user('sanctum'), $request->all());
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
 }
