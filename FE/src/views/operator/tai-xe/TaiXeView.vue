@@ -108,10 +108,6 @@ const licenseClasses = [
   { value: 'D', label: 'Hạng D' },
   { value: 'E', label: 'Hạng E' },
   { value: 'F', label: 'Hạng F' },
-  { value: 'FB2', label: 'Hạng FB2' },
-  { value: 'FC', label: 'Hạng FC' },
-  { value: 'FD', label: 'Hạng FD' },
-  { value: 'FE', label: 'Hạng FE' },
 ]
 
 const initialFormData = () => ({
