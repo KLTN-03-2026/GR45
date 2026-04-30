@@ -267,8 +267,9 @@ const fetchWalletInfo = async () => {
   loading.value = true;
   try {
     const res = await operatorApi.getWalletInfo();
-    wallet.value = res.data.wallet;
-    transactions.value = res.data.transactions.data || res.data.transactions;
+    const payload = res.data ?? res; // axios interceptor đã unwrap .data
+    wallet.value = payload.wallet;
+    transactions.value = payload.transactions?.data || payload.transactions || [];
     
     // Init bank form
     if (wallet.value) {
@@ -295,7 +296,7 @@ const updateBankInfo = async () => {
   submitting.value = true;
   try {
     const res = await operatorApi.updateBankInfo(bankForm.value);
-    wallet.value = res.data.wallet;
+    wallet.value = (res.data ?? res).wallet;
     showBankInfoModal.value = false;
     Swal.fire('Thành công', 'Cập nhật thông tin ngân hàng thành công', 'success');
   } catch (err) {
@@ -309,7 +310,7 @@ const requestTopup = async () => {
   submitting.value = true;
   try {
     const res = await operatorApi.requestTopup({ amount: topupAmount.value });
-    qrData.value = res.data.qr_data;
+    qrData.value = (res.data ?? res).qr_data;
     // Cập nhật lại lịch sử
     fetchWalletInfo();
   } catch (err) {

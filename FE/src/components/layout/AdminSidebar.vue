@@ -18,7 +18,8 @@ import {
   Settings,
   Database,
   Gift,
-  Star
+  Star,
+  Wallet
 } from 'lucide-vue-next'
 
 // Inject từ AdminLayout
@@ -202,6 +203,12 @@ const menuList = [
     icon: TrendingUp,
     permissionSlugs: ['xem-thong-ke'],
     permissionHints: ['thong-ke', 'doanh-thu'],
+  },
+  {
+    id: 'vi-nha-xe',
+    name: 'Quản lý ví nhà xe',
+    path: '/admin/vi-nha-xe',
+    icon: Wallet,
   },
 ]
 
