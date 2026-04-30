@@ -395,4 +395,18 @@ class ChuyenXeController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
+
+    public function hoanThanhChuyenXe($id)
+    {
+        try {
+            $data = $this->chuyenXeService->hoanThanh($id);
+            return response()->json([
+                'success' => true,
+                'message' => 'Đã hoàn thành chuyến xe và tích điểm cho khách hàng.',
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
 }

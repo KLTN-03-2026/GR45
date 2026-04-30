@@ -54,6 +54,7 @@ const alerts = ref([]);
 const isFetchingTrip = ref(true);
 const isStartingTrip = ref(false);
 const isSendingSOS = ref(false);
+const isCompletingTrip = ref(false);
 
 const sendSOS = async () => {
   if (!currentTrip.value.id || isSendingSOS.value) return;
@@ -127,6 +128,42 @@ const batDauDiChuyen = async () => {
     });
   } finally {
     isStartingTrip.value = false;
+  }
+};
+
+const hoanThanhChuyenXe = async () => {
+  if (!currentTrip.value.id || isCompletingTrip.value) return;
+
+  if (
+    !confirm(
+      "XÁC NHẬN HOÀN THÀNH CHUYẾN XE?\nThao tác này sẽ cập nhật trạng thái chuyến và tự động cộng điểm cho khách hàng."
+    )
+  ) {
+    return;
+  }
+
+  isCompletingTrip.value = true;
+  try {
+    const res = await driverApi.hoanThanhChuyenXe(currentTrip.value.id);
+    if (res.success || res.data) {
+      currentTrip.value.trang_thai = "hoan_thanh";
+      alerts.value.unshift({
+        id: Date.now(),
+        type: "success",
+        message: "✅ Chuyến xe đã hoàn thành thành công!",
+        time: new Date().toLocaleTimeString("vi-VN"),
+      });
+    }
+  } catch (error) {
+    console.error("Lỗi khi hoàn thành chuyến xe:", error);
+    alerts.value.unshift({
+      id: Date.now(),
+      type: "danger",
+      message: "Lỗi khi hoàn thành: " + (error.response?.data?.message || error.message),
+      time: new Date().toLocaleTimeString("vi-VN"),
+    });
+  } finally {
+    isCompletingTrip.value = false;
   }
 };
 
@@ -1122,8 +1159,14 @@ onUnmounted(() => {
                 <div class="spinner-sm" v-if="isSendingSOS"></div>
                 <AlertTriangle v-else class="icon" /> S.O.S KHẨN CẤP
               </button>
-              <button class="action-btn report-btn">
-                <Truck class="icon" /> Báo cáo kẹt xe
+              <button
+                class="action-btn report-btn"
+                @click="hoanThanhChuyenXe"
+                :disabled="isCompletingTrip"
+                style="background: linear-gradient(135deg, #10b981, #059669); border-color: #047857;"
+              >
+                <div class="spinner-sm" v-if="isCompletingTrip"></div>
+                <Flag v-else class="icon" /> HOÀN THÀNH CHUYẾN
               </button>
             </div>
           </div>

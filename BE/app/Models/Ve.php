@@ -24,10 +24,14 @@ class Ve extends Model
         'tien_ban_dau',
         'tien_khuyen_mai',
         'id_voucher',
+        'diem_quy_doi',
+        'tien_diem',
     ];
 
     protected $casts = [
         'tong_tien' => 'decimal:2',
+        'tien_diem' => 'decimal:2',
+        'diem_quy_doi' => 'integer',
         'thoi_gian_dat' => 'datetime',
         'thoi_gian_thanh_toan' => 'datetime',
     ];
