@@ -243,7 +243,7 @@ Route::prefix('v1')->group(function () {
             Route::get('nha-xe', [NhaXeController::class, 'index'])->middleware('permission:xem-nha-xe');
             Route::get('nha-xe/{id}', [NhaXeController::class, 'show'])->middleware('permission:xem-nha-xe');
             Route::post('nha-xe', [NhaXeController::class, 'store'])->middleware('permission:them-nha-xe');
-            Route::put('nha-xe/{id}', [NhaXeController::class, 'updateOperator'])->middleware('permission:sua-nha-xe');
+            Route::match(['put', 'post'], 'nha-xe/{id}', [NhaXeController::class, 'updateOperator'])->middleware('permission:sua-nha-xe');
             Route::patch('nha-xe/{id}/trang-thai', [NhaXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-nha-xe');
             Route::delete('nha-xe/{id}', [NhaXeController::class, 'destroy'])->middleware('permission:xoa-nha-xe');
 

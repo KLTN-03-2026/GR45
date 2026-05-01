@@ -77,10 +77,13 @@ class NhaXeController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            // $request->all() trong Laravel đã bao gồm UploadedFile objects
             $nhaXe = $this->service->create($request->all());
             return response()->json(['success' => true, 'message' => 'Tạo nhà xe thành công.', 'data' => $nhaXe], 201);
         } catch (ValidationException $e) {
             return response()->json(['success' => false, 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Đã xảy ra lỗi: ' . $e->getMessage()], 500);
         }
     }
 
