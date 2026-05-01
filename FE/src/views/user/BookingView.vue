@@ -31,6 +31,28 @@ const paymentMethod = ref('tien_mat');
 const bookingResult = ref(null);
 const errorMessage = ref('');
 
+// Loyalty State
+const loyaltyInfo = ref(null);
+const pointsToRedeem = ref(0);
+
+import { watch } from 'vue';
+watch(pointsToRedeem, (newVal) => {
+  if (loyaltyInfo.value && newVal > loyaltyInfo.value.diem_hien_tai) {
+    pointsToRedeem.value = loyaltyInfo.value.diem_hien_tai;
+  }
+  
+  // Không cho phép giảm quá số tiền cần thanh toán
+  const remainingPrice = baseTotalPrice.value - discountAmount.value;
+  const maxPointsForPrice = Math.floor(remainingPrice / 100);
+  if (newVal > maxPointsForPrice) {
+    pointsToRedeem.value = maxPointsForPrice;
+  }
+
+  if (newVal < 0) {
+    pointsToRedeem.value = 0;
+  }
+});
+
 // --- COMPUTED ---
 const selectedVoucher = computed(() => {
   return vouchers.value.find(v => v.id === selectedVoucherId.value) || null;
@@ -53,8 +75,13 @@ const discountAmount = computed(() => {
   return dist > baseTotalPrice.value ? baseTotalPrice.value : dist;
 });
 
+const pointsDiscountAmount = computed(() => {
+  return (Number(pointsToRedeem.value) || 0) * 100;
+});
+
 const finalPrice = computed(() => {
-  return baseTotalPrice.value - discountAmount.value;
+  const total = baseTotalPrice.value - discountAmount.value - pointsDiscountAmount.value;
+  return total < 0 ? 0 : total;
 });
 
 // Cấu hình VietQR
@@ -178,6 +205,12 @@ const fetchInitialData = async () => {
       if (vouchersRes.success) {
         vouchers.value = vouchersRes.data;
       }
+
+      // Load loyalty points
+      const loyaltyRes = await clientApi.getLoyaltyInfo();
+      if (loyaltyRes.success) {
+        loyaltyInfo.value = loyaltyRes.data;
+      }
       
       // Select appropriate payment method if cash is not allowed
       if (tripData.value.thanh_toan_sau === 0) {
@@ -247,6 +280,7 @@ const submitBooking = async () => {
       id_tram_tra: dropoffPointId.value,
       ghi_chu: customerNote.value,
       id_voucher: selectedVoucherId.value || null,
+      diem_quy_doi: Number(pointsToRedeem.value) || 0,
       phuong_thuc_thanh_toan: paymentMethod.value
     };
 
@@ -541,6 +575,51 @@ onMounted(() => {
               </div>
             </div>
 
+            <!-- Điểm thành viên -->
+            <div v-if="loyaltyInfo && loyaltyInfo.diem_hien_tai > 0" class="mb-10 bg-blue-50/50 p-6 rounded-2xl border border-blue-100">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <span class="material-symbols-outlined text-blue-600">stars</span>
+                  Dùng điểm tích lũy
+                </h3>
+                <div class="text-sm font-bold text-blue-700">
+                  Bạn có: {{ loyaltyInfo.diem_hien_tai }} điểm
+                </div>
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-center gap-4">
+                <div class="relative flex-1 w-full">
+                  <input 
+                    type="number" 
+                    v-model="pointsToRedeem" 
+                    :max="loyaltyInfo.diem_hien_tai"
+                    min="0"
+                    step="10"
+                    class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 pr-16 focus:outline-none focus:border-blue-500 font-bold text-slate-700"
+                    placeholder="Nhập số điểm muốn dùng..."
+                  />
+                  <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button 
+                      @click="pointsToRedeem = loyaltyInfo.diem_hien_tai"
+                      class="text-[10px] font-black bg-blue-600 text-white px-2 py-1 rounded uppercase tracking-tighter"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
+                <div class="shrink-0 text-slate-500 font-bold hidden sm:block">
+                  <span class="material-symbols-outlined">sync_alt</span>
+                </div>
+                <div class="bg-white border-2 border-dashed border-emerald-200 rounded-xl px-6 py-3 flex-1 w-full text-center">
+                  <div class="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-0.5">Tiết kiệm được</div>
+                  <div class="text-lg font-black text-emerald-600">{{ formatPrice(pointsDiscountAmount) }}</div>
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-3 italic">
+                * Quy đổi: 100 điểm = 10.000đ. Số điểm sử dụng phải nhỏ hơn hoặc bằng số dư hiện có.
+              </p>
+            </div>
+
             <!-- Phương thức TT -->
             <div class="mb-8">
               <h3 class="text-xl font-bold text-slate-800 mb-4">
@@ -725,8 +804,13 @@ onMounted(() => {
               </div>
               
               <div v-if="discountAmount > 0" class="flex justify-between text-sm text-green-600">
-                <span>Khuyến mãi</span>
+                <span>Khuyến mãi Voucher</span>
                 <span>-{{ formatPrice(discountAmount) }}</span>
+              </div>
+
+              <div v-if="pointsDiscountAmount > 0" class="flex justify-between text-sm text-emerald-600">
+                <span>Giảm giá từ điểm</span>
+                <span>-{{ formatPrice(pointsDiscountAmount) }}</span>
               </div>
               
               <div class="flex justify-between items-center mt-2 pt-3 border-t">

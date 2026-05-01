@@ -152,17 +152,30 @@ class RatingController extends Controller
     }
 
     /**
-     * Danh sách đánh giá theo chuyến xe — công khai (mọi người xem được), chỉ trả họ tên khách.
+     * Danh sách đánh giá theo nhà xe của chuyến đang xem (công khai).
+     * FE vẫn gọi bằng tripId nhưng backend sẽ mở rộng ra toàn bộ đánh giá của nhà xe đó.
      */
     public function listRatingsByTrip(Request $request, int $tripId): JsonResponse
     {
-        if (!ChuyenXe::where('id', $tripId)->exists()) {
+        $trip = ChuyenXe::with([
+            'xe:id,ma_nha_xe',
+            'tuyenDuong.nhaXe:id,ma_nha_xe',
+        ])->find($tripId);
+        if (! $trip) {
             return response()->json(['success' => false, 'message' => 'Chuyến xe không tồn tại.'], 404);
+        }
+        $maNhaXe = (string) ($trip->tuyenDuong->nhaXe->ma_nha_xe ?? $trip->xe->ma_nha_xe ?? '');
+        if ($maNhaXe === '') {
+            return response()->json(['success' => false, 'message' => 'Chuyến xe chưa gắn nhà xe hợp lệ.'], 422);
         }
 
         $perPage = min(max((int) $request->input('per_page', 30), 1), 50);
 
-        $stats = DanhGia::where('id_chuyen_xe', $tripId)
+        $baseQuery = DanhGia::query()->whereHas('chuyenXe.tuyenDuong.nhaXe', function ($q) use ($maNhaXe) {
+            $q->where('ma_nha_xe', $maNhaXe);
+        });
+
+        $stats = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_ratings, AVG(diem_so) as avg_diem_so')
             ->first();
 
@@ -171,8 +184,15 @@ class RatingController extends Controller
             ? round((float) $stats->avg_diem_so, 1)
             : null;
 
-        $paginator = DanhGia::with(['khachHang:id,ho_va_ten'])
-            ->where('id_chuyen_xe', $tripId)
+        $paginator = DanhGia::with([
+            'khachHang:id,ho_va_ten',
+            'chuyenXe:id,id_tuyen_duong,id_xe,ngay_khoi_hanh,gio_khoi_hanh',
+            'chuyenXe.tuyenDuong:id,ten_tuyen_duong,diem_bat_dau,diem_ket_thuc',
+            'chuyenXe.xe:id,bien_so,ten_xe',
+        ])
+            ->whereHas('chuyenXe.tuyenDuong.nhaXe', function ($q) use ($maNhaXe) {
+                $q->where('ma_nha_xe', $maNhaXe);
+            })
             ->orderByDesc('created_at')
             ->paginate($perPage);
 

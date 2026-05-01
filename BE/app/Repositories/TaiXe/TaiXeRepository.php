@@ -8,7 +8,9 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class TaiXeRepository implements TaiXeRepositoryInterface
 {
-    public function __construct(protected TaiXe $model) {}
+    public function __construct(protected TaiXe $model)
+    {
+    }
 
     public function getAll(array $filters = []): LengthAwarePaginator
     {
@@ -86,7 +88,8 @@ class TaiXeRepository implements TaiXeRepositoryInterface
     public function update(int $id, array $data): ?TaiXe
     {
         $taiXe = $this->model->find($id);
-        if (!$taiXe) return null;
+        if (!$taiXe)
+            return null;
         $taiXe->update($data);
         return $taiXe->fresh(['hoSo', 'nhaXe']);
     }
@@ -94,7 +97,8 @@ class TaiXeRepository implements TaiXeRepositoryInterface
     public function delete(int $id): bool
     {
         $taiXe = $this->model->find($id);
-        if (!$taiXe) return false;
+        if (!$taiXe)
+            return false;
         return $taiXe->delete();
     }
 
@@ -110,7 +114,8 @@ class TaiXeRepository implements TaiXeRepositoryInterface
     public function toggleStatus(int $id): ?TaiXe
     {
         $taiXe = $this->model->find($id);
-        if (!$taiXe) return null;
+        if (!$taiXe)
+            return null;
         $taiXe->update([
             'tinh_trang' => $taiXe->tinh_trang === 'hoat_dong' ? 'khoa' : 'hoat_dong',
         ]);

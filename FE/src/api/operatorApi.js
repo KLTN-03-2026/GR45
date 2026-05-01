@@ -6,6 +6,7 @@ const operatorApi = {
   changePassword: (data) => axiosClient.post('/v1/nha-xe/doi-mat-khau', data),
 
   // --- THỐNG KÊ NHÀ XE ---
+  getDashboardKpis: () => axiosClient.get('/v1/nha-xe/dashboard-kpis'),
   getStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke', { params }),
   getStatisticsByRoute: (params) => axiosClient.get('/v1/nha-xe/thong-ke/theo-tuyen', { params }),
   getStatisticsTicketStatus: (params) => axiosClient.get('/v1/nha-xe/thong-ke/trang-thai-ve', { params }),

@@ -260,7 +260,7 @@ const detailRatings = ref([]);
 const ratingSummary = ref({ total_ratings: 0, avg_diem_so: null });
 const ratingLoading = ref(false);
 const showRatingDetailModal = ref(false);
-const selectedRating = ref(null);
+const selectedRatingGroup = ref(null);
 
 const fetchTripRatings = async (tripId) => {
   if (!tripId) {
@@ -270,13 +270,36 @@ const fetchTripRatings = async (tripId) => {
   }
   try {
     ratingLoading.value = true;
-    const body = await clientApi.getTripRatings(tripId, { per_page: 50 });
-    const paginator = body?.data;
-    const list = paginator?.data ?? (Array.isArray(paginator) ? paginator : []);
-    detailRatings.value = Array.isArray(list) ? list : [];
-    const s = body?.summary;
+    let page = 1;
+    let merged = [];
+    let firstSummary = null;
+    let lastPaginator = null;
+
+    // API is paginated; fetch all pages so grouped customer ratings are complete.
+    while (page <= 50) {
+      const body = await clientApi.getTripRatings(tripId, { per_page: 50, page });
+      const paginator = body?.data;
+      const list = paginator?.data ?? (Array.isArray(paginator) ? paginator : []);
+      if (Array.isArray(list) && list.length) {
+        merged = merged.concat(list);
+      }
+      if (!firstSummary && body?.summary) {
+        firstSummary = body.summary;
+      }
+      lastPaginator = paginator;
+
+      const currentPage = Number(paginator?.current_page || page);
+      const lastPage = Number(paginator?.last_page || currentPage);
+      if (!Number.isFinite(lastPage) || currentPage >= lastPage) {
+        break;
+      }
+      page = currentPage + 1;
+    }
+
+    detailRatings.value = merged;
+    const s = firstSummary;
     const totalFromSummary = Number(s?.total_ratings);
-    const totalFromPage = Number(paginator?.total);
+    const totalFromPage = Number(lastPaginator?.total);
     ratingSummary.value = {
       total_ratings:
         Number.isFinite(totalFromSummary) && totalFromSummary >= 0
@@ -312,11 +335,11 @@ const closeModal = () => {
   ratingSummary.value = { total_ratings: 0, avg_diem_so: null };
   ratingLoading.value = false;
   showRatingDetailModal.value = false;
-  selectedRating.value = null;
+  selectedRatingGroup.value = null;
 };
 
-const openRatingDetail = (rating) => {
-  selectedRating.value = rating;
+const openRatingDetail = (group) => {
+  selectedRatingGroup.value = group;
   showRatingDetailModal.value = true;
 };
 
@@ -332,6 +355,54 @@ const getRatingCustomerName = (rating) => {
     "";
   return name.trim() || "—";
 };
+
+const getRatingTripRoute = (rating) => {
+  const td = rating?.chuyen_xe?.tuyen_duong || rating?.chuyenXe?.tuyenDuong;
+  const from = td?.diem_bat_dau || "";
+  const to = td?.diem_ket_thuc || "";
+  if (from && to) return `${from} → ${to}`;
+  return `Chuyến #${rating?.id_chuyen_xe ?? "?"}`;
+};
+
+const getRatingTripMeta = (rating) => {
+  const td = rating?.chuyen_xe?.tuyen_duong || rating?.chuyenXe?.tuyenDuong;
+  const xe = rating?.chuyen_xe?.xe || rating?.chuyenXe?.xe;
+  const tenTuyen = td?.ten_tuyen_duong || "";
+  const ngay = rating?.chuyen_xe?.ngay_khoi_hanh || rating?.chuyenXe?.ngay_khoi_hanh;
+  const gio = rating?.chuyen_xe?.gio_khoi_hanh || rating?.chuyenXe?.gio_khoi_hanh;
+  const bienSo = xe?.bien_so || "";
+
+  const parts = [];
+  if (tenTuyen) parts.push(tenTuyen);
+  if (ngay) parts.push(`Ngày: ${formatFullDate(ngay)}`);
+  if (gio) parts.push(`Giờ: ${formatTime(gio)}`);
+  if (bienSo) parts.push(`Xe: ${bienSo}`);
+  return parts.join(" · ");
+};
+
+const groupedRatings = computed(() => {
+  const map = new Map();
+  for (const r of detailRatings.value || []) {
+    const khId = r?.id_khach_hang ?? r?.khach_hang?.id ?? r?.khachHang?.id ?? null;
+    const name = getRatingCustomerName(r);
+    const key = khId != null ? `id:${khId}` : `name:${name}`;
+    const current = map.get(key) || { key, name, ratings: [] };
+    current.ratings.push(r);
+    map.set(key, current);
+  }
+
+  const out = [];
+  for (const g of map.values()) {
+    g.ratings.sort((a, b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime());
+    const total = g.ratings.length;
+    const sum = g.ratings.reduce((acc, r) => acc + Number(r?.diem_so ?? 0), 0);
+    g.total = total;
+    g.avgScore = total > 0 ? Math.round((sum / total) * 10) / 10 : 0;
+    out.push(g);
+  }
+  out.sort((a, b) => new Date(b.ratings?.[0]?.created_at || 0).getTime() - new Date(a.ratings?.[0]?.created_at || 0).getTime());
+  return out;
+});
 
 /** Điểm sao 0–5 (số nguyên) cho hiển thị ★ */
 const clampRatingScore = (raw) => {
@@ -952,30 +1023,31 @@ onBeforeUnmount(() => {
                 </div>
                 <div v-else class="trip-modal__rating-list">
                   <div
-                    v-for="rating in detailRatings"
-                    :key="rating.id"
+                    v-for="group in groupedRatings"
+                    :key="group.key"
                     class="trip-modal__rating-item"
-                    @click="openRatingDetail(rating)"
+                    @click="openRatingDetail(group)"
                   >
                     <div class="trip-modal__rating-head">
                       <span class="trip-modal__rating-name">
-                        {{ getRatingCustomerName(rating) }}
+                        {{ group.name }}
                       </span>
+                      <span class="trip-modal__rating-count">{{ group.total }} lượt</span>
                     </div>
                     <div class="trip-modal__rating-stars-row">
                       <span
                         v-for="star in 5"
-                        :key="`${rating.id}-list-${star}`"
+                        :key="`${group.key}-list-${star}`"
                         class="trip-modal__rating-star"
                         :class="{
                           'trip-modal__rating-star--on':
-                            star <= clampRatingScore(rating.diem_so),
+                            star <= clampRatingScore(group.avgScore),
                         }"
                         aria-hidden="true"
                         >★</span
                       >
                       <span class="trip-modal__rating-score"
-                        >{{ clampRatingScore(rating.diem_so) }}/5</span
+                        >{{ group.avgScore }}/5</span
                       >
                     </div>
                   </div>
@@ -1128,7 +1200,7 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <Transition name="modal-fade">
         <div
-          v-if="showRatingDetailModal && selectedRating"
+          v-if="showRatingDetailModal && selectedRatingGroup"
           class="trip-rating-detail-overlay"
           @click.self="showRatingDetailModal = false"
         >
@@ -1140,29 +1212,9 @@ onBeforeUnmount(() => {
               </button>
             </div>
             <div class="trip-rating-detail-body">
-              <div v-if="selectedTrip" class="trip-rating-detail-trip">
-                <div class="trip-rating-detail-trip-title">Chuyến xe</div>
-                <div class="trip-rating-detail-trip-route">
-                  {{ selectedTrip.tuyen_duong?.diem_bat_dau }} →
-                  {{ selectedTrip.tuyen_duong?.diem_ket_thuc }}
-                </div>
-                <div class="trip-rating-detail-trip-meta">
-                  <span>{{ selectedTrip.tuyen_duong?.ten_tuyen_duong }}</span>
-                  <span v-if="selectedTrip.tuyen_duong?.nha_xe?.ten_nha_xe">
-                    · {{ selectedTrip.tuyen_duong.nha_xe.ten_nha_xe }}
-                  </span>
-                </div>
-                <div class="trip-rating-detail-trip-meta">
-                  <span>Ngày: {{ formatFullDate(selectedTrip.ngay_khoi_hanh) }}</span>
-                  <span> · Giờ: {{ formatTime(selectedTrip.gio_khoi_hanh) }}</span>
-                  <span v-if="selectedTrip.xe?.bien_so">
-                    · Xe: {{ selectedTrip.xe.bien_so }}</span
-                  >
-                </div>
-              </div>
               <div class="trip-rating-detail-top">
                 <span class="trip-rating-detail-name">
-                  {{ getRatingCustomerName(selectedRating) }}
+                  {{ selectedRatingGroup?.name }}
                 </span>
                 <div class="trip-rating-detail-stars-row">
                   <span
@@ -1171,87 +1223,118 @@ onBeforeUnmount(() => {
                     class="trip-rating-detail-star"
                     :class="{
                       'trip-rating-detail-star--on':
-                        star <= clampRatingScore(selectedRating?.diem_so),
+                        star <= clampRatingScore(selectedRatingGroup?.avgScore),
                     }"
                     aria-hidden="true"
                     >★</span
                   >
                   <span class="trip-rating-detail-score">{{
-                    clampRatingScore(selectedRating?.diem_so)
+                    selectedRatingGroup?.avgScore
                   }}/5</span>
                 </div>
               </div>
-              <div class="trip-rating-detail-grid">
-                <div class="trip-rating-detail-metric">
-                  <span class="trip-rating-detail-metric-label">Dịch vụ</span>
-                  <div class="trip-rating-detail-metric-stars">
+              <div class="trip-rating-detail-scroll-list">
+                <div
+                  v-for="rating in selectedRatingGroup?.ratings || []"
+                  :key="rating.id"
+                  class="trip-rating-detail-item"
+                >
+                  <div class="trip-rating-detail-trip">
+                    <div class="trip-rating-detail-trip-title">Chuyến xe</div>
+                    <div class="trip-rating-detail-trip-route">
+                      {{ getRatingTripRoute(rating) }}
+                    </div>
+                    <div class="trip-rating-detail-trip-meta">
+                      {{ getRatingTripMeta(rating) }}
+                    </div>
+                  </div>
+                  <div class="trip-rating-detail-stars-row">
                     <span
                       v-for="star in 5"
-                      :key="`dv-${star}`"
+                      :key="`rate-${rating.id}-${star}`"
                       class="trip-rating-detail-star trip-rating-detail-star--sm"
                       :class="{
                         'trip-rating-detail-star--on':
-                          star <= subRatingStars(selectedRating?.diem_dich_vu),
+                          star <= clampRatingScore(rating?.diem_so),
                       }"
                       aria-hidden="true"
                       >★</span
                     >
-                    <strong>{{ subRatingLabel(selectedRating?.diem_dich_vu) }}</strong>
+                    <strong>{{ clampRatingScore(rating?.diem_so) }}/5</strong>
                   </div>
-                </div>
-                <div class="trip-rating-detail-metric">
-                  <span class="trip-rating-detail-metric-label">An toàn</span>
-                  <div class="trip-rating-detail-metric-stars">
-                    <span
-                      v-for="star in 5"
-                      :key="`at-${star}`"
-                      class="trip-rating-detail-star trip-rating-detail-star--sm"
-                      :class="{
-                        'trip-rating-detail-star--on':
-                          star <= subRatingStars(selectedRating?.diem_an_toan),
-                      }"
-                      aria-hidden="true"
-                      >★</span
-                    >
-                    <strong>{{ subRatingLabel(selectedRating?.diem_an_toan) }}</strong>
+                  <div class="trip-rating-detail-grid">
+                    <div class="trip-rating-detail-metric">
+                      <span class="trip-rating-detail-metric-label">Dịch vụ</span>
+                      <div class="trip-rating-detail-metric-stars">
+                        <span
+                          v-for="star in 5"
+                          :key="`dv-${rating.id}-${star}`"
+                          class="trip-rating-detail-star trip-rating-detail-star--sm"
+                          :class="{
+                            'trip-rating-detail-star--on':
+                              star <= subRatingStars(rating?.diem_dich_vu),
+                          }"
+                          aria-hidden="true"
+                          >★</span
+                        >
+                        <strong>{{ subRatingLabel(rating?.diem_dich_vu) }}</strong>
+                      </div>
+                    </div>
+                    <div class="trip-rating-detail-metric">
+                      <span class="trip-rating-detail-metric-label">An toàn</span>
+                      <div class="trip-rating-detail-metric-stars">
+                        <span
+                          v-for="star in 5"
+                          :key="`at-${rating.id}-${star}`"
+                          class="trip-rating-detail-star trip-rating-detail-star--sm"
+                          :class="{
+                            'trip-rating-detail-star--on':
+                              star <= subRatingStars(rating?.diem_an_toan),
+                          }"
+                          aria-hidden="true"
+                          >★</span
+                        >
+                        <strong>{{ subRatingLabel(rating?.diem_an_toan) }}</strong>
+                      </div>
+                    </div>
+                    <div class="trip-rating-detail-metric">
+                      <span class="trip-rating-detail-metric-label">Sạch sẽ</span>
+                      <div class="trip-rating-detail-metric-stars">
+                        <span
+                          v-for="star in 5"
+                          :key="`ss-${rating.id}-${star}`"
+                          class="trip-rating-detail-star trip-rating-detail-star--sm"
+                          :class="{
+                            'trip-rating-detail-star--on':
+                              star <= subRatingStars(rating?.diem_sach_se),
+                          }"
+                          aria-hidden="true"
+                          >★</span
+                        >
+                        <strong>{{ subRatingLabel(rating?.diem_sach_se) }}</strong>
+                      </div>
+                    </div>
+                    <div class="trip-rating-detail-metric">
+                      <span class="trip-rating-detail-metric-label">Thái độ</span>
+                      <div class="trip-rating-detail-metric-stars">
+                        <span
+                          v-for="star in 5"
+                          :key="`td-${rating.id}-${star}`"
+                          class="trip-rating-detail-star trip-rating-detail-star--sm"
+                          :class="{
+                            'trip-rating-detail-star--on':
+                              star <= subRatingStars(rating?.diem_thai_do),
+                          }"
+                          aria-hidden="true"
+                          >★</span
+                        >
+                        <strong>{{ subRatingLabel(rating?.diem_thai_do) }}</strong>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div class="trip-rating-detail-metric">
-                  <span class="trip-rating-detail-metric-label">Sạch sẽ</span>
-                  <div class="trip-rating-detail-metric-stars">
-                    <span
-                      v-for="star in 5"
-                      :key="`ss-${star}`"
-                      class="trip-rating-detail-star trip-rating-detail-star--sm"
-                      :class="{
-                        'trip-rating-detail-star--on':
-                          star <= subRatingStars(selectedRating?.diem_sach_se),
-                      }"
-                      aria-hidden="true"
-                      >★</span
-                    >
-                    <strong>{{ subRatingLabel(selectedRating?.diem_sach_se) }}</strong>
-                  </div>
-                </div>
-                <div class="trip-rating-detail-metric">
-                  <span class="trip-rating-detail-metric-label">Thái độ</span>
-                  <div class="trip-rating-detail-metric-stars">
-                    <span
-                      v-for="star in 5"
-                      :key="`td-${star}`"
-                      class="trip-rating-detail-star trip-rating-detail-star--sm"
-                      :class="{
-                        'trip-rating-detail-star--on':
-                          star <= subRatingStars(selectedRating?.diem_thai_do),
-                      }"
-                      aria-hidden="true"
-                      >★</span
-                    >
-                    <strong>{{ subRatingLabel(selectedRating?.diem_thai_do) }}</strong>
-                  </div>
+                  <p class="trip-rating-detail-note">{{ rating?.noi_dung || "Không có nhận xét." }}</p>
                 </div>
               </div>
-              <p class="trip-rating-detail-note">{{ selectedRating?.noi_dung || "Không có nhận xét." }}</p>
             </div>
           </div>
         </div>
@@ -2620,7 +2703,7 @@ onBeforeUnmount(() => {
 
 .trip-modal__rating-head {
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
 }
 
@@ -2628,6 +2711,12 @@ onBeforeUnmount(() => {
   font-size: 0.82rem;
   font-weight: 700;
   color: #1e293b;
+}
+
+.trip-modal__rating-count {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 600;
 }
 
 .trip-modal__rating-stars-row {
@@ -2700,6 +2789,23 @@ onBeforeUnmount(() => {
 
 .trip-rating-detail-body {
   padding: 0.9rem 1rem 1rem;
+}
+
+.trip-rating-detail-scroll-list {
+  max-height: 38vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-right: 0.2rem;
+  margin-top: 0.35rem;
+}
+
+.trip-rating-detail-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 0.6rem 0.65rem;
 }
 
 .trip-rating-detail-trip {

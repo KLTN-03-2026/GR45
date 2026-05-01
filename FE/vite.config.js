@@ -15,8 +15,11 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    // Cho phép tất cả các host truy cập (giải quyết lỗi ngrok bị block)
+    allowedHosts: true,
+  },
   optimizeDeps: {
     exclude: ['onnxruntime-web']
   }
 })
-

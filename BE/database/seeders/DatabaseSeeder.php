@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
 
                 // --- Tang 3: Danh muc doc lap ---
             KhachHangSeeder::class,
+            DiemThanhVienSeeder::class,
 
             LoaiXeSeeder::class,
             LoaiGheSeeder::class,

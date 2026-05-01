@@ -31,7 +31,8 @@ class DatVeRequest extends FormRequest
             'id_voucher' => 'nullable|integer|exists:vouchers,id',
             'phuong_thuc_thanh_toan' => 'nullable|string|in:tien_mat,chuyen_khoan,vi_dien_tu',
             'sdt_khach_hang' => 'nullable|string|max:20',
-            'tinh_trang' => 'nullable|string|in:dang_cho,da_thanh_toan'
+            'tinh_trang' => 'nullable|string|in:dang_cho,da_thanh_toan',
+            'diem_quy_doi' => 'nullable|integer|min:0'
         ];
     }
 

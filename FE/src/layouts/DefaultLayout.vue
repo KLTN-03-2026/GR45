@@ -440,7 +440,7 @@ onUnmounted(() => {
           @click.self="showDetailedRatingModal = false"
         >
           <div
-            class="trip-rating-detail-modal trip-rating-detail-modal--pending trip-rating-detail-modal--pending-wide"
+            class="trip-rating-detail-modal trip-rating-detail-modal--pending"
             role="dialog"
             aria-modal="true"
             aria-labelledby="pending-rating-detail-title"
@@ -473,6 +473,11 @@ onUnmounted(() => {
               </button>
             </div>
             <div class="trip-rating-detail-body">
+              <p class="trip-rating-detail-hint">
+                Bạn có một chuyến đi đã hoàn thành nhưng chưa được đánh giá.
+                Hãy chia sẻ trải nghiệm của bạn!
+              </p>
+
               <div class="trip-rating-detail-trip">
                 <div class="trip-rating-detail-trip-title">Chuyến xe</div>
                 <div class="trip-rating-detail-trip-route">
@@ -541,78 +546,105 @@ onUnmounted(() => {
               </div>
 
               <div class="pending-rating-grid">
-                <label class="rating-label"
+                <label class="pending-rating-label"
                   >Đánh giá tổng thể
-                  <select v-model="detailedDraft.diem_so" class="rating-select">
-                    <option :value="5">5 sao</option>
-                    <option :value="4">4 sao</option>
-                    <option :value="3">3 sao</option>
-                    <option :value="2">2 sao</option>
-                    <option :value="1">1 sao</option>
-                  </select>
+                  <div class="trip-rating-detail-stars-row pending-rating-stars">
+                    <button
+                      v-for="star in 5"
+                      :key="`detail-overall-${star}`"
+                      type="button"
+                      class="trip-rating-detail-star pending-rating-star-btn"
+                      :class="{
+                        'trip-rating-detail-star--on': detailedDraft.diem_so >= star,
+                      }"
+                      @click="detailedDraft.diem_so = star"
+                    >
+                      ★
+                    </button>
+                  </div>
                 </label>
-                <label class="rating-label"
+                <label class="pending-rating-label"
                   >Chất lượng dịch vụ
-                  <select
-                    v-model="detailedDraft.diem_dich_vu"
-                    class="rating-select"
-                  >
-                    <option :value="5">5 sao</option>
-                    <option :value="4">4 sao</option>
-                    <option :value="3">3 sao</option>
-                    <option :value="2">2 sao</option>
-                    <option :value="1">1 sao</option>
-                  </select>
+                  <div class="trip-rating-detail-stars-row pending-rating-stars">
+                    <button
+                      v-for="star in 5"
+                      :key="`detail-service-${star}`"
+                      type="button"
+                      class="trip-rating-detail-star pending-rating-star-btn"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          detailedDraft.diem_dich_vu >= star,
+                      }"
+                      @click="detailedDraft.diem_dich_vu = star"
+                    >
+                      ★
+                    </button>
+                  </div>
                 </label>
-                <label class="rating-label"
+                <label class="pending-rating-label"
                   >Độ an toàn
-                  <select
-                    v-model="detailedDraft.diem_an_toan"
-                    class="rating-select"
-                  >
-                    <option :value="5">5 sao</option>
-                    <option :value="4">4 sao</option>
-                    <option :value="3">3 sao</option>
-                    <option :value="2">2 sao</option>
-                    <option :value="1">1 sao</option>
-                  </select>
+                  <div class="trip-rating-detail-stars-row pending-rating-stars">
+                    <button
+                      v-for="star in 5"
+                      :key="`detail-safety-${star}`"
+                      type="button"
+                      class="trip-rating-detail-star pending-rating-star-btn"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          detailedDraft.diem_an_toan >= star,
+                      }"
+                      @click="detailedDraft.diem_an_toan = star"
+                    >
+                      ★
+                    </button>
+                  </div>
                 </label>
-                <label class="rating-label"
+                <label class="pending-rating-label"
                   >Độ sạch sẽ
-                  <select
-                    v-model="detailedDraft.diem_sach_se"
-                    class="rating-select"
-                  >
-                    <option :value="5">5 sao</option>
-                    <option :value="4">4 sao</option>
-                    <option :value="3">3 sao</option>
-                    <option :value="2">2 sao</option>
-                    <option :value="1">1 sao</option>
-                  </select>
+                  <div class="trip-rating-detail-stars-row pending-rating-stars">
+                    <button
+                      v-for="star in 5"
+                      :key="`detail-clean-${star}`"
+                      type="button"
+                      class="trip-rating-detail-star pending-rating-star-btn"
+                      :class="{
+                        'trip-rating-detail-star--on':
+                          detailedDraft.diem_sach_se >= star,
+                      }"
+                      @click="detailedDraft.diem_sach_se = star"
+                    >
+                      ★
+                    </button>
+                  </div>
                 </label>
               </div>
 
-              <label class="rating-label"
+              <label class="pending-rating-label rating-label--full"
                 >Thái độ phục vụ
-                <select
-                  v-model="detailedDraft.diem_thai_do"
-                  class="rating-select"
-                >
-                  <option :value="5">5 sao</option>
-                  <option :value="4">4 sao</option>
-                  <option :value="3">3 sao</option>
-                  <option :value="2">2 sao</option>
-                  <option :value="1">1 sao</option>
-                </select>
+                <div class="trip-rating-detail-stars-row pending-rating-stars">
+                  <button
+                    v-for="star in 5"
+                    :key="`detail-attitude-${star}`"
+                    type="button"
+                    class="trip-rating-detail-star pending-rating-star-btn"
+                    :class="{
+                      'trip-rating-detail-star--on': detailedDraft.diem_thai_do >= star,
+                    }"
+                    @click="detailedDraft.diem_thai_do = star"
+                  >
+                    ★
+                  </button>
+                </div>
               </label>
 
               <label class="pending-rating-label pending-rating-label--block"
-                >Nhận xét
+                >Nhận xét (tùy chọn)
                 <textarea
                   v-model="detailedDraft.noi_dung"
                   rows="3"
                   class="trip-rating-detail-textarea"
                   maxlength="500"
+                  placeholder="Chia sẻ trải nghiệm của bạn..."
                 />
               </label>
             </div>
@@ -643,8 +675,8 @@ onUnmounted(() => {
 <style scoped>
 .rating-label {
   display: block;
-  font-size: 0.92rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
   color: #334155;
 }
 
@@ -705,10 +737,6 @@ onUnmounted(() => {
   max-height: min(90vh, 720px);
   display: flex;
   flex-direction: column;
-}
-
-.trip-rating-detail-modal--pending-wide {
-  max-width: 720px;
 }
 
 .trip-rating-detail-header {
@@ -828,8 +856,8 @@ onUnmounted(() => {
   border: none;
   background: none;
   cursor: pointer;
-  padding: 0.1rem 0.15rem;
-  font-size: 1.35rem;
+  padding: 0.05rem 0.1rem;
+  font-size: 1.05rem;
   transition: transform 0.15s ease;
 }
 
@@ -849,7 +877,7 @@ onUnmounted(() => {
 }
 
 .pending-rating-label--block {
-  margin-top: 0.35rem;
+  margin-top: 1rem;
 }
 
 .pending-rating-caption {
@@ -875,6 +903,10 @@ onUnmounted(() => {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+}
+
+.trip-rating-detail-textarea::placeholder {
+  color: #94a3b8;
 }
 
 .trip-rating-detail-footer {
@@ -940,6 +972,14 @@ onUnmounted(() => {
   grid-template-columns: 1fr 1fr;
   gap: 0.65rem 0.75rem;
   margin-bottom: 0.65rem;
+}
+
+.pending-rating-grid .trip-rating-detail-stars-row {
+  margin-top: 0.35rem;
+}
+
+.rating-label--full {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 640px) {
