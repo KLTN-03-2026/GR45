@@ -24,7 +24,7 @@ class KhachHangResource extends JsonResource
             'diem_thanh_vien' => $this->whenLoaded('diemThanhVien', function () {
                 return [
                     'hang_thanh_vien' => $this->diemThanhVien?->hang_thanh_vien,
-                    'diem_kha_dung'   => $this->diemThanhVien?->diem_kha_dung,
+                    'diem_hien_tai'   => $this->diemThanhVien?->diem_hien_tai,
                 ];
             }),
         ];

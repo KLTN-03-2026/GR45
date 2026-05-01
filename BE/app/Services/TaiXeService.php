@@ -179,11 +179,12 @@ class TaiXeService
                 }
             }
 
-            // 1. Tạo tài khoản đăng nhập (tai_xes)
+            // 1. Tạo tài khoản đăng nhập (tai_xes) - Chỉ lưu các trường bắt buộc
             $taiXeData = [
-                'ho_va_ten' => $data['ho_va_ten'] ?? $data['email'],
+                'ho_va_ten' => $data['ho_va_ten'],
                 'email' => $data['email'],
                 'cccd' => $data['cccd'],
+                'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
                 'password' => Hash::make($data['password']),
                 'ma_nha_xe' => $data['ma_nha_xe'],
                 'tinh_trang' => $data['tinh_trang'] ?? 'cho_duyet',
@@ -191,11 +192,11 @@ class TaiXeService
 
             $taiXe = $this->repo->create($taiXeData);
 
-            // 2. Tạo hồ sơ chi tiết (ho_so_tai_xes)
+            // 2. Tạo hồ sơ chi tiết (ho_so_tai_xes) - Lưu TOÀN BỘ thông tin
             $hoSoData = [
                 'id_tai_xe' => $taiXe->id,
                 'ma_nha_xe' => $data['ma_nha_xe'],
-                'ho_va_ten' => $data['ho_va_ten'] ?? $data['email'],
+                'ho_va_ten' => $data['ho_va_ten'],
                 'email' => $data['email'],
                 'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
                 'so_cccd' => $data['cccd'],
@@ -206,7 +207,7 @@ class TaiXeService
                 'hang_bang_lai' => $this->normalizeLicenseClass($data['hang_bang_lai'] ?? null),
                 'ngay_cap_gplx' => $data['ngay_cap_gplx'] ?? null,
                 'ngay_het_han_gplx' => $data['ngay_het_han_gplx'] ?? null,
-                'trang_thai_duyet' => 'pending',
+                'trang_thai_duyet' => ($data['tinh_trang'] ?? '') === 'hoat_dong' ? 'approved' : 'pending',
                 'nguoi_tao_id' => auth('sanctum')->id() ?? auth()->id(),
                 'anh_cccd_mat_truoc' => $data['anh_cccd_mat_truoc'] ?? null,
                 'anh_cccd_mat_sau' => $data['anh_cccd_mat_sau'] ?? null,
@@ -241,33 +242,25 @@ class TaiXeService
                 unset($data['password']);
             }
 
-            // 1. Cập nhật tai_xes
-            $taiXeData = array_intersect_key($data, array_flip(['ho_va_ten', 'email', 'cccd', 'password', 'ma_nha_xe', 'tinh_trang']));
+            // 1. Cập nhật tai_xes - Chỉ cập nhật các trường được phép trong Model
+            $taiXeFields = ['ho_va_ten', 'email', 'cccd', 'so_dien_thoai', 'password', 'ma_nha_xe', 'tinh_trang'];
+            $taiXeData = array_intersect_key($data, array_flip($taiXeFields));
+            
             $taiXe = $this->repo->update($id, $taiXeData);
 
             if (!$taiXe)
                 return null;
 
-            // 2. Cập nhật hoặc tạo mới ho_so_tai_xes
-            // Lọc bỏ các giá trị rỗng để không ghi đè dữ liệu cũ bằng chuỗi trống
+            // 2. Cập nhật ho_so_tai_xes - Lưu cả các trường chi tiết và ảnh
             $hoSoData = array_filter($data, function ($value, $key) {
                 return !in_array($key, ['password', 'tinh_trang']) && $value !== '' && $value !== null;
             }, ARRAY_FILTER_USE_BOTH);
+
             if (isset($data['cccd'])) {
                 $hoSoData['so_cccd'] = $data['cccd'];
             }
             if (array_key_exists('hang_bang_lai', $hoSoData)) {
                 $hoSoData['hang_bang_lai'] = $this->normalizeLicenseClass($hoSoData['hang_bang_lai']);
-            }
-
-            // Một số tài xế seed cũ chưa có bản ghi ho_so_tai_xes.
-            // Khi update lần đầu, bổ sung dữ liệu tối thiểu để updateOrCreate tạo hồ sơ hợp lệ.
-            if (!$taiXe->hoSo) {
-                $hoSoData = array_merge([
-                    'ho_va_ten' => $data['ho_va_ten'] ?? $taiXe->ho_va_ten ?? 'Tai xe',
-                    'email' => $data['email'] ?? $taiXe->email,
-                    'ma_nha_xe' => $data['ma_nha_xe'] ?? $taiXe->ma_nha_xe,
-                ], $hoSoData);
             }
 
             // Ánh xạ trạng thái duyệt nếu có thay đổi tinh_trang

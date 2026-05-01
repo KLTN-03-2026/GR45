@@ -112,6 +112,8 @@ class VeService
             $soLuongGhe = count($danhSachIdGhe);
             $tienBanDau = $giaVeCoBan * $soLuongGhe;
             $tienKhuyenMai = 0;
+            $tienDiem = 0;
+            $diemQuyDoi = (int)($data['diem_quy_doi'] ?? 0);
 
             // Xử lý Voucher (nếu có)
             $voucher = null;
@@ -135,7 +137,17 @@ class VeService
                 }
             }
 
-            $tongTien = $tienBanDau - $tienKhuyenMai;
+            // Xử lý đổi điểm thành viên
+            if ($role === 'khach_hang' && $diemQuyDoi > 0) {
+                $viDiem = $user->diemThanhVien;
+                if (!$viDiem || $viDiem->diem_hien_tai < $diemQuyDoi) {
+                    throw new Exception("Bạn không đủ điểm để thực hiện quy đổi (Cần $diemQuyDoi điểm).");
+                }
+                $tienDiem = $diemQuyDoi * 100; // 1 điểm = 100đ
+            }
+
+            $tongTien = $tienBanDau - $tienKhuyenMai - $tienDiem;
+            if ($tongTien < 0) $tongTien = 0;
 
             $tinhTrang = $data['tinh_trang'] ?? 'dang_cho';
             $phuongThucThanhToan = $data['phuong_thuc_thanh_toan'] ?? 'tien_mat';
@@ -179,6 +191,8 @@ class VeService
                 'tien_ban_dau' => $tienBanDau,
                 'tien_khuyen_mai' => $tienKhuyenMai,
                 'id_voucher' => $voucher ? $voucher->id : null,
+                'diem_quy_doi' => $diemQuyDoi,
+                'tien_diem' => $tienDiem,
             ]);
 
             // Cập nhật số lượng voucher
@@ -200,6 +214,15 @@ class VeService
                     'gia_ve' => $giaVeCoBan, // Giá gốc từng ghế
                     'tinh_trang' => $tinhTrangChiTiet,
                 ]);
+            }
+
+            // Trừ điểm thành viên nếu có dùng
+            if ($role === 'khach_hang' && $diemQuyDoi > 0) {
+                $user->diemThanhVien->suDungDiem(
+                    $diemQuyDoi,
+                    "Sử dụng điểm thanh toán cho vé " . $ve->ma_ve,
+                    $ve->ma_ve
+                );
             }
 
             DB::commit();

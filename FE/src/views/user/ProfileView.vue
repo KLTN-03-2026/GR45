@@ -103,6 +103,17 @@ const statusFilter = ref("all");
 const currentPage = ref(1);
 const pageSize = 10;
 
+// Loyalty state
+const loyaltyInfo = ref(null);
+const loyaltyHistory = ref([]);
+const isLoadingLoyalty = ref(false);
+const isLoadingLoyaltyHistory = ref(false);
+const loyaltyTab = ref("info"); // 'info' or 'history'
+const loyaltyPagination = ref({
+  current_page: 1,
+  last_page: 1,
+});
+
 const filterOptions = [
   { value: "all", label: "Tất cả" },
   { value: "dang_cho", label: "Chờ thanh toán" },
@@ -311,8 +322,8 @@ const getRankInfo = (rank) => {
       label: "Hạng Vàng",
       class: "bg-yellow-50 text-yellow-700 border-yellow-300",
     },
-    kim_cuong: {
-      label: "Hạng Kim Cương",
+    bach_kim: {
+      label: "Hạng Bạch Kim",
       class: "bg-blue-50 text-blue-700 border-blue-200",
     },
   };
@@ -326,7 +337,7 @@ const getRankInfo = (rank) => {
 
 const displayPoints = computed(() => {
   const p = clientStore.user?.diem_thanh_vien;
-  if (p && typeof p === "object") return p.diem_kha_dung ?? 0;
+  if (p && typeof p === "object") return p.diem_hien_tai ?? 0;
   return p ?? 0;
 });
 
@@ -527,6 +538,61 @@ const selectMenu = (main, sub) => {
   if (main === "account") expandedMenus.value.account = true;
   if (main === "offers") expandedMenus.value.offers = true;
   if (main === "tickets" || main === "my-ratings") fetchRatingsData();
+  if (main === "offers" && sub === "points") fetchLoyaltyInfo();
+};
+
+const fetchLoyaltyInfo = async () => {
+  isLoadingLoyalty.value = true;
+  try {
+    const res = await clientApi.getLoyaltyInfo();
+    if (res.success) {
+      loyaltyInfo.value = res.data;
+      // Cập nhật lại clientStore nếu cần
+      if (res.data) {
+        const newUser = { ...clientStore.user, diem_thanh_vien: res.data };
+        clientStore.updateUser(newUser);
+      }
+    }
+  } catch (error) {
+    console.error("Fetch loyalty info error:", error);
+  } finally {
+    isLoadingLoyalty.value = false;
+  }
+};
+
+const fetchLoyaltyHistory = async (page = 1) => {
+  isLoadingLoyaltyHistory.value = true;
+  try {
+    const res = await clientApi.getLoyaltyHistory({ page });
+    if (res.success) {
+      loyaltyHistory.value = res.data.data;
+      loyaltyPagination.value = {
+        current_page: res.data.current_page,
+        last_page: res.data.last_page,
+      };
+    }
+  } catch (error) {
+    console.error("Fetch loyalty history error:", error);
+  } finally {
+    isLoadingLoyaltyHistory.value = false;
+  }
+};
+
+const changeLoyaltyTab = (tab) => {
+  loyaltyTab.value = tab;
+  if (tab === "history") {
+    fetchLoyaltyHistory();
+  }
+};
+
+const getLoyaltyTypeInfo = (type) => {
+  const map = {
+    tich_diem: { label: "Tích điểm", class: "text-emerald-600 bg-emerald-50" },
+    su_dung: { label: "Sử dụng", class: "text-amber-600 bg-amber-50" },
+    hoan_diem: { label: "Hoàn điểm", class: "text-blue-600 bg-blue-50" },
+    het_han: { label: "Hết hạn", class: "text-slate-500 bg-slate-50" },
+  };
+  return map[type] || { label: type, class: "text-slate-600 bg-slate-50" };
 };
 
 onMounted(() => {
@@ -1305,49 +1371,162 @@ onUnmounted(() => {
           <!-- Points Content -->
           <div
             v-if="activeMenu.main === 'offers' && activeMenu.sub === 'points'"
-            class="bg-white p-6 sm:p-10 rounded-3xl shadow-sm border border-slate-200 animate-fade-in"
+            class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden animate-fade-in"
           >
-            <div class="text-center py-8">
-              <div
-                class="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg"
+            <!-- Loyalty Tabs Header -->
+            <div class="flex border-b border-slate-100">
+              <button 
+                @click="changeLoyaltyTab('info')"
+                :class="[
+                  'flex-1 py-4 text-sm font-bold transition-all border-b-2',
+                  loyaltyTab === 'info' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ]"
               >
-                <span class="material-symbols-outlined text-5xl text-white"
-                  >hotel_class</span
+                Thông tin & Hạng
+              </button>
+              <button 
+                @click="changeLoyaltyTab('history')"
+                :class="[
+                  'flex-1 py-4 text-sm font-bold transition-all border-b-2',
+                  loyaltyTab === 'history' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                ]"
+              >
+                Lịch sử giao dịch
+              </button>
+            </div>
+
+            <!-- Tab 1: Info & Rank -->
+            <div v-if="loyaltyTab === 'info'" class="p-6 sm:p-10">
+              <div class="text-center py-4">
+                <div
+                  class="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg relative"
                 >
+                  <span class="material-symbols-outlined text-5xl text-white">hotel_class</span>
+                  <div class="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-sm">
+                    <span class="material-symbols-outlined text-blue-600 text-xl font-black">verified</span>
+                  </div>
+                </div>
+                <h2 class="text-4xl font-black text-slate-900 mb-2">
+                  {{ displayPoints }} <span class="text-xl font-bold text-slate-400">điểm</span>
+                </h2>
+                <div class="mb-8">
+                  <span :class="displayRank.class" class="px-6 py-1.5 rounded-full text-xs font-black border shadow-sm uppercase tracking-wider">
+                    {{ displayRank.label }}
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left max-w-3xl mx-auto mt-10">
+                  <div class="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                    <h3 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <span class="material-symbols-outlined text-blue-600">stars</span>
+                      Cách tích điểm
+                    </h3>
+                    <ul class="space-y-3 text-sm text-slate-600">
+                      <li class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
+                        <span>Mỗi <b>10.000đ</b> chi tiêu khi đặt vé bạn sẽ nhận được <b>1 điểm</b> thưởng.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
+                        <span>Hoàn thành chuyến xe để điểm được cộng vào tài khoản chính thức.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
+                        <span>Tham gia các chương trình khuyến mãi đặc biệt để nhận nhân đôi điểm.</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div class="bg-slate-50 rounded-2xl p-6 border border-slate-100">
+                    <h3 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <span class="material-symbols-outlined text-orange-500">redeem</span>
+                      Quyền lợi hạng {{ displayRank.label }}
+                    </h3>
+                    <ul class="space-y-3 text-sm text-slate-600">
+                      <li class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-orange-400 text-lg">bolt</span>
+                        <span>Đổi điểm nhận Voucher giảm giá trực tiếp vào giá vé.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-orange-400 text-lg">bolt</span>
+                        <span>Ưu tiên chọn chỗ ngồi đẹp trên các chuyến xe cao cấp.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="material-symbols-outlined text-orange-400 text-lg">bolt</span>
+                        <span>Hỗ trợ nhanh chóng qua đường dây nóng dành riêng cho VIP.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <h2 class="text-3xl font-bold text-slate-900 mb-2">
-                {{ displayPoints }} điểm
-              </h2>
-              <p class="text-slate-500 max-w-md mx-auto">
-                Tích điểm khi đặt vé và nhận ưu đãi độc quyền.
-              </p>
-              <div
-                class="mt-8 bg-slate-50 rounded-2xl p-6 text-left max-w-lg mx-auto"
-              >
-                <h3 class="font-bold text-slate-900 mb-3">Cách tích điểm</h3>
-                <ul class="space-y-2 text-sm text-slate-600">
-                  <li class="flex items-center gap-2">
-                    <span
-                      class="material-symbols-outlined text-blue-500 text-sm"
-                      >check_circle</span
-                    >
-                    Mỗi 10.000đ = 1 điểm
-                  </li>
-                  <li class="flex items-center gap-2">
-                    <span
-                      class="material-symbols-outlined text-blue-500 text-sm"
-                      >check_circle</span
-                    >
-                    Điểm có thể đổi voucher giảm giá
-                  </li>
-                  <li class="flex items-center gap-2">
-                    <span
-                      class="material-symbols-outlined text-blue-500 text-sm"
-                      >check_circle</span
-                    >
-                    Điểm không có giá trị quy đổi thành tiền mặt
-                  </li>
-                </ul>
+            </div>
+
+            <!-- Tab 2: History -->
+            <div v-if="loyaltyTab === 'history'" class="p-6 sm:p-10">
+              <div v-if="isLoadingLoyaltyHistory" class="flex flex-col items-center justify-center py-20">
+                <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                <p class="text-slate-500 font-medium">Đang tải lịch sử...</p>
+              </div>
+
+              <div v-else-if="loyaltyHistory.length === 0" class="text-center py-20">
+                <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span class="material-symbols-outlined text-4xl text-slate-300">history</span>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800">Chưa có lịch sử giao dịch</h3>
+                <p class="text-slate-500 text-sm mt-1">Hãy đặt vé để tích lũy điểm thưởng ngay hôm nay!</p>
+              </div>
+
+              <div v-else class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead>
+                    <tr class="border-b border-slate-100">
+                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider">Ngày GD</th>
+                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider">Nội dung</th>
+                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider">Loại</th>
+                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider text-right">Biến động</th>
+                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider text-right">Số dư</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-50">
+                    <tr v-for="item in loyaltyHistory" :key="item.id" class="group hover:bg-slate-50 transition-colors">
+                      <td class="py-4 pr-4">
+                        <div class="text-sm font-bold text-slate-900">{{ formatDate(item.created_at) }}</div>
+                        <div class="text-[10px] text-slate-400 font-mono">{{ item.created_at.substring(11, 16) }}</div>
+                      </td>
+                      <td class="py-4 pr-4">
+                        <div class="text-sm font-semibold text-slate-700 leading-snug">{{ item.ghi_chu }}</div>
+                        <div v-if="item.ma_tham_chieu" class="text-[11px] text-blue-500 font-bold mt-1">#{{ item.ma_tham_chieu }}</div>
+                      </td>
+                      <td class="py-4 pr-4">
+                        <span :class="getLoyaltyTypeInfo(item.loai_giao_dich).class" class="px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                          {{ getLoyaltyTypeInfo(item.loai_giao_dich).label }}
+                        </span>
+                      </td>
+                      <td class="py-4 pr-4 text-right">
+                        <div :class="item.so_diem > 0 ? 'text-emerald-600' : 'text-rose-600'" class="text-base font-black">
+                          {{ item.so_diem > 0 ? '+' : '' }}{{ item.so_diem }}
+                        </div>
+                      </td>
+                      <td class="py-4 text-right">
+                        <div class="text-sm font-bold text-slate-500">{{ item.diem_sau }}</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <!-- Pagination -->
+                <div v-if="loyaltyPagination.last_page > 1" class="mt-8 flex justify-center gap-2">
+                  <button 
+                    v-for="p in loyaltyPagination.last_page" :key="p"
+                    @click="fetchLoyaltyHistory(p)"
+                    :class="[
+                      'w-10 h-10 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center',
+                      loyaltyPagination.current_page === p ? 'bg-blue-600 text-white shadow-blue-200' : 'bg-white text-slate-600 hover:bg-blue-50 border border-slate-200'
+                    ]"
+                  >
+                    {{ p }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -113,6 +113,16 @@ const driverApi = {
   postSOS(data) {
     const url = '/v1/tai-xe/sos';
     return axiosClient.post(url, data);
+  },
+
+  /**
+   * Hoàn thành chuyến xe (Cập nhật trạng thái và tích điểm cho khách)
+   * @param {Number} id 
+   * @returns {Promise}
+   */
+  hoanThanhChuyenXe(id) {
+    const url = `/v1/tai-xe/chuyen-xe/${id}/hoan-thanh`;
+    return axiosClient.post(url);
   }
 };
 

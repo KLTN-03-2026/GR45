@@ -25,8 +25,17 @@ const adminApi = {
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
 
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
-  createOperator: (data) => axiosClient.post('/v1/admin/nha-xe', data),
-  updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
+  createOperator: (data) => {
+    const isFormData = data instanceof FormData
+    return axiosClient.post('/v1/admin/nha-xe', data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {})
+  },
+  updateOperator: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT')
+      return axiosClient.post(`/v1/admin/nha-xe/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } })
+    }
+    return axiosClient.put(`/v1/admin/nha-xe/${id}`, data)
+  },
   toggleOperatorStatus: (id) => axiosClient.patch(`/v1/admin/nha-xe/${id}/trang-thai`),
   deleteOperator: (id) => axiosClient.delete(`/v1/admin/nha-xe/${id}`),
 

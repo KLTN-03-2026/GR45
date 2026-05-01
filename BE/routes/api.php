@@ -28,7 +28,7 @@ Route::prefix('v1')->group(function () {
     Route::get('tuyen-duong/public', [TuyenDuongController::class, 'indexPublic']);
     Route::get('xe/public', [XeController::class, 'indexPublic']);
     Route::get('tai-xe/public', [TaiXeController::class, 'indexPublic']);
-    
+
     // SePay Webhook
     Route::post('sepay/webhook', [ThanhToanController::class, 'sepayWebhook']);
 
@@ -62,6 +62,10 @@ Route::prefix('v1')->group(function () {
         Route::get('rating/{ticketCode}', [RatingController::class, 'getRating']);
         Route::get('pending-rating', [RatingController::class, 'getPendingRating']);
         Route::get('my-ratings', [RatingController::class, 'getMyRatings']);
+
+        // Loyalty points
+        Route::get('diem-thanh-vien', [KhachHangController::class, 'getDiemThanhVien']);
+        Route::get('lich-su-diem', [KhachHangController::class, 'getLichSuDiem']);
     });
 
     Route::get('map/direction', [MapProxyController::class, 'direction']);
@@ -95,6 +99,9 @@ Route::prefix('v1')->group(function () {
             Route::get('chuyen-xe/{id}/lich-trinh', [ChuyenXeController::class, 'getLichTrinh']);
             Route::post('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'postTracking']);
             Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
+
+            // hoàn thành chuyến xe
+            Route::post('chuyen-xe/{id}/hoan-thanh', [ChuyenXeController::class, 'hoanThanhChuyenXe']);
         });
 
         Route::get('chuyen-xe', [ChuyenXeController::class, 'index']);
@@ -139,6 +146,8 @@ Route::prefix('v1')->group(function () {
             Route::put('chuyen-xe/{id}/doi-xe', [ChuyenXeController::class, 'changeVehicle']);
             Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
             Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
+            // hoàn thành chuyến xe khi đã đến bến
+            Route::patch('chuyen-xe/{id}/hoan-thanh', [ChuyenXeController::class, 'finishTrip']);
 
             Route::get('voucher', [VoucherController::class, 'indexNhaXe']);
             Route::post('voucher', [VoucherController::class, 'storeNhaXe']);
@@ -234,7 +243,7 @@ Route::prefix('v1')->group(function () {
             Route::get('nha-xe', [NhaXeController::class, 'index'])->middleware('permission:xem-nha-xe');
             Route::get('nha-xe/{id}', [NhaXeController::class, 'show'])->middleware('permission:xem-nha-xe');
             Route::post('nha-xe', [NhaXeController::class, 'store'])->middleware('permission:them-nha-xe');
-            Route::put('nha-xe/{id}', [NhaXeController::class, 'updateOperator'])->middleware('permission:sua-nha-xe');
+            Route::match(['put', 'post'], 'nha-xe/{id}', [NhaXeController::class, 'updateOperator'])->middleware('permission:sua-nha-xe');
             Route::patch('nha-xe/{id}/trang-thai', [NhaXeController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-nha-xe');
             Route::delete('nha-xe/{id}', [NhaXeController::class, 'destroy'])->middleware('permission:xoa-nha-xe');
 

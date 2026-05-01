@@ -21,15 +21,27 @@ class NhaXeResource extends JsonResource
             // Ho so phap ly (neu da load)
             'ho_so' => $this->whenLoaded('hoSo', function () {
                 return [
-                    'ten_cong_ty' => $this->hoSo?->ten_cong_ty,
-                    'ma_so_thue' => $this->hoSo?->ma_so_thue,
-                    'so_dang_ky_kinh_doanh' => $this->hoSo?->so_dang_kinh_doanh,
-                    'nguoi_dai_dien' => $this->hoSo?->nguoi_dai_dien,
-                    'so_dien_thoai' => $this->hoSo?->so_dien_thoai,
-                    'email' => $this->hoSo?->email,
-                    'dia_chi' => $this->hoSo?->dia_chi_chi_tiet,
-                    'id_phuong_xa' => $this->hoSo?->id_phuong_xa,
-                    'trang_thai' => $this->hoSo?->trang_thai,
+                    'ten_cong_ty'           => $this->hoSo?->ten_cong_ty,
+                    'ma_so_thue'            => $this->hoSo?->ma_so_thue,
+                    'so_dang_ky_kinh_doanh' => $this->hoSo?->so_dang_ky_kinh_doanh,
+                    'nguoi_dai_dien'        => $this->hoSo?->nguoi_dai_dien,
+                    'so_dien_thoai'         => $this->hoSo?->so_dien_thoai,
+                    'email'                 => $this->hoSo?->email,
+                    'dia_chi'               => $this->hoSo?->dia_chi_chi_tiet,
+                    'id_phuong_xa'          => $this->hoSo?->id_phuong_xa,
+                    'trang_thai'            => $this->hoSo?->trang_thai,
+                    'anh_logo'              => $this->hoSo?->anh_logo
+                        ? asset('storage/' . $this->hoSo->anh_logo)
+                        : null,
+                    'anh_tru_so'            => $this->hoSo?->anh_tru_so
+                        ? asset('storage/' . $this->hoSo->anh_tru_so)
+                        : null,
+                    'file_giay_phep_kinh_doanh' => $this->hoSo?->file_giay_phep_kinh_doanh
+                        ? asset('storage/' . $this->hoSo->file_giay_phep_kinh_doanh)
+                        : null,
+                    'file_cccd_dai_dien'    => $this->hoSo?->file_cccd_dai_dien
+                        ? asset('storage/' . $this->hoSo->file_cccd_dai_dien)
+                        : null,
                 ];
             }),
             'dia_chi_nha_xe' => $this->whenLoaded('diaChiNhaXes', function () {
