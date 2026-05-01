@@ -268,7 +268,11 @@ class RatingController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $ratings = DanhGia::with(['chuyenXe.tuyenDuong', 'khachHang:id,ho_va_ten'])
+        $ratings = DanhGia::with([
+            'chuyenXe.tuyenDuong.nhaXe',
+            'chuyenXe.xe:id,bien_so,ten_xe',
+            'khachHang:id,ho_va_ten',
+        ])
             ->where('id_khach_hang', $khachHang->id)
             ->orderByDesc('created_at')
             ->get();
@@ -279,6 +283,8 @@ class RatingController extends Controller
             $row['route_diem_bat_dau'] = $td?->diem_bat_dau;
             $row['route_diem_ket_thuc'] = $td?->diem_ket_thuc;
             $row['ten_tuyen_duong'] = $td?->ten_tuyen_duong;
+            $row['ten_nha_xe'] = $td?->nhaXe?->ten_nha_xe;
+            $row['bien_so_xe'] = $r->chuyenXe?->xe?->bien_so;
             $row['chuyen_ngay_khoi_hanh'] = $r->chuyenXe?->ngay_khoi_hanh?->format('Y-m-d');
             $row['chuyen_gio_khoi_hanh'] = $r->chuyenXe?->gio_khoi_hanh?->format('H:i');
 
@@ -304,7 +310,7 @@ class RatingController extends Controller
 
         $ratings = DanhGia::with([
             'khachHang:id,ho_va_ten,email,so_dien_thoai',
-            'chuyenXe.tuyenDuong',
+            'chuyenXe.tuyenDuong.nhaXe',
             'chuyenXe.xe:id,bien_so,ten_xe,ma_nha_xe',
         ])
             ->whereHas('chuyenXe.xe', function ($q) use ($nhaXe) {
@@ -330,7 +336,7 @@ class RatingController extends Controller
 
         $query = DanhGia::with([
             'khachHang:id,ho_va_ten,email,so_dien_thoai,avatar',
-            'chuyenXe.tuyenDuong:id,ten_tuyen_duong,diem_bat_dau,diem_ket_thuc',
+            'chuyenXe.tuyenDuong.nhaXe',
             'chuyenXe.xe:id,bien_so,ten_xe,ma_nha_xe,id_loai_xe',
             'chuyenXe.xe.nhaXe:id,ma_nha_xe,ten_nha_xe',
         ])->orderByDesc('created_at');
