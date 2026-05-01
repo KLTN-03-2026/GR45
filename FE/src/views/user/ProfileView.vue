@@ -96,6 +96,9 @@ const passwordForm = reactive({
   mat_khau_moi_confirmation: "",
 });
 const passwordMessage = ref({ type: "", text: "" });
+const showPwCu = ref(false);
+const showPwMoi = ref(false);
+const showPwMoiConf = ref(false);
 
 // Tickets History Filter Logic (Client-side filtering for 100% accuracy)
 const allTickets = ref([]);
@@ -282,6 +285,18 @@ const getRatingRouteLine = (rating) => {
   const b = to != null && String(to).trim() !== "" ? String(to).trim() : "—";
   return `${a} → ${b}`;
 };
+
+const getRatingTenNhaXe = (rating) =>
+  rating?.ten_nha_xe ||
+  rating?.chuyen_xe?.tuyen_duong?.nha_xe?.ten_nha_xe ||
+  rating?.chuyenXe?.tuyenDuong?.nhaXe?.ten_nha_xe ||
+  "";
+
+const getRatingBienSoXe = (rating) =>
+  rating?.bien_so_xe ||
+  rating?.chuyen_xe?.xe?.bien_so ||
+  rating?.chuyenXe?.xe?.bienSo ||
+  "";
 
 const getRatingProfileName = (rating) => {
   return (
@@ -991,40 +1006,81 @@ onUnmounted(() => {
                   <label class="block text-sm font-semibold text-slate-700"
                     >Mật khẩu hiện tại</label
                   >
-                  <input
-                    type="password"
-                    v-model="passwordForm.mat_khau_cu"
-                    required
-                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]"
-                    placeholder="••••••••"
-                  />
+                  <div class="relative">
+                    <input
+                      :type="showPwCu ? 'text' : 'password'"
+                      v-model="passwordForm.mat_khau_cu"
+                      required
+                      class="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]"
+                      placeholder="••••••••"
+                      autocomplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:bg-slate-200/80"
+                      :aria-label="showPwCu ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+                      @click="showPwCu = !showPwCu"
+                    >
+                      <span class="material-symbols-outlined text-[22px]">{{
+                        showPwCu ? "visibility_off" : "visibility"
+                      }}</span>
+                    </button>
+                  </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div class="space-y-2">
                     <label class="block text-sm font-semibold text-slate-700"
                       >Mật khẩu mới</label
                     >
-                    <input
-                      type="password"
-                      v-model="passwordForm.mat_khau_moi"
-                      required
-                      minlength="6"
-                      class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]"
-                      placeholder="••••••••"
-                    />
+                    <div class="relative">
+                      <input
+                        :type="showPwMoi ? 'text' : 'password'"
+                        v-model="passwordForm.mat_khau_moi"
+                        required
+                        minlength="6"
+                        class="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]"
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:bg-slate-200/80"
+                        :aria-label="showPwMoi ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+                        @click="showPwMoi = !showPwMoi"
+                      >
+                        <span class="material-symbols-outlined text-[22px]">{{
+                          showPwMoi ? "visibility_off" : "visibility"
+                        }}</span>
+                      </button>
+                    </div>
                   </div>
                   <div class="space-y-2">
                     <label class="block text-sm font-semibold text-slate-700"
                       >Xác nhận mật khẩu</label
                     >
-                    <input
-                      type="password"
-                      v-model="passwordForm.mat_khau_moi_confirmation"
-                      required
-                      minlength="6"
-                      class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]"
-                      placeholder="••••••••"
-                    />
+                    <div class="relative">
+                      <input
+                        :type="showPwMoiConf ? 'text' : 'password'"
+                        v-model="passwordForm.mat_khau_moi_confirmation"
+                        required
+                        minlength="6"
+                        class="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-colors font-mono h-[50px]"
+                        placeholder="••••••••"
+                        autocomplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:bg-slate-200/80"
+                        :aria-label="
+                          showPwMoiConf ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
+                        "
+                        @click="showPwMoiConf = !showPwMoiConf"
+                      >
+                        <span class="material-symbols-outlined text-[22px]">{{
+                          showPwMoiConf ? "visibility_off" : "visibility"
+                        }}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div class="pt-4">
@@ -1329,6 +1385,12 @@ onUnmounted(() => {
                   <div class="mr-list-route">
                     {{ getRatingRouteLine(rating) }}
                   </div>
+                  <div
+                    v-if="getRatingTenNhaXe(rating)"
+                    class="text-xs font-semibold text-slate-500 mt-0.5"
+                  >
+                    {{ getRatingTenNhaXe(rating) }}
+                  </div>
                   <div class="mr-list-meta">
                     <span
                       v-if="rating.chuyen_ngay_khoi_hanh"
@@ -1619,11 +1681,11 @@ onUnmounted(() => {
             @click.self="closeTicketDetail"
           >
             <div
-              class="trip-rating-detail-modal max-w-2xl"
+              class="trip-rating-detail-modal max-w-2xl max-h-[min(90vh,900px)] min-h-0 flex flex-col"
               role="dialog"
               aria-modal="true"
             >
-              <div class="trip-rating-detail-header py-6 px-10">
+              <div class="trip-rating-detail-header py-6 px-10 shrink-0">
                 <h3 class="text-2xl font-bold text-slate-800">Chi tiết vé</h3>
                 <button
                   type="button"
@@ -1642,7 +1704,9 @@ onUnmounted(() => {
                   </svg>
                 </button>
               </div>
-              <div class="p-10 overflow-y-auto space-y-12 bg-white">
+              <div
+                class="p-10 space-y-12 bg-white min-h-0 flex-1 overflow-y-auto overscroll-contain"
+              >
                 <!-- PHẦN 1: THÔNG TIN VÉ -->
                 <section>
                   <div class="flex justify-between items-center mb-6">
@@ -2001,8 +2065,33 @@ onUnmounted(() => {
                     <span v-if="selectedMyRating.ten_tuyen_duong">{{
                       selectedMyRating.ten_tuyen_duong
                     }}</span>
-                    <span v-if="selectedMyRating.id_chuyen_xe">
-                      · ID #{{ selectedMyRating.id_chuyen_xe }}</span
+                  </div>
+                  <div
+                    v-if="
+                      getRatingTenNhaXe(selectedMyRating) ||
+                      getRatingBienSoXe(selectedMyRating)
+                    "
+                    class="trip-rating-detail-trip-meta"
+                  >
+                    <span v-if="getRatingTenNhaXe(selectedMyRating)"
+                      >Nhà xe:
+                      <strong>{{
+                        getRatingTenNhaXe(selectedMyRating)
+                      }}</strong></span
+                    >
+                    <span
+                      v-if="
+                        getRatingTenNhaXe(selectedMyRating) &&
+                        getRatingBienSoXe(selectedMyRating)
+                      "
+                    >
+                      ·
+                    </span>
+                    <span v-if="getRatingBienSoXe(selectedMyRating)"
+                      >Biển số:
+                      <strong class="trip-rating-detail-mono">{{
+                        getRatingBienSoXe(selectedMyRating)
+                      }}</strong></span
                     >
                   </div>
                   <div class="trip-rating-detail-trip-meta">
@@ -2283,7 +2372,7 @@ onUnmounted(() => {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 
   display: flex;
-  overflow: scroll;
+  overflow: hidden;
   max-height: 85vh;
 
   flex-direction: column;

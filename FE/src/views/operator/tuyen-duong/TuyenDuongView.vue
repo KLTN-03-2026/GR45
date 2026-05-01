@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import operatorApi from '@/api/operatorApi'
 import BaseTable from '@/components/common/BaseTable.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -26,10 +26,20 @@ const pagination = reactive({ currentPage: 1, perPage: 15, total: 0, lastPage: 1
 const searchQuery = ref('')
 const filterStatus = ref('')
 
+const routesTableRows = computed(() =>
+  routes.value.map((r, i) => ({
+    ...r,
+    stt: (pagination.currentPage - 1) * pagination.perPage + i + 1,
+    ten_nha_xe:
+      r.nha_xe?.ten_nha_xe || r.nhaXe?.ten_nha_xe || r.ma_nha_xe || '—',
+  })),
+)
+
 // Cấu hình cột bảng - Nhà xe không thấy cột Mã Nhà Xe (vì chỉ xem của mình)
 const tableColumns = [
-  { key: 'id', label: 'ID' },
+  { key: 'stt', label: 'STT' },
   { key: 'ten_tuyen_duong', label: 'Tên Tuyến' },
+  { key: 'ten_nha_xe', label: 'Nhà xe' },
   { key: 'lo_trinh', label: 'Lộ Trình' },
   { key: 'quang_duong', label: 'Km' },
   { key: 'gio_khoi_hanh', label: 'Giờ chạy' },
@@ -171,21 +181,14 @@ const fetchRoutes = async (page = 1) => {
       page,
     })
 
-    // Bóc tách data linh hoạt (API có thể lồng nhiều cấp)
+    const d = res?.data
     let listData = []
     let pageInfo = {}
-
-    if (res.data?.data?.data?.data) {
-      listData = res.data.data.data.data
-      pageInfo = res.data.data.data
-    } else if (res.data?.data?.data) {
-      listData = res.data.data.data
-      pageInfo = res.data.data
-    } else if (Array.isArray(res.data?.data)) {
-      listData = res.data.data
-      pageInfo = res.data
-    } else if (Array.isArray(res.data)) {
-      listData = res.data
+    if (d && Array.isArray(d.data)) {
+      listData = d.data
+      pageInfo = d
+    } else if (Array.isArray(d)) {
+      listData = d
     }
 
     routes.value = Array.isArray(listData) ? listData : []
@@ -357,7 +360,7 @@ onMounted(() => { fetchRoutes() })
     <div class="table-card">
       <BaseTable
         :columns="tableColumns"
-        :data="routes"
+        :data="routesTableRows"
         :loading="loading"
       >
         <!-- Lộ trình -->

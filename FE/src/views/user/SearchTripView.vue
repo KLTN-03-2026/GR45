@@ -47,6 +47,32 @@ const getProvinceName = (id) => {
   return p ? p.ten_tinh_thanh : "";
 };
 
+/** Điểm đến không hiển thị cùng tỉnh với điểm đi */
+const provincesForTo = computed(() =>
+  provinces.value.filter((p) => p.id !== searchForm.value.tinh_thanh_di_id),
+);
+/** Điểm đi không hiển thị cùng tỉnh với điểm đến */
+const provincesForFrom = computed(() =>
+  provinces.value.filter((p) => p.id !== searchForm.value.tinh_thanh_den_id),
+);
+
+watch(
+  () => searchForm.value.tinh_thanh_di_id,
+  (id) => {
+    if (id && searchForm.value.tinh_thanh_den_id === id) {
+      searchForm.value.tinh_thanh_den_id = "";
+    }
+  },
+);
+watch(
+  () => searchForm.value.tinh_thanh_den_id,
+  (id) => {
+    if (id && searchForm.value.tinh_thanh_di_id === id) {
+      searchForm.value.tinh_thanh_di_id = "";
+    }
+  },
+);
+
 // Lấy danh sách tỉnh thành từ API
 const fetchProvinces = async () => {
   try {
@@ -573,7 +599,7 @@ onBeforeUnmount(() => {
             <div v-if="isOpenFrom" class="search-hero__dropdown">
               <div class="search-hero__dropdown-scroll">
                 <button
-                  v-for="p in provinces"
+                  v-for="p in provincesForFrom"
                   :key="p.id"
                   @click.stop="
                     searchForm.tinh_thanh_di_id = p.id;
@@ -642,7 +668,7 @@ onBeforeUnmount(() => {
             <div v-if="isOpenTo" class="search-hero__dropdown">
               <div class="search-hero__dropdown-scroll">
                 <button
-                  v-for="p in provinces"
+                  v-for="p in provincesForTo"
                   :key="p.id"
                   @click.stop="
                     searchForm.tinh_thanh_den_id = p.id;

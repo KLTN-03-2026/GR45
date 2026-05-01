@@ -262,7 +262,13 @@ class VeService
         }
 
         if (!empty($filters['ngay_khoi_hanh'])) {
-            $query->where('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
+            $query->whereHas('chuyenXe', function ($q) use ($filters) {
+                $q->whereDate('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
+            });
+        }
+
+        if (!empty($filters['id_chuyen_xe'])) {
+            $query->where('id_chuyen_xe', (int) $filters['id_chuyen_xe']);
         }
 
         if (!empty($filters['tinh_trang'])) {
@@ -270,14 +276,25 @@ class VeService
         }
 
         if (!empty($filters['search'])) {
-            $kw = $filters['search'];
+            $kw = trim((string) $filters['search']);
             $query->where(function ($q) use ($kw) {
-                $q->where('ma_ve', 'like', "%$kw%")
-                    ->orWhereHas('khachHang', fn($kh) => $kh->where('so_dien_thoai', 'like', "%$kw%"));
+                $q->where('ma_ve', 'like', '%' . $kw . '%')
+                    ->orWhereHas('khachHang', function ($kh) use ($kw) {
+                        $kh->where('so_dien_thoai', 'like', '%' . $kw . '%')
+                            ->orWhere('ho_va_ten', 'like', '%' . $kw . '%')
+                            ->orWhere('email', 'like', '%' . $kw . '%');
+                    })
+                    ->orWhereHas('chuyenXe.tuyenDuong', function ($td) use ($kw) {
+                        $td->where('ten_tuyen_duong', 'like', '%' . $kw . '%')
+                            ->orWhere('diem_bat_dau', 'like', '%' . $kw . '%')
+                            ->orWhere('diem_ket_thuc', 'like', '%' . $kw . '%');
+                    });
             });
         }
 
-        return $query->paginate($filters['per_page'] ?? 5);
+        $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 15;
+
+        return $query->paginate($perPage > 0 ? $perPage : 15);
     }
 
     public function getChiTietVe($id, string $role)

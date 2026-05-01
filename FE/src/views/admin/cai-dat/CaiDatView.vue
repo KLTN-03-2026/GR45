@@ -83,6 +83,9 @@ const passwordForm = ref({
   mat_khau_moi: '',
   mat_khau_moi_confirmation: '',
 })
+const showPwCu = ref(false)
+const showPwMoi = ref(false)
+const showPwConf = ref(false)
 let toastTimer = null
 
 const loginHistory = ref([
@@ -313,23 +316,49 @@ onMounted(() => {
         <h3 class="sub-title">Đổi mật khẩu</h3>
         <div class="field">
           <label>Mật khẩu hiện tại</label>
-          <input v-model="passwordForm.mat_khau_cu" type="password" placeholder="Nhập mật khẩu hiện tại" />
+          <div class="pw-field">
+            <input
+              v-model="passwordForm.mat_khau_cu"
+              :type="showPwCu ? 'text' : 'password'"
+              placeholder="Nhập mật khẩu hiện tại"
+              autocomplete="current-password"
+            />
+            <button type="button" class="pw-toggle" :aria-label="showPwCu ? 'Ẩn' : 'Hiện'" @click="showPwCu = !showPwCu">
+              <span class="material-symbols-outlined">{{ showPwCu ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
           <small v-if="passwordErrors.mat_khau_cu" class="error-text">{{ passwordErrors.mat_khau_cu[0] }}</small>
         </div>
 
         <div class="field">
           <label>Mật khẩu mới</label>
-          <input v-model="passwordForm.mat_khau_moi" type="password" placeholder="Ít nhất 6 ký tự" />
+          <div class="pw-field">
+            <input
+              v-model="passwordForm.mat_khau_moi"
+              :type="showPwMoi ? 'text' : 'password'"
+              placeholder="Ít nhất 6 ký tự"
+              autocomplete="new-password"
+            />
+            <button type="button" class="pw-toggle" :aria-label="showPwMoi ? 'Ẩn' : 'Hiện'" @click="showPwMoi = !showPwMoi">
+              <span class="material-symbols-outlined">{{ showPwMoi ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
           <small v-if="passwordErrors.mat_khau_moi" class="error-text">{{ passwordErrors.mat_khau_moi[0] }}</small>
         </div>
 
         <div class="field">
           <label>Xác nhận mật khẩu mới</label>
-          <input
-            v-model="passwordForm.mat_khau_moi_confirmation"
-            type="password"
-            placeholder="Nhập lại mật khẩu mới"
-          />
+          <div class="pw-field">
+            <input
+              v-model="passwordForm.mat_khau_moi_confirmation"
+              :type="showPwConf ? 'text' : 'password'"
+              placeholder="Nhập lại mật khẩu mới"
+              autocomplete="new-password"
+            />
+            <button type="button" class="pw-toggle" :aria-label="showPwConf ? 'Ẩn' : 'Hiện'" @click="showPwConf = !showPwConf">
+              <span class="material-symbols-outlined">{{ showPwConf ? 'visibility_off' : 'visibility' }}</span>
+            </button>
+          </div>
         </div>
 
         <button class="btn-save btn-password" :disabled="isChangingPassword" @click="handleChangePassword">
@@ -458,6 +487,42 @@ onMounted(() => {
   border-radius: 10px;
   padding: 10px;
   font-size: 14px;
+}
+
+.pw-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pw-field input {
+  width: 100%;
+  padding-right: 44px;
+}
+
+.pw-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pw-toggle:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.pw-toggle .material-symbols-outlined {
+  font-size: 22px;
 }
 
 .btn-save {
