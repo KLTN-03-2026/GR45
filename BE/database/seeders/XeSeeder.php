@@ -25,6 +25,7 @@ class XeSeeder extends Seeder
                 'id_tai_xe_chinh'  => $taiXe['trantaitx@futa.vn'] ?? null,
                 'trang_thai'       => 'hoat_dong',
                 'so_ghe_thuc_te'   => 40,
+                'hinh_anh'         => 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800',
                 'thong_tin_cai_dat' => json_encode(['camera_ai' => true, 'gps' => true, 'wifi' => true]),
             ],
             [
@@ -35,6 +36,7 @@ class XeSeeder extends Seeder
                 'id_tai_xe_chinh'  => $taiXe['hoangnamtx@futa.vn'] ?? null,
                 'trang_thai'       => 'hoat_dong',
                 'so_ghe_thuc_te'   => 20,
+                'hinh_anh'         => 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&q=80&w=800',
                 'thong_tin_cai_dat' => json_encode(['camera_ai' => true, 'gps' => true, 'wifi' => true]),
             ],
             // --- Xe của Hoàng Long (NX002) ---
@@ -46,6 +48,7 @@ class XeSeeder extends Seeder
                 'id_tai_xe_chinh'  => $taiXe['giakhiemtx@hoanglong.vn'] ?? null,
                 'trang_thai'       => 'hoat_dong',
                 'so_ghe_thuc_te'   => 40,
+                'hinh_anh'         => 'https://images.unsplash.com/photo-1557223562-6c77ef16210f?auto=format&fit=crop&q=80&w=800',
                 'thong_tin_cai_dat' => json_encode(['camera_ai' => true, 'gps' => true]),
             ],
             // --- Xe của Thành Bưởi (NX003) ---
@@ -57,6 +60,7 @@ class XeSeeder extends Seeder
                 'id_tai_xe_chinh'  => $taiXe['minhquantx@thanhbuoi.vn'] ?? null,
                 'trang_thai'       => 'hoat_dong',
                 'so_ghe_thuc_te'   => 40,
+                'hinh_anh'         => 'https://images.unsplash.com/photo-1557223562-6c77ef16210f?auto=format&fit=crop&q=80&w=800',
                 'thong_tin_cai_dat' => json_encode(['camera_ai' => true, 'gps' => true]),
             ],
         ];

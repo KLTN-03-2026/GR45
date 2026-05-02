@@ -50,6 +50,7 @@ class UpdateXeRequest extends FormRequest
             'hinh_bien_so' => 'nullable|string|max:500',
             'ghi_chu' => 'nullable|string|max:1000',
             'tien_nghi' => 'nullable|string|max:500',
+            'hinh_anh' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'trang_thai' => 'nullable|in:hoat_dong,bao_tri,cho_duyet,ngung_su_dung',
         ];
     }

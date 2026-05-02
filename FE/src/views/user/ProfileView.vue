@@ -1844,7 +1844,7 @@ onUnmounted(() => {
                         <p class="font-bold text-slate-900 text-lg">
                           {{
                             selectedTicket.chi_tiet_ves?.[0]?.tram_don
-                              ?.phuong_xa?.quan_huyen?.tinh_thanh
+                              ?.phuong_xa?.tinh_thanh
                               ?.ten_tinh_thanh ||
                             selectedTicket.chuyen_xe?.tuyen_duong?.diem_bat_dau
                           }}
@@ -1881,7 +1881,7 @@ onUnmounted(() => {
                         <p class="font-bold text-slate-900 text-lg">
                           {{
                             selectedTicket.chi_tiet_ves?.[0]?.tram_tra
-                              ?.phuong_xa?.quan_huyen?.tinh_thanh
+                              ?.phuong_xa?.tinh_thanh
                               ?.ten_tinh_thanh ||
                             selectedTicket.chuyen_xe?.tuyen_duong?.diem_ket_thuc
                           }}
