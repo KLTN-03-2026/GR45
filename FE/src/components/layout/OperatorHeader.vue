@@ -1,7 +1,7 @@
 <script setup>
-import { inject, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { useOperatorStore } from '@/stores/operatorStore'
+import { inject, ref, computed } from "vue";
+import { useRouter } from "vue-router";
+import { useOperatorStore } from "@/stores/operatorStore";
 import {
   Menu,
   Search,
@@ -13,36 +13,38 @@ import {
   AlertTriangle,
   CheckCircle,
   Info,
-  Zap
-} from 'lucide-vue-next'
+  Zap,
+} from "lucide-vue-next";
 
 // Inject từ OperatorLayout
-const toggleSidebar = inject('toggleSidebar')
+const toggleSidebar = inject("toggleSidebar");
 
-const router = useRouter()
-const operatorStore = useOperatorStore()
+const router = useRouter();
+const operatorStore = useOperatorStore();
 
 // Thông tin nhà xe
-const operatorUser = computed(() => operatorStore.user || { ten_nha_xe: 'Nhà Xe', role: 'Quản lý' })
+const operatorUser = computed(
+  () => operatorStore.user || { ten_nha_xe: "Nhà Xe", role: "Quản lý" },
+);
 
 // --- Profile dropdown ---
-const isProfileMenuOpen = ref(false)
+const isProfileMenuOpen = ref(false);
 const toggleProfileMenu = () => {
-  isProfileMenuOpen.value = !isProfileMenuOpen.value
-  if (isProfileMenuOpen.value) isNotifyMenuOpen.value = false
-}
+  isProfileMenuOpen.value = !isProfileMenuOpen.value;
+  if (isProfileMenuOpen.value) isNotifyMenuOpen.value = false;
+};
 
 const handleLogout = () => {
-  operatorStore.logout()
-  router.push('/auth/operator-login')
-}
+  operatorStore.logout();
+  router.push("/auth/operator-login");
+};
 
 // --- Notification dropdown ---
-const isNotifyMenuOpen = ref(false)
+const isNotifyMenuOpen = ref(false);
 const toggleNotifyMenu = () => {
-  isNotifyMenuOpen.value = !isNotifyMenuOpen.value
-  if (isNotifyMenuOpen.value) isProfileMenuOpen.value = false
-}
+  isNotifyMenuOpen.value = !isNotifyMenuOpen.value;
+  if (isNotifyMenuOpen.value) isProfileMenuOpen.value = false;
+};
 
 // Lấy thông báo từ store và kết hợp với thông báo mẫu
 const notifications = computed(() => {
@@ -53,68 +55,71 @@ const notifications = computed(() => {
 const sampleNotifications = ref([
   {
     id: 1,
-    type: 'alert',
-    title: 'Hệ thống AI',
-    message: 'Hệ thống giám sát tài xế đang hoạt động.',
-    time: 'Bắt đầu phiên',
+    type: "alert",
+    title: "Hệ thống AI",
+    message: "Hệ thống giám sát tài xế đang hoạt động.",
+    time: "Bắt đầu phiên",
     read: true,
-    icon: 'alert'
+    icon: "alert",
   },
   {
     id: 2,
-    type: 'info',
-    title: 'Hỗ trợ',
-    message: 'Chào mừng bạn đến với bảng điều khiển Nhà Xe.',
-    time: 'Hôm nay',
+    type: "info",
+    title: "Hỗ trợ",
+    message: "Chào mừng bạn đến với bảng điều khiển Nhà Xe.",
+    time: "Hôm nay",
     read: true,
-    icon: 'info'
-  }
-])
+    icon: "info",
+  },
+]);
 
-const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
+const unreadCount = computed(
+  () => notifications.value.filter((n) => !n.read).length,
+);
 
 // Đánh dấu tất cả đã đọc
 const markAllRead = () => {
-  notifications.value.forEach(n => n.read = true)
-}
+  notifications.value.forEach((n) => (n.read = true));
+};
 
 // Đóng dropdown khi click ngoài
 const closeAll = () => {
-  isProfileMenuOpen.value = false
-  isNotifyMenuOpen.value = false
-}
+  isProfileMenuOpen.value = false;
+  isNotifyMenuOpen.value = false;
+};
 
 // Xử lý khi click vào một thông báo
 const handleNotificationClick = (note) => {
   // Đánh dấu đã đọc
-  operatorStore.markNotificationRead(note.id)
-  note.read = true // Fallback cho sample data không nằm trong store
+  operatorStore.markNotificationRead(note.id);
+  note.read = true; // Fallback cho sample data không nằm trong store
 
   // Chuyển hướng dựa trên loại thông báo
   // 1. Báo động/Cảnh báo -> /nha-xe/canh-bao
   // 2. Tin nhắn/Hỗ trợ/Thông tin -> /nha-xe/ho-tro
   // 3. Đặt vé/Thành công -> /nha-xe/ve
 
-  const type = note.type?.toLowerCase() || ''
-  
-  if (type === 'alert' || type === 'warning' || type === 'danger') {
-    router.push('/nha-xe/canh-bao')
-  } else if (type === 'message' || type === 'info' || type === 'chat') {
-    router.push('/nha-xe/ho-tro')
-  } else if (type === 'booking' || type === 'success' || type === 'ticket') {
-    router.push('/nha-xe/ve')
+  const type = note.type?.toLowerCase() || "";
+
+  if (type === "alert" || type === "warning" || type === "danger") {
+    router.push("/nha-xe/canh-bao");
+  } else if (type === "wallet") {
+    router.push("/nha-xe/vi-nha-xe");
+  } else if (type === "message" || type === "info" || type === "chat") {
+    router.push("/nha-xe/ho-tro");
+  } else if (type === "booking" || type === "success" || type === "ticket") {
+    router.push("/nha-xe/ve");
   } else {
     // Mặc định chuyển về trang hỗ trợ/tin nhắn
-    router.push('/nha-xe/ho-tro')
+    router.push("/nha-xe/ho-tro");
   }
 
-  isNotifyMenuOpen.value = false
-}
+  isNotifyMenuOpen.value = false;
+};
 </script>
 
 <template>
   <header class="operator-header glass-header" @click.self="closeAll">
-
     <!-- Phần trái: hamburger + tìm kiếm -->
     <div class="header-left">
       <button class="hamburger-btn" @click="toggleSidebar">
@@ -123,18 +128,23 @@ const handleNotificationClick = (note) => {
 
       <div class="search-box">
         <Search class="search-icon" />
-        <input type="text" placeholder="Tìm kiếm chuyến xe, vé, tài xế..." class="search-input" />
+        <input
+          type="text"
+          placeholder="Tìm kiếm chuyến xe, vé, tài xế..."
+          class="search-input"
+        />
       </div>
     </div>
 
     <!-- Phần phải: Notification + Profile -->
     <div class="header-right">
-
       <!-- Nút thông báo -->
       <div class="notify-container">
         <button class="action-btn notify-btn" @click.stop="toggleNotifyMenu">
           <Bell class="action-icon" />
-          <span v-if="unreadCount > 0" class="notify-badge">{{ unreadCount }}</span>
+          <span v-if="unreadCount > 0" class="notify-badge">{{
+            unreadCount
+          }}</span>
         </button>
 
         <!-- Dropdown Thông Báo -->
@@ -144,9 +154,13 @@ const handleNotificationClick = (note) => {
             <div class="dropdown-header flex-between">
               <div class="notify-header-left">
                 <span class="dropdown-title">Thông báo</span>
-                <span v-if="unreadCount > 0" class="unread-chip">{{ unreadCount }} mới</span>
+                <span v-if="unreadCount > 0" class="unread-chip"
+                  >{{ unreadCount }} mới</span
+                >
               </div>
-              <button class="mark-read-btn" @click="markAllRead">Đánh dấu đã đọc</button>
+              <button class="mark-read-btn" @click="markAllRead">
+                Đánh dấu đã đọc
+              </button>
             </div>
 
             <!-- Danh sách thông báo -->
@@ -155,13 +169,16 @@ const handleNotificationClick = (note) => {
                 v-for="note in notifications"
                 :key="note.id"
                 class="notify-item"
-                :class="{ 'unread': !note.read, [`type-${note.type}`]: true }"
+                :class="{ unread: !note.read, [`type-${note.type}`]: true }"
                 @click="handleNotificationClick(note)"
               >
                 <!-- Icon loại thông báo -->
                 <div class="notify-icon-wrap" :class="`icon-${note.type}`">
                   <AlertTriangle v-if="note.icon === 'alert'" class="n-icon" />
-                  <CheckCircle v-else-if="note.icon === 'success'" class="n-icon" />
+                  <CheckCircle
+                    v-else-if="note.icon === 'success'"
+                    class="n-icon"
+                  />
                   <Info v-else class="n-icon" />
                 </div>
                 <div class="notify-content">
@@ -175,7 +192,13 @@ const handleNotificationClick = (note) => {
 
             <!-- Footer -->
             <div class="dropdown-footer">
-              <button class="view-all-btn" @click="router.push('/nha-xe/ho-tro'); isNotifyMenuOpen = false">
+              <button
+                class="view-all-btn"
+                @click="
+                  router.push('/nha-xe/ho-tro');
+                  isNotifyMenuOpen = false;
+                "
+              >
                 Xem tất cả thông báo
               </button>
             </div>
@@ -193,10 +216,15 @@ const handleNotificationClick = (note) => {
             <UserCircle class="avatar-icon" />
           </div>
           <div class="user-info">
-            <span class="user-name">{{ operatorUser.ten_nha_xe || operatorUser.name || 'Nhà Xe' }}</span>
+            <span class="user-name">{{
+              operatorUser.ten_nha_xe || operatorUser.name || "Nhà Xe"
+            }}</span>
             <span class="user-role">Quản lý nhà xe</span>
           </div>
-          <ChevronDown class="arrow-down" :class="{ 'rotate': isProfileMenuOpen }" />
+          <ChevronDown
+            class="arrow-down"
+            :class="{ rotate: isProfileMenuOpen }"
+          />
         </div>
 
         <!-- Dropdown Profile -->
@@ -208,13 +236,25 @@ const handleNotificationClick = (note) => {
                   <UserCircle class="avatar-icon-lg" />
                 </div>
                 <div>
-                  <p class="profile-name">{{ operatorUser.ten_nha_xe || operatorUser.name || 'Nhà Xe' }}</p>
-                  <p class="profile-email">{{ operatorUser.email || 'operator@smartbus.vn' }}</p>
+                  <p class="profile-name">
+                    {{
+                      operatorUser.ten_nha_xe || operatorUser.name || "Nhà Xe"
+                    }}
+                  </p>
+                  <p class="profile-email">
+                    {{ operatorUser.email || "operator@smartbus.vn" }}
+                  </p>
                 </div>
               </div>
             </div>
             <div class="dropdown-body">
-              <button class="dropdown-item" @click="router.push('/nha-xe/cai-dat'); isProfileMenuOpen = false">
+              <button
+                class="dropdown-item"
+                @click="
+                  router.push('/nha-xe/cai-dat');
+                  isProfileMenuOpen = false;
+                "
+              >
                 <Settings class="drop-icon" />
                 Cài đặt hệ thống
               </button>
@@ -226,7 +266,6 @@ const handleNotificationClick = (note) => {
           </div>
         </transition>
       </div>
-
     </div>
   </header>
 </template>
@@ -272,8 +311,13 @@ const handleNotificationClick = (note) => {
   border-radius: 8px;
   transition: background 0.2s;
 }
-.hamburger-btn:hover { background: rgba(0,0,0,0.05); }
-.icon-menu { width: 24px; height: 24px; }
+.hamburger-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.icon-menu {
+  width: 24px;
+  height: 24px;
+}
 
 .search-box {
   display: flex;
@@ -282,14 +326,21 @@ const handleNotificationClick = (note) => {
   border-radius: 30px;
   padding: 10px 16px;
   min-width: 280px;
-  transition: box-shadow 0.3s, background 0.3s;
+  transition:
+    box-shadow 0.3s,
+    background 0.3s;
   border: 1px solid #dcfce7;
 }
 .search-box:focus-within {
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
   background-color: #fff;
 }
-.search-icon { width: 18px; height: 18px; color: #16a34a; margin-right: 12px; }
+.search-icon {
+  width: 18px;
+  height: 18px;
+  color: #16a34a;
+  margin-right: 12px;
+}
 .search-input {
   border: none;
   background: transparent;
@@ -298,7 +349,9 @@ const handleNotificationClick = (note) => {
   color: #0d4f35;
   width: 100%;
 }
-.search-input::placeholder { color: #86efac; }
+.search-input::placeholder {
+  color: #86efac;
+}
 
 /* Phải */
 .header-right {
@@ -319,16 +372,19 @@ const handleNotificationClick = (note) => {
   cursor: pointer;
   position: relative;
   color: #16a34a;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
   transition: all 0.2s ease;
   border: 1px solid #dcfce7;
 }
 .action-btn:hover {
   color: #0d4f35;
   transform: translateY(-2px);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
-.action-icon { width: 20px; height: 20px; }
+.action-icon {
+  width: 20px;
+  height: 20px;
+}
 
 .notify-badge {
   position: absolute;
@@ -349,7 +405,9 @@ const handleNotificationClick = (note) => {
 }
 
 /* ======= Notification Dropdown ======= */
-.notify-container { position: relative; }
+.notify-container {
+  position: relative;
+}
 
 .notify-dropdown {
   position: absolute;
@@ -399,7 +457,9 @@ const handleNotificationClick = (note) => {
   cursor: pointer;
   font-weight: 600;
 }
-.mark-read-btn:hover { text-decoration: underline; }
+.mark-read-btn:hover {
+  text-decoration: underline;
+}
 
 /* Danh sách notify */
 .notify-list {
@@ -416,9 +476,15 @@ const handleNotificationClick = (note) => {
   transition: background 0.2s;
   position: relative;
 }
-.notify-item:hover { background: #f8fafc; }
-.notify-item.unread { background: #f0fdf4; }
-.notify-item.unread:hover { background: #dcfce7; }
+.notify-item:hover {
+  background: #f8fafc;
+}
+.notify-item.unread {
+  background: #f0fdf4;
+}
+.notify-item.unread:hover {
+  background: #dcfce7;
+}
 
 .notify-icon-wrap {
   width: 38px;
@@ -429,14 +495,37 @@ const handleNotificationClick = (note) => {
   justify-content: center;
   flex-shrink: 0;
 }
-.icon-alert { background: #fef2f2; color: #ef4444; }
-.icon-success { background: #f0fdf4; color: #16a34a; }
-.icon-warning { background: #fffbeb; color: #f59e0b; }
-.icon-ticket, .icon-info { background: #eff6ff; color: #3b82f6; }
+.icon-alert {
+  background: #fef2f2;
+  color: #ef4444;
+}
+.icon-success {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+.icon-warning {
+  background: #fffbeb;
+  color: #f59e0b;
+}
+.icon-ticket,
+.icon-info {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+.icon-wallet {
+  background: #f0fdf4;
+  color: #16a34a;
+}
 
-.n-icon { width: 18px; height: 18px; color: inherit; }
+.n-icon {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
 
-.notify-content { flex: 1; }
+.notify-content {
+  flex: 1;
+}
 .notify-title {
   font-size: 13px;
   font-weight: 700;
@@ -450,7 +539,10 @@ const handleNotificationClick = (note) => {
   margin: 0 0 4px 0;
   line-height: 1.4;
 }
-.notify-time { font-size: 11px; color: #94a3b8; }
+.notify-time {
+  font-size: 11px;
+  color: #94a3b8;
+}
 
 .unread-dot {
   width: 8px;
@@ -474,7 +566,9 @@ const handleNotificationClick = (note) => {
   font-weight: 700;
   cursor: pointer;
 }
-.view-all-btn:hover { text-decoration: underline; }
+.view-all-btn:hover {
+  text-decoration: underline;
+}
 
 /* ======= Divider ======= */
 .divider-vertical {
@@ -484,7 +578,10 @@ const handleNotificationClick = (note) => {
 }
 
 /* ======= Profile ======= */
-.profile-container { position: relative; cursor: pointer; }
+.profile-container {
+  position: relative;
+  cursor: pointer;
+}
 
 .profile-trigger {
   display: flex;
@@ -494,7 +591,9 @@ const handleNotificationClick = (note) => {
   border-radius: 40px;
   transition: background 0.2s;
 }
-.profile-trigger:hover { background: #f0fdf4; }
+.profile-trigger:hover {
+  background: #f0fdf4;
+}
 
 .avatar {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
@@ -505,11 +604,25 @@ const handleNotificationClick = (note) => {
   align-items: center;
   justify-content: center;
 }
-.avatar-icon { width: 24px; height: 24px; color: white; }
+.avatar-icon {
+  width: 24px;
+  height: 24px;
+  color: white;
+}
 
-.user-info { display: flex; flex-direction: column; }
-.user-name { font-size: 14px; font-weight: 700; color: #0d4f35; }
-.user-role { font-size: 11px; color: #16a34a; }
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+.user-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0d4f35;
+}
+.user-role {
+  font-size: 11px;
+  color: #16a34a;
+}
 
 .arrow-down {
   width: 16px;
@@ -517,7 +630,9 @@ const handleNotificationClick = (note) => {
   color: #16a34a;
   transition: transform 0.3s;
 }
-.arrow-down.rotate { transform: rotate(180deg); }
+.arrow-down.rotate {
+  transform: rotate(180deg);
+}
 
 /* Profile Dropdown */
 .profile-dropdown {
@@ -548,11 +663,26 @@ const handleNotificationClick = (note) => {
   justify-content: center;
   flex-shrink: 0;
 }
-.avatar-icon-lg { width: 28px; height: 28px; color: white; }
-.profile-name { font-size: 14px; font-weight: 700; color: #0d4f35; margin: 0 0 2px 0; }
-.profile-email { font-size: 11px; color: #64748b; margin: 0; }
+.avatar-icon-lg {
+  width: 28px;
+  height: 28px;
+  color: white;
+}
+.profile-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0d4f35;
+  margin: 0 0 2px 0;
+}
+.profile-email {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+}
 
-.dropdown-body { padding: 8px 0; }
+.dropdown-body {
+  padding: 8px 0;
+}
 .dropdown-item {
   width: 100%;
   display: flex;
@@ -567,16 +697,31 @@ const handleNotificationClick = (note) => {
   cursor: pointer;
   transition: background 0.2s;
 }
-.dropdown-item:hover { background: #f0fdf4; color: #16a34a; }
-.text-danger { color: #ef4444 !important; }
-.text-danger:hover { background: #fef2f2 !important; color: #dc2626 !important; }
-.drop-icon { width: 18px; height: 18px; }
+.dropdown-item:hover {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+.text-danger {
+  color: #ef4444 !important;
+}
+.text-danger:hover {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+.drop-icon {
+  width: 18px;
+  height: 18px;
+}
 
 /* Animations */
-.fade-scale-enter-active, .fade-scale-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+.fade-scale-enter-active,
+.fade-scale-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
-.fade-scale-enter-from, .fade-scale-leave-to {
+.fade-scale-enter-from,
+.fade-scale-leave-to {
   opacity: 0;
   transform: scale(0.95) translateY(-8px);
 }
@@ -586,13 +731,26 @@ const handleNotificationClick = (note) => {
   .operator-header {
     margin: 0;
     border-radius: 0;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   }
-  .hamburger-btn { display: block; }
-  .search-box { display: none; }
-  .user-info { display: none; }
-  .profile-trigger { padding: 0; }
-  .arrow-down { display: none; }
-  .notify-dropdown { width: 300px; right: -60px; }
+  .hamburger-btn {
+    display: block;
+  }
+  .search-box {
+    display: none;
+  }
+  .user-info {
+    display: none;
+  }
+  .profile-trigger {
+    padding: 0;
+  }
+  .arrow-down {
+    display: none;
+  }
+  .notify-dropdown {
+    width: 300px;
+    right: -60px;
+  }
 }
 </style>

@@ -95,17 +95,17 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
                 throw new \Exception('Bạn không có quyền truy cập.');
             }
             $query = $this->model->query()
-                ->with('tramDungs')
+                ->with(['tramDungs', 'nhaXe'])
                 ->where('ma_nha_xe', $nhaXe->ma_nha_xe)
                 ->orderByDesc('created_at');
 
             if (!empty($filters['search'])) {
-                $kw = $filters['search'];
+                $kw = trim((string) $filters['search']);
                 $query->where(function ($q) use ($kw) {
-                    $q->where('id', 'like', "%$kw%")
-                        ->orWhere('ten_tuyen_duong', 'like', "%$kw%")
-                        ->orWhere('ma_nha_xe', 'like', "%$kw%")
-                        ->orWhereHas('nhaXe', fn($h) => $h->where('ten_nha_xe', 'like', "%$kw%"));
+                    $q->where('ten_tuyen_duong', 'like', '%' . $kw . '%')
+                        ->orWhere('diem_bat_dau', 'like', '%' . $kw . '%')
+                        ->orWhere('diem_ket_thuc', 'like', '%' . $kw . '%')
+                        ->orWhereHas('nhaXe', fn ($h) => $h->where('ten_nha_xe', 'like', '%' . $kw . '%'));
                 });
             }
 

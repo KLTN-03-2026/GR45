@@ -461,11 +461,11 @@ onMounted(() => loadAllTickets());
           @click="closeDetail"
         />
         <div
-          class="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200"
+          class="relative z-10 flex w-full max-h-[min(92vh,880px)] min-h-0 flex-col overflow-hidden bg-white rounded-t-3xl sm:max-w-lg sm:rounded-3xl shadow-2xl border border-slate-200"
           @click.stop
         >
           <div
-            class="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white rounded-t-3xl"
+            class="flex shrink-0 items-center justify-between px-5 py-4 border-b border-slate-100 bg-white rounded-t-3xl"
           >
             <h2 class="text-lg font-bold text-slate-900">Chi tiết vé</h2>
             <button
@@ -478,14 +478,17 @@ onMounted(() => loadAllTickets());
             </button>
           </div>
 
-          <div v-if="detailLoading" class="p-12 text-center">
+          <div v-if="detailLoading" class="p-12 text-center shrink-0">
             <span
               class="material-symbols-outlined animate-spin text-3xl text-blue-600"
               >refresh</span
             >
           </div>
 
-          <div v-else-if="detailTicket" class="p-5 sm:p-6 space-y-6 pb-8">
+          <div
+            v-else-if="detailTicket"
+            class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-6 pb-8"
+          >
             <p
               v-if="detailError"
               class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3"

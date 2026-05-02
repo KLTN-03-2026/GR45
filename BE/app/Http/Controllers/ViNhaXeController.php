@@ -90,8 +90,8 @@ class ViNhaXeController extends Controller
             return response()->json(['message' => 'Vui lòng cập nhật thông tin ngân hàng trước khi rút tiền'], 400);
         }
 
-        if ($viNhaXe->so_du < $amount) {
-            return response()->json(['message' => 'Số dư không đủ để thực hiện rút tiền'], 400);
+        if ($viNhaXe->so_du - $amount < 1000000) {
+            return response()->json(['message' => 'Số dư còn lại sau khi rút phải tối thiểu là ' . number_format(1000000, 0, ',', '.') . ' VNĐ'], 400);
         }
 
         try {
@@ -138,9 +138,9 @@ class ViNhaXeController extends Controller
                 'message' => 'Tạo yêu cầu nạp tiền thành công',
                 'transaction' => $transaction,
                 'qr_data' => [
-                    'bank_code' => '970422', // MB Bank
-                    'account_no' => '0123456789',
-                    'account_name' => 'HE THONG VEXE',
+                    'bank_code' => env('SEPAY_BANK_ID', 'MBBank'), 
+                    'account_no' => env('SEPAY_ACCOUNT_NUMBER', '0377417720'),
+                    'account_name' => env('SEPAY_ACCOUNT_NAME', 'NGUYENHUUTHAI'),
                     'amount' => $amount,
                     'content' => $transaction->transaction_code
                 ]
@@ -149,5 +149,39 @@ class ViNhaXeController extends Controller
             DB::rollBack();
             return response()->json(['message' => 'Có lỗi xảy ra: ' . $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Chi tiết giao dịch
+     */
+    public function getTransactionDetail(int $id)
+    {
+        $nhaXe = Auth::guard('nha_xe')->user();
+        if (!$nhaXe) {
+            return response()->json(['message' => 'Không tìm thấy nhà xe'], 404);
+        }
+
+        $viNhaXe = ViNhaXe::where('ma_nha_xe', $nhaXe->ma_nha_xe)->firstOrFail();
+
+        $transaction = $viNhaXe->lichSu()
+            ->with(['chuyenXe', 'nguoiThucHien'])
+            ->findOrFail($id);
+
+        $data = [
+            'transaction' => $transaction
+        ];
+
+        // Nếu là nạp tiền và đang chờ, kèm theo data QR
+        if ($transaction->loai_giao_dich === 'nap_tien' && $transaction->tinh_trang === 'cho_xac_nhan') {
+            $data['qr_data'] = [
+                'bank_code' => env('SEPAY_BANK_ID', 'MBBank'),
+                'account_no' => env('SEPAY_ACCOUNT_NUMBER', '0377417720'),
+                'account_name' => env('SEPAY_ACCOUNT_NAME', 'NGUYENHUUTHAI'),
+                'amount' => (float)$transaction->so_tien,
+                'content' => $transaction->transaction_code
+            ];
+        }
+
+        return response()->json($data);
     }
 }

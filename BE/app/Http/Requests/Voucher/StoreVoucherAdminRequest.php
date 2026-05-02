@@ -4,7 +4,7 @@ namespace App\Http\Requests\Voucher;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StoreVoucherRequest extends FormRequest
+class StoreVoucherAdminRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -22,6 +22,14 @@ class StoreVoucherRequest extends FormRequest
             'so_luong' => 'required|integer|min:1',
             'dieu_kien' => 'nullable|string',
             'is_public' => 'nullable|boolean',
+            'id_nha_xes' => 'nullable|array',
+            'id_nha_xes.*' => 'exists:nha_xes,id',
+            'id_khach_hangs' => 'nullable|array',
+            'id_khach_hangs.*' => 'exists:khach_hangs,id',
+            'tinh_trang_khach_hangs' => 'nullable|array',
+            'tinh_trang_khach_hangs.*' => 'in:hoat_dong,khoa,chua_xac_nhan',
+            'hang_thanh_viens' => 'nullable|array',
+            'hang_thanh_viens.*' => 'in:dong,bac,vang,bach_kim',
         ];
     }
 
@@ -30,17 +38,13 @@ class StoreVoucherRequest extends FormRequest
         return [
             'ten_voucher.required' => 'Tên voucher là bắt buộc.',
             'loai_voucher.required' => 'Loại voucher là bắt buộc.',
-            'loai_voucher.in' => 'Loại voucher không hợp lệ.',
-            'gia_tri.required' => 'Giá trị giảm là bắt buộc.',
-            'gia_tri.numeric' => 'Giá trị phải là số.',
-            'ngay_bat_dau.required' => 'Ngày bắt đầu là bắt buộc.',
-            'ngay_bat_dau.date' => 'Ngày bắt đầu không hợp lệ.',
-            'ngay_ket_thuc.required' => 'Ngày kết thúc là bắt buộc.',
-            'ngay_ket_thuc.date' => 'Ngày kết thúc không hợp lệ.',
-            'ngay_ket_thuc.after_or_equal' => 'Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.',
+            'gia_tri.required' => 'Giá trị là bắt buộc.',
             'so_luong.required' => 'Số lượng là bắt buộc.',
-            'so_luong.integer' => 'Số lượng phải là số nguyên.',
-            'so_luong.min' => 'Số lượng phải lớn hơn 0.',
+            'ngay_bat_dau.required' => 'Ngày bắt đầu là bắt buộc.',
+            'ngay_ket_thuc.required' => 'Ngày kết thúc là bắt buộc.',
+            'ngay_ket_thuc.after_or_equal' => 'Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.',
+            'id_nha_xes.array' => 'Danh sách nhà xe không hợp lệ.',
+            'id_khach_hangs.array' => 'Danh sách khách hàng không hợp lệ.',
         ];
     }
 }

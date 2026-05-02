@@ -325,11 +325,11 @@ class KhachHangService
                     $qTram->where(function ($q) use ($diemDiPatterns) {
                         foreach ($diemDiPatterns as $pattern) {
                             $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
-                              ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
+                                ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
                         }
                     });
                 });
-            }); 
+            });
         }
 
         if (!empty($filters['diem_den'])) {
@@ -343,7 +343,7 @@ class KhachHangService
                     $qTram->where(function ($q) use ($diemDenPatterns) {
                         foreach ($diemDenPatterns as $pattern) {
                             $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
-                              ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
+                                ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
                         }
                     });
                 });

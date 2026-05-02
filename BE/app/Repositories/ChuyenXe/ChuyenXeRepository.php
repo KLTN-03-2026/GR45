@@ -93,7 +93,7 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
         }
 
         $query = $this->model->query()
-            ->with(['tuyenDuong', 'xe', 'taiXe'])
+            ->with(['tuyenDuong.nhaXe', 'xe', 'taiXe'])
             ->whereHas('tuyenDuong', function ($q) use ($nhaXe) {
                 $q->where('ma_nha_xe', $nhaXe->ma_nha_xe);
             });

@@ -226,11 +226,10 @@ const tripContext = computed(() => {
   const c = chuyenOf(r);
   const t = tuyenOf(r);
   const xe = c?.xe || c?.Xe;
-  const nx = xe?.nha_xe || xe?.nhaXe;
+  const nxTuyen = t?.nha_xe || t?.nhaXe;
+  const nxXe = xe?.nha_xe || xe?.nhaXe;
   if (!c && !t) return null;
   return {
-    chuyenId: c?.id ?? r?.id_chuyen_xe ?? "—",
-    trangThai: c?.trang_thai ?? c?.trangThai,
     ngayKH: c?.ngay_khoi_hanh ?? c?.ngayKhoiHanh,
     gioKH: c?.gio_khoi_hanh ?? c?.gioKhoiHanh,
     tenTuyen: t?.ten_tuyen_duong || t?.tenTuyenDuong || "—",
@@ -238,7 +237,11 @@ const tripContext = computed(() => {
     diemDen: t?.diem_ket_thuc || t?.diemKetThuc || "—",
     bienSo: xe?.bien_so || xe?.bienSo,
     tenXe: xe?.ten_xe || xe?.tenXe,
-    tenNhaXe: nx?.ten_nha_xe || nx?.tenNhaXe,
+    tenNhaXe:
+      nxTuyen?.ten_nha_xe ||
+      nxTuyen?.tenNhaXe ||
+      nxXe?.ten_nha_xe ||
+      nxXe?.tenNhaXe,
   };
 });
 
@@ -543,14 +546,8 @@ onUnmounted(() => {
                   <span> · Giờ: {{ formatTimeOnly(tripContext.gioKH) }}</span>
                   <span v-if="tripContext.bienSo"> · Xe: {{ tripContext.bienSo }}</span>
                 </div>
-                <div v-if="tripContext.tenXe || tripContext.trangThai" class="trip-rating-detail-trip-meta">
-                  <span v-if="tripContext.tenXe">Tên xe: {{ tripContext.tenXe }}</span>
-                  <span v-if="tripContext.trangThai">
-                    <template v-if="tripContext.tenXe"> · </template>Trạng thái: {{ tripContext.trangThai }}
-                  </span>
-                </div>
-                <div class="trip-rating-detail-trip-meta">
-                  <span>ID chuyến: #{{ tripContext.chuyenId }}</span>
+                <div v-if="tripContext.tenXe" class="trip-rating-detail-trip-meta">
+                  <span>Tên xe: {{ tripContext.tenXe }}</span>
                 </div>
               </div>
 

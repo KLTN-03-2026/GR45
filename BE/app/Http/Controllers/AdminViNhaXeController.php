@@ -7,6 +7,8 @@ use App\Models\ViNhaXe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Events\YeuCauRutTienApprovedEvent;
+use App\Events\YeuCauRutTienRejectedEvent;
 
 class AdminViNhaXeController extends Controller
 {
@@ -115,6 +117,9 @@ class AdminViNhaXeController extends Controller
 
             DB::commit();
 
+            // Fire event thông báo realtime
+            event(new YeuCauRutTienApprovedEvent($giaoDich->fresh(['viNhaXe'])));
+
             return response()->json([
                 'success' => true,
                 'message' => 'Đã duyệt yêu cầu rút tiền thành công.',
@@ -153,6 +158,9 @@ class AdminViNhaXeController extends Controller
             }
 
             DB::commit();
+
+            // Fire event thông báo realtime
+            event(new YeuCauRutTienRejectedEvent($giaoDich->fresh(['viNhaXe'])));
 
             return response()->json([
                 'success' => true,

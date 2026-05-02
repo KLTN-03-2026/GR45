@@ -67,28 +67,27 @@ const tableColumns = [
   { key: "actions", label: "Hành Động" },
 ];
 
+/** API: { success, data: paginator } — axios đã unwrap response.data */
+const extractPaginated = (res) => {
+  const d = res?.data;
+  if (!d) return { list: [], info: {} };
+  if (Array.isArray(d)) return { list: d, info: {} };
+  if (Array.isArray(d.data))
+    return { list: d.data, info: d };
+  return { list: [], info: {} };
+};
+
 const fetchTickets = async (page = 1) => {
   try {
     loading.value = true;
     const res = await operatorApi.getTickets({
       per_page: pagination.perPage,
-      search: searchQuery.value || undefined,
+      search: searchQuery.value?.trim() || undefined,
       tinh_trang: filterStatus.value || undefined,
       id_chuyen_xe: filterTripId.value || undefined,
       page,
     });
-    let list = [],
-      info = {};
-    if (res.data?.data?.data?.data) {
-      list = res.data.data.data.data;
-      info = res.data.data.data;
-    } else if (res.data?.data?.data) {
-      list = res.data.data.data;
-      info = res.data.data;
-    } else if (Array.isArray(res.data?.data)) {
-      list = res.data.data;
-      info = res.data;
-    }
+    const { list, info } = extractPaginated(res);
     tickets.value = Array.isArray(list) ? list : [];
     pagination.currentPage = info.current_page || 1;
     pagination.total = info.total || 0;
