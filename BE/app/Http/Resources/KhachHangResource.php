@@ -19,6 +19,7 @@ class KhachHangResource extends JsonResource
             'email'         => $this->email,
             'dia_chi'       => $this->dia_chi,
             'so_dien_thoai' => $this->so_dien_thoai,
+            'ngay_sinh'     => $this->ngay_sinh,
             'avatar'        => $this->avatar,
             // Diem thanh vien (neu da load)
             'diem_thanh_vien' => $this->whenLoaded('diemThanhVien', function () {
