@@ -25,7 +25,7 @@ return new class extends Migration
             $table->integer('so_luong');                  // Tổng số lượng
             $table->integer('so_luong_con_lai');          // Còn lại
 
-            $table->enum('trang_thai', ['hoat_dong', 'vo_hieu', 'het_han', 'tam_ngung', 'cho_duyet'])
+            $table->enum('trang_thai', ['hoat_dong', 'vo_hieu', 'het_han', 'tam_ngung', 'cho_duyet','huy','tu_choi'])
                 ->default('cho_duyet');                   // Trạng thái
             $table->text('dieu_kien')->nullable();        // Điều kiện áp dụng
 
@@ -33,7 +33,7 @@ return new class extends Migration
 
             $table->decimal('tong_tien_giam', 15, 2)
                 ->default(0);                           // Tổng tiền đã giảm
-                
+
 
             $table->timestamps();
         });

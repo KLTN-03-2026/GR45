@@ -63,4 +63,12 @@ class KhachHang extends Authenticatable
     {
         return $this->hasMany(DanhGia::class, 'id_khach_hang');
     }
+
+    /** Vouchers cua khach hang */
+    public function vouchers()
+    {
+        return $this->belongsToMany(Voucher::class, 'voucher_khach_hangs', 'khach_hang_id', 'voucher_id')
+                    ->withPivot('trang_thai', 'used_at')
+                    ->withTimestamps();
+    }
 }

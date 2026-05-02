@@ -14,7 +14,7 @@ class UpdateVoucherStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'trang_thai' => 'required|in:hoat_dong,vo_hieu,het_han,tam_ngung,cho_duyet',
+            'trang_thai' => 'required|in:hoat_dong,vo_hieu,het_han,tam_ngung,cho_duyet,tu_choi,huy',
         ];
     }
 

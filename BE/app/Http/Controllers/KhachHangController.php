@@ -252,10 +252,21 @@ class KhachHangController extends Controller
             'tinh_trang',
             'per_page',
         ]));
-
+        
         return response()->json([
             'success' => true,
             'data'    => $data,
+        ]);
+    }
+
+    /** GET /api/v1/admin/khach-hang/list-minimal */
+    public function listMinimal(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => \App\Models\KhachHang::select('id', 'ho_va_ten', 'so_dien_thoai')
+                ->where('tinh_trang', 'hoat_dong')
+                ->get(),
         ]);
     }
 

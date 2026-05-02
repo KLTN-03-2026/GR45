@@ -23,7 +23,10 @@ const showToast = (msg, type = "success") => {
 
 // --- DATA & STATE ---
 const vouchers = ref([]);
+const operators = ref([]);
+const customers = ref([]);
 const loading = ref(false);
+const fetchLoading = ref(false);
 
 // Bộ lọc tìm kiếm
 const searchQuery = ref("");
@@ -90,6 +93,104 @@ const fetchVouchers = async () => {
   }
 };
 
+const fetchOperators = async () => {
+  try {
+    const res = await adminApi.getOperatorsListMinimal();
+    operators.value = res.data?.data || res.data || [];
+  } catch (error) {
+    console.error("Lỗi khi tải danh sách nhà xe:", error);
+  }
+};
+
+const fetchCustomers = async () => {
+  try {
+    const res = await adminApi.getClientsListMinimal();
+    customers.value = res.data?.data || res.data || [];
+  } catch (error) {
+    console.error("Lỗi khi tải danh sách khách hàng:", error);
+  }
+};
+
+// --- MODAL TẠO VOUCHER ADMIN ---
+const createModal = reactive({
+  show: false,
+  loading: false,
+  form: {
+    ten_voucher: "",
+    loai_voucher: "percent",
+    gia_tri: "",
+    so_luong: "",
+    ngay_bat_dau: "",
+    ngay_ket_thuc: "",
+    dieu_kien: "",
+    target_type: "all", // all, specific_nha_xe, specific_khach_hang, target_criteria
+    id_nha_xes: [],
+    id_khach_hangs: [],
+    tinh_trang_khach_hangs: [],
+    hang_thanh_viens: [],
+    is_public: false,
+  }
+});
+
+const openCreateModal = () => {
+  createModal.form = {
+    ten_voucher: "",
+    loai_voucher: "percent",
+    gia_tri: "",
+    so_luong: "",
+    ngay_bat_dau: "",
+    ngay_ket_thuc: "",
+    dieu_kien: "",
+    target_type: "all",
+    id_nha_xes: [],
+    id_khach_hangs: [],
+    tinh_trang_khach_hangs: [],
+    hang_thanh_viens: [],
+    is_public: false,
+  };
+  createModal.show = true;
+};
+
+const submitCreate = async () => {
+  try {
+    createModal.loading = true;
+    const payload = { ...createModal.form };
+    
+    // Xử lý targeting
+    if (payload.target_type === 'all') {
+      payload.id_nha_xes = [];
+      payload.id_khach_hangs = [];
+    } else if (payload.target_type === 'specific_nha_xe') {
+      payload.id_khach_hangs = [];
+    } else if (payload.target_type === 'specific_khach_hang') {
+      payload.id_nha_xes = [];
+      payload.tinh_trang_khach_hangs = [];
+      payload.hang_thanh_viens = [];
+    } else if (payload.target_type === 'target_criteria') {
+      payload.id_nha_xes = [];
+      payload.id_khach_hangs = [];
+    }
+    
+    delete payload.target_type;
+
+    await adminApi.createVoucher(payload);
+    showToast("Tạo voucher admin thành công!");
+    createModal.show = false;
+    fetchVouchers();
+  } catch (error) {
+    let msg = "Lỗi khi tạo voucher!";
+    if (error.response?.data?.errors) {
+      const errors = error.response.data.errors;
+      msg = Object.values(errors)[0][0]; // Lấy lỗi đầu tiên
+    } else if (error.response?.data?.message) {
+      msg = error.response.data.message;
+    }
+    showToast(msg, "error");
+  } finally {
+    createModal.loading = false;
+  }
+};
+
 // --- MODAL DUYỆT / ĐỔI TRẠNG THÁI ---
 const statusModal = reactive({
   show: false,
@@ -118,8 +219,13 @@ const submitApprove = async () => {
     statusModal.show = false;
     fetchVouchers();
   } catch (error) {
-    const msg =
-      error.response?.data?.message || "Không thể cập nhật trạng thái!";
+    let msg = "Không thể cập nhật trạng thái!";
+    if (error.response?.data?.errors) {
+      const errors = error.response.data.errors;
+      msg = Object.values(errors)[0][0];
+    } else if (error.response?.data?.message) {
+      msg = error.response.data.message;
+    }
     showToast(msg, "error");
   } finally {
     statusModal.loading = false;
@@ -150,6 +256,8 @@ const resetFilters = () => {
 
 onMounted(() => {
   fetchVouchers();
+  fetchOperators();
+  fetchCustomers();
 });
 </script>
 
@@ -170,22 +278,34 @@ onMounted(() => {
           voucher do Nhà xe yêu cầu.
         </p>
       </div>
-      <div class="header-stats" v-if="vouchers.length > 0">
-        <div class="stat-chip stat-total">
-          <span class="stat-number">{{ vouchers.length }}</span>
-          <span class="stat-label">Tổng</span>
+      <BaseButton variant="primary" @click="openCreateModal">
+        + Tạo Voucher Mới
+      </BaseButton>
+    </div>
+    <div class="header-stats" v-if="vouchers.length > 0">
+      <div class="stat-card">
+        <div class="stat-icon icon-total">📊</div>
+        <div class="stat-info">
+          <span class="stat-value">{{ vouchers.length }}</span>
+          <span class="stat-desc">Tổng Voucher</span>
         </div>
-        <div class="stat-chip stat-pending">
-          <span class="stat-number">{{
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon icon-pending">⏳</div>
+        <div class="stat-info">
+          <span class="stat-value">{{
             vouchers.filter((v) => v.trang_thai === "cho_duyet").length
           }}</span>
-          <span class="stat-label">Chờ duyệt</span>
+          <span class="stat-desc">Chờ duyệt</span>
         </div>
-        <div class="stat-chip stat-active">
-          <span class="stat-number">{{
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon icon-active">✅</div>
+        <div class="stat-info">
+          <span class="stat-value">{{
             vouchers.filter((v) => v.trang_thai === "hoat_dong").length
           }}</span>
-          <span class="stat-label">Hoạt động</span>
+          <span class="stat-desc">Hoạt động</span>
         </div>
       </div>
     </div>
@@ -412,6 +532,151 @@ onMounted(() => {
         >
       </template>
     </BaseModal>
+
+    <!-- ===== MODAL TẠO VOUCHER MỚI ===== -->
+    <BaseModal
+      v-model="createModal.show"
+      title="Tạo Voucher Admin Mới"
+      maxWidth="700px"
+    >
+      <form @submit.prevent="submitCreate" class="form-grid-2">
+        <div class="form-group full-width">
+          <label class="form-label">Tên Voucher *</label>
+          <input type="text" v-model="createModal.form.ten_voucher" class="custom-input" placeholder="VD: Khuyến mãi hè 2024" required />
+        </div>
+
+        <div class="form-group">
+          <BaseSelect
+            v-model="createModal.form.loai_voucher"
+            label="Loại Voucher *"
+            :options="[
+              { value: 'percent', label: '📊 Phần trăm (%)' },
+              { value: 'fixed', label: '💰 Cố định (VNĐ)' },
+            ]"
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Giá Trị *</label>
+          <input type="number" v-model="createModal.form.gia_tri" class="custom-input" min="1" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Số Lượng Phát Hành *</label>
+          <input type="number" v-model="createModal.form.so_luong" class="custom-input" min="1" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ngày Bắt Đầu *</label>
+          <input type="date" v-model="createModal.form.ngay_bat_dau" class="custom-input" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ngày Kết Thúc *</label>
+          <input type="date" v-model="createModal.form.ngay_ket_thuc" class="custom-input" required />
+        </div>
+
+        <div class="form-group">
+          <BaseSelect
+            v-model="createModal.form.target_type"
+            label="Đối tượng áp dụng"
+            :options="[
+              { value: 'all', label: 'Toàn bộ hệ thống' },
+              { value: 'specific_nha_xe', label: 'Nhà xe cụ thể' },
+              { value: 'specific_khach_hang', label: 'Khách hàng cụ thể' },
+              { value: 'target_criteria', label: 'Theo nhóm khách hàng (Tình trạng/Hạng)' },
+            ]"
+          />
+        </div>
+
+        <div class="form-group full-width">
+          <label class="checkbox-item public-toggle">
+            <input type="checkbox" v-model="createModal.form.is_public" />
+            <div class="toggle-text">
+              <span class="toggle-title">Voucher Công Khai (Săn Voucher)</span>
+              <span class="toggle-desc">Khách hàng có thể nhìn thấy và "săn" voucher này vào ví cá nhân.</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Target by Criteria (Status/Rank) -->
+        <template v-if="createModal.form.target_type === 'target_criteria'">
+          <div class="form-group full-width">
+            <label class="form-label">Theo Tình Trạng Khách Hàng</label>
+            <div class="criteria-list">
+              <label class="checkbox-item">
+                <input type="checkbox" value="hoat_dong" v-model="createModal.form.tinh_trang_khach_hangs" />
+                <span>Hoạt động</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" value="chua_xac_nhan" v-model="createModal.form.tinh_trang_khach_hangs" />
+                <span>Chưa xác nhận</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" value="khoa" v-model="createModal.form.tinh_trang_khach_hangs" />
+                <span>Bị khóa</span>
+              </label>
+            </div>
+          </div>
+          
+          <div class="form-group full-width">
+            <label class="form-label">Theo Hạng Thành Viên</label>
+            <div class="criteria-list">
+              <label class="checkbox-item">
+                <input type="checkbox" value="dong" v-model="createModal.form.hang_thanh_viens" />
+                <span>Hạng Đồng</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" value="bac" v-model="createModal.form.hang_thanh_viens" />
+                <span>Hạng Bạc</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" value="vang" v-model="createModal.form.hang_thanh_viens" />
+                <span>Hạng Vàng</span>
+              </label>
+              <label class="checkbox-item">
+                <input type="checkbox" value="bach_kim" v-model="createModal.form.hang_thanh_viens" />
+                <span>Hạng Bạch Kim</span>
+              </label>
+            </div>
+          </div>
+        </template>
+
+        <!-- Chọn Nhà Xe -->
+        <div class="form-group full-width" v-if="createModal.form.target_type === 'specific_nha_xe'">
+          <label class="form-label">Chọn Nhà Xe (Có thể chọn nhiều) *</label>
+          <div class="multi-select-list">
+            <label v-for="nx in operators" :key="nx.id" class="checkbox-item">
+              <input type="checkbox" :value="nx.id" v-model="createModal.form.id_nha_xes" />
+              <span>{{ nx.ten_nha_xe }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Chọn Khách Hàng -->
+        <div class="form-group full-width" v-if="createModal.form.target_type === 'specific_khach_hang'">
+          <label class="form-label">Chọn Khách Hàng (Có thể chọn nhiều) *</label>
+          <div class="multi-select-list">
+            <label v-for="kh in customers" :key="kh.id" class="checkbox-item">
+              <input type="checkbox" :value="kh.id" v-model="createModal.form.id_khach_hangs" />
+              <span>{{ kh.ten_khach_hang }} ({{ kh.so_dien_thoai }})</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group full-width">
+          <label class="form-label">Điều Kiện Áp Dụng</label>
+          <textarea v-model="createModal.form.dieu_kien" class="custom-textarea" placeholder="Mô tả điều kiện sử dụng..."></textarea>
+        </div>
+      </form>
+
+      <template #footer>
+        <BaseButton variant="secondary" @click="createModal.show = false">Hủy</BaseButton>
+        <BaseButton variant="primary" :loading="createModal.loading" @click="submitCreate">
+          🚀 Phát Hành Voucher
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
@@ -443,37 +708,61 @@ onMounted(() => {
 /* Thẻ thống kê nhanh */
 .header-stats {
   display: flex;
-  gap: 0.75rem;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
-.stat-chip {
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  min-width: 180px;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e1;
+}
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 1.25rem;
+}
+.icon-total {
+  background: #f1f5f9;
+}
+.icon-pending {
+  background: #fef3c7;
+}
+.icon-active {
+  background: #dcfce7;
+}
+.stat-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-  min-width: 64px;
 }
-.stat-number {
-  font-size: 1.25rem;
-  font-weight: 700;
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.2;
 }
-.stat-label {
-  font-size: 0.7rem;
+.stat-desc {
+  font-size: 0.8rem;
   font-weight: 500;
+  color: #64748b;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-.stat-total {
-  background: #f1f5f9;
-  color: #475569;
-}
-.stat-pending {
-  background: #fef3c7;
-  color: #92400e;
-}
-.stat-active {
-  background: #dcfce7;
-  color: #166534;
+  letter-spacing: 0.5px;
 }
 
 /* Bộ lọc */
@@ -743,6 +1032,68 @@ onMounted(() => {
   color: #92400e;
 }
 
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.custom-input, .custom-textarea {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.95rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: all 0.2s;
+}
+
+.custom-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.multi-select-list {
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  background: #f8fafc;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #475569;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.checkbox-item:hover {
+  background: #eff6ff;
+}
+
+.criteria-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .header-stats {
@@ -764,5 +1115,25 @@ onMounted(() => {
   .page-header {
     flex-direction: column;
   }
+}
+
+.public-toggle {
+  background: #f0f9ff;
+  border: 1px dashed #0ea5e9;
+  padding: 1rem !important;
+  border-radius: 12px;
+  margin-top: 0.5rem;
+}
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+}
+.toggle-title {
+  font-weight: 700;
+  color: #0369a1;
+}
+.toggle-desc {
+  font-size: 0.8rem;
+  color: #0c4a6e;
 }
 </style>

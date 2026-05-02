@@ -61,6 +61,12 @@ const router = createRouter({
           component: () => import('../views/user/TrackingView.vue'),
         },
         {
+          path: 'san-voucher',
+          name: 'voucher-hunting',
+          component: () => import('../views/user/VoucherHuntingView.vue'),
+          beforeEnter: checkClientLogin,
+        },
+        {
           path: 'hop-tac',
           name: 'partner',
           component: () => import('../views/user/PartnerView.vue'),

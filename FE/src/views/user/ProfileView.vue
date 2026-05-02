@@ -86,6 +86,10 @@ const showMyRatingDetail = ref(false);
 const selectedMyRating = ref(null);
 const showTicketModal = ref(false);
 const selectedTicket = ref(null);
+
+const bankId = import.meta.env.VITE_BANK_ID || "MB";
+const bankAccount = import.meta.env.VITE_BANK_ACCOUNT || "0377417720";
+const accountName = import.meta.env.VITE_ACCOUNT_NAME || "NGUYEN HUU THAI";
 const CLIENT_TOKEN_KEY = "auth.client.token";
 
 // Password state
@@ -116,6 +120,11 @@ const loyaltyPagination = ref({
   current_page: 1,
   last_page: 1,
 });
+
+// Vouchers state
+const myVouchers = ref([]);
+const isLoadingVouchers = ref(false);
+const vouchersMessage = ref({ type: "", text: "" });
 
 const filterOptions = [
   { value: "all", label: "Tất cả" },
@@ -554,6 +563,7 @@ const selectMenu = (main, sub) => {
   if (main === "offers") expandedMenus.value.offers = true;
   if (main === "tickets" || main === "my-ratings") fetchRatingsData();
   if (main === "offers" && sub === "points") fetchLoyaltyInfo();
+  if (main === "offers" && sub === "vouchers") fetchMyVouchers();
 };
 
 const fetchLoyaltyInfo = async () => {
@@ -598,6 +608,55 @@ const changeLoyaltyTab = (tab) => {
   if (tab === "history") {
     fetchLoyaltyHistory();
   }
+};
+
+const fetchMyVouchers = async () => {
+  ensureClientAuthContext();
+  isLoadingVouchers.value = true;
+  vouchersMessage.value = { type: "", text: "" };
+  try {
+    const res = await clientApi.getMyVouchers();
+    myVouchers.value = res.data || [];
+  } catch (error) {
+    vouchersMessage.value = {
+      type: "error",
+      text: "Không thể tải danh sách voucher.",
+    };
+  } finally {
+    isLoadingVouchers.value = false;
+  }
+};
+
+const getVoucherStatusInfo = (v) => {
+  const pivot = v.targeted_khach_hangs?.[0]?.pivot;
+  const status = pivot?.trang_thai;
+
+  if (status === "da_dung") {
+    return {
+      label: "Đã sử dụng",
+      class: "text-slate-400 border-slate-200 bg-slate-50",
+      icon: "check_circle",
+      isAvailable: false,
+    };
+  }
+
+  const now = new Date();
+  const expiry = new Date(v.ngay_ket_thuc);
+  if (expiry < now) {
+    return {
+      label: "Hết hạn",
+      class: "text-rose-500 border-rose-100 bg-rose-50",
+      icon: "event_busy",
+      isAvailable: false,
+    };
+  }
+
+  return {
+    label: "Sẵn sàng",
+    class: "text-emerald-600 border-emerald-100 bg-emerald-50",
+    icon: "verified",
+    isAvailable: true,
+  };
 };
 
 const getLoyaltyTypeInfo = (type) => {
@@ -1152,6 +1211,7 @@ onUnmounted(() => {
                 v-for="ticket in pagedTickets"
                 :key="ticket.id"
                 class="group bg-white border border-slate-200 rounded-[32px] p-8 flex flex-col md:flex-row items-center justify-between hover:shadow-2xl hover:border-blue-200 transition-all duration-500 cursor-pointer relative overflow-hidden"
+                @click="openTicketDetail(ticket)"
               >
                 <!-- Hiệu ứng trang trí góc -->
                 <div
@@ -1159,7 +1219,7 @@ onUnmounted(() => {
                 ></div>
 
                 <div class="flex-1 w-full relative z-10">
-                  <div @click="openTicketDetail(ticket)">
+                  <div>
                     <div class="flex justify-between items-center mb-8">
                       <span
                         :class="getStatusInfoExtended(ticket).class"
@@ -1280,7 +1340,7 @@ onUnmounted(() => {
                     class="flex justify-end"
                   >
                     <button
-                      @click="rateTrip(ticket)"
+                      @click.stop="rateTrip(ticket)"
                       class="text-blue-800 hover:text-blue-600 font-semibold mt-2"
                     >
                       <div class="flex items-center gap-2">
@@ -1593,78 +1653,107 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Vouchers Content -->
           <div
             v-if="activeMenu.main === 'offers' && activeMenu.sub === 'vouchers'"
-            class="bg-white p-6 sm:p-10 rounded-3xl shadow-sm border border-slate-200 animate-fade-in"
+            class="bg-white p-6 sm:p-10 rounded-3xl shadow-sm border border-slate-200 animate-fade-in min-h-[400px]"
           >
-            <div class="text-center py-8">
-              <div
-                class="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6"
-              >
-                <span class="material-symbols-outlined text-5xl text-purple-600"
-                  >local_activity</span
-                >
-              </div>
-              <h2 class="text-2xl font-bold text-slate-900 mb-2">
+            <div class="flex items-center justify-between mb-8">
+              <h2 class="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <span class="material-symbols-outlined text-purple-600 text-3xl">local_activity</span>
                 Kho Voucher
               </h2>
-              <p class="text-slate-500 max-w-md mx-auto mb-8">
-                Ưu đãi độc quyền dành cho thành viên Smart Bus
-              </p>
-              <div
-                class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left items-stretch"
+              <button 
+                @click="router.push('/san-voucher')"
+                class="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-purple-100 transition flex items-center gap-2"
               >
-                <div
-                  class="border border-slate-200 rounded-2xl p-5 hover:shadow-md transition flex flex-col h-full"
-                >
-                  <div>
-                    <div class="flex justify-between items-start mb-3">
-                      <span
-                        class="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full"
-                        >Giảm 20%</span
-                      >
-                      <span class="text-xs text-slate-400"
-                        >HSD: 30/12/2025</span
-                      >
+                <span class="material-symbols-outlined text-base">redeem</span>
+                Săn thêm voucher
+              </button>
+            </div>
+
+            <div v-if="isLoadingVouchers" class="flex flex-col items-center justify-center py-20">
+              <div class="w-12 h-12 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+              <p class="text-slate-500 font-medium">Đang tải kho voucher...</p>
+            </div>
+
+            <div v-else-if="myVouchers.length === 0" class="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+              <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                <span class="material-symbols-outlined text-4xl text-slate-300">confirmation_number</span>
+              </div>
+              <h3 class="text-lg font-bold text-slate-800">Kho voucher trống</h3>
+              <p class="text-slate-500 text-sm mt-2 mb-8">Bạn chưa có voucher nào trong ví. Hãy săn ngay nhé!</p>
+              <button 
+                @click="router.push('/san-voucher')"
+                class="bg-purple-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-purple-200 hover:bg-purple-700 transition active:scale-95"
+              >
+                Đến trang săn Voucher
+              </button>
+            </div>
+
+            <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div 
+                v-for="v in myVouchers" :key="v.id"
+                class="relative border rounded-2xl overflow-hidden transition-all duration-300 group flex h-full"
+                :class="getVoucherStatusInfo(v).isAvailable ? 'border-slate-200 hover:shadow-xl bg-white' : 'border-slate-100 opacity-75 grayscale-[0.5] bg-slate-50/50'"
+              >
+                <!-- Left decoration -->
+                <div 
+                  class="w-4 flex-shrink-0"
+                  :class="getVoucherStatusInfo(v).isAvailable ? 'bg-purple-600' : 'bg-slate-300'"
+                ></div>
+                
+                <div class="p-5 flex-1 flex flex-col">
+                  <div class="flex justify-between items-start mb-3">
+                    <span 
+                      class="text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider border"
+                      :class="getVoucherStatusInfo(v).isAvailable ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-slate-100 text-slate-500 border-slate-200'"
+                    >
+                      {{ v.loai_voucher === 'percent' ? `Giảm ${parseFloat(v.gia_tri)}%` : `Giảm ${formatCurrency(v.gia_tri)}` }}
+                    </span>
+                    <div class="text-right">
+                      <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Hạn dùng</span>
+                      <span class="text-[10px] font-black text-slate-600">{{ formatDate(v.ngay_ket_thuc) }}</span>
                     </div>
-                    <h3 class="font-bold text-slate-900">
-                      Giảm giá vé tuyến cố định
-                    </h3>
-                    <p class="text-sm text-slate-500 mt-1">
-                      Áp dụng cho tất cả tuyến Đà Nẵng - Hội An
-                    </p>
                   </div>
-                  <button
-                    class="mt-6 w-full bg-blue-600 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition mt-auto"
+                  
+                  <h3 
+                    class="font-black text-slate-800 text-base leading-tight transition-colors mb-2"
+                    :class="getVoucherStatusInfo(v).isAvailable ? 'group-hover:text-purple-700' : 'text-slate-500'"
                   >
-                    Nhận ngay
-                  </button>
-                </div>
-                <div
-                  class="border border-slate-200 rounded-2xl p-5 hover:shadow-md transition flex flex-col h-full"
-                >
-                  <div>
-                    <div class="flex justify-between items-start mb-3">
-                      <span
-                        class="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full"
-                        >Miễn phí</span
-                      >
-                      <span class="text-xs text-slate-400"
-                        >HSD: 15/11/2025</span
-                      >
+                    {{ v.ten_voucher }}
+                  </h3>
+                  
+                  <div class="flex items-center gap-2 mb-4">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase">Mã:</span>
+                    <span class="text-xs font-black text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{{ v.ma_voucher }}</span>
+                  </div>
+                  
+                  <div class="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <div class="flex flex-col">
+                      <span class="text-[9px] text-slate-400 font-bold uppercase leading-none mb-1">Trạng thái</span>
+                      <div class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm" :class="getVoucherStatusInfo(v).class.split(' ')[0]">{{ getVoucherStatusInfo(v).icon }}</span>
+                        <span class="text-[11px] font-black" :class="getVoucherStatusInfo(v).class.split(' ')[0]">{{ getVoucherStatusInfo(v).label }}</span>
+                      </div>
                     </div>
-                    <h3 class="font-bold text-slate-900">Phụ kiện xe buýt</h3>
-                    <p class="text-sm text-slate-500 mt-1">
-                      Tặng 1 suất nước suối trên xe
-                    </p>
+                    
+                    <button 
+                      v-if="getVoucherStatusInfo(v).isAvailable"
+                      @click="router.push('/')"
+                      class="bg-slate-900 text-white text-xs font-bold px-5 py-2 rounded-xl hover:bg-blue-600 transition shadow-lg shadow-slate-100 active:scale-95"
+                    >
+                      Dùng ngay
+                    </button>
+                    <div v-else class="text-[10px] font-bold text-slate-400 italic">
+                      Không khả dụng
+                    </div>
                   </div>
-                  <button
-                    class="mt-6 w-full bg-blue-600 text-white py-2 rounded-xl font-semibold hover:bg-blue-700 transition mt-auto"
-                  >
-                    Nhận ngay
-                  </button>
                 </div>
+
+                <!-- Punch holes effect -->
+                <div class="absolute top-1/2 -left-2.5 w-5 h-5 bg-slate-50 rounded-full -translate-y-1/2 border border-slate-200 z-10"></div>
+                <div class="absolute top-0 left-[75px] w-3 h-3 bg-slate-50 rounded-full -translate-x-1/2 -translate-y-1/2 border border-slate-200 z-10"></div>
+                <div class="absolute bottom-0 left-[75px] w-3 h-3 bg-slate-50 rounded-full -translate-x-1/2 translate-y-1/2 border border-slate-200 z-10"></div>
               </div>
             </div>
           </div>
@@ -1956,6 +2045,51 @@ onUnmounted(() => {
                       <span class="text-2xl font-black text-slate-900">{{
                         formatCurrency(selectedTicket.tong_tien)
                       }}</span>
+                    </div>
+
+                    <!-- Phần QR Thanh toán cho vé đang chờ -->
+                    <div
+                      v-if="
+                        selectedTicket.tinh_trang === 'dang_cho' &&
+                        selectedTicket.phuong_thuc_thanh_toan === 'chuyen_khoan'
+                      "
+                      class="mt-10 p-6 bg-blue-50/50 border border-blue-100 rounded-[24px] flex flex-col items-center animate-fade-in"
+                    >
+                      <div class="flex items-center gap-2 mb-4">
+                        <span
+                          class="material-symbols-outlined text-blue-600 animate-pulse"
+                          >payments</span
+                        >
+                        <h5 class="font-bold text-blue-800 text-base">
+                          Quét mã QR để thanh toán ngay
+                        </h5>
+                      </div>
+
+                      <div
+                        class="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm mb-5"
+                      >
+                        <img
+                          :src="`https://img.vietqr.io/image/${bankId}-${bankAccount}-compact2.png?amount=${selectedTicket.tong_tien}&addInfo=${selectedTicket.ma_ve}&accountName=${encodeURIComponent(accountName)}`"
+                          class="w-44 h-44 mix-blend-multiply"
+                          alt="QR Thanh toán"
+                        />
+                      </div>
+
+                      <div class="w-full space-y-2 text-center">
+                        <div
+                          class="flex items-center justify-between px-4 py-2 bg-white rounded-xl border border-blue-50"
+                        >
+                          <span class="text-[10px] font-bold text-slate-400 uppercase"
+                            >Nội dung CK</span
+                          >
+                          <span class="font-black text-blue-700 tracking-wider"
+                            >{{ selectedTicket.ma_ve }}</span
+                          >
+                        </div>
+                        <p class="text-[10px] text-slate-500 font-medium italic">
+                          * Hệ thống sẽ tự động xác nhận sau khi nhận được tiền.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </section>

@@ -15,6 +15,7 @@ const adminApi = {
 
   // --- QUẢN LÝ KHÁCH HÀNG ---
   getClients: (params) => axiosClient.get('/v1/admin/khach-hang', { params }),
+  getClientsListMinimal: () => axiosClient.get('/v1/admin/khach-hang/list-minimal'),
   getClientDetails: (id) => axiosClient.get(`/v1/admin/khach-hang/${id}`),
   createClient: (data) => axiosClient.post('/v1/admin/khach-hang', data),
   updateClient: (id, data) => axiosClient.put(`/v1/admin/khach-hang/${id}`, data),
@@ -23,6 +24,7 @@ const adminApi = {
 
   // --- QUẢN LÝ NHÀ XE ---
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
+  getOperatorsListMinimal: () => axiosClient.get('/v1/admin/nha-xe/list-minimal'),
 
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
   createOperator: (data) => {
@@ -108,6 +110,7 @@ const adminApi = {
 
   // --- QUẢN LÝ VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),
+  createVoucher: (data) => axiosClient.post('/v1/admin/voucher', data),
   approveVoucher: (id, data) => axiosClient.patch(`/v1/admin/voucher/${id}/duyet`, data),
 
   // --- QUẢN LÝ ĐÁNH GIÁ ---
