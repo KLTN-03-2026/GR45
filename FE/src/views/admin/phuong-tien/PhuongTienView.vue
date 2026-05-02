@@ -39,6 +39,7 @@ const pagination = reactive({ currentPage: 1, perPage: 15, total: 0, lastPage: 1
 
 const tableColumns = [
   { key: 'id', label: 'ID' },
+  { key: 'hinh_anh', label: 'Hình Ảnh' },
   { key: 'bien_so', label: 'Biển Số' },
   { key: 'ten_xe', label: 'Tên Xe' },
   { key: 'nha_xe', label: 'Nhà Xe' },
@@ -168,6 +169,8 @@ const initialFormData = () => ({
   id_tai_xe_chinh: '',
   bien_nhan_dang: '',
   so_ghe_thuc_te: '',
+  hinh_anh: null,
+  hinh_anh_url: '',
 })
 
 const formData = reactive(initialFormData())
@@ -217,10 +220,20 @@ const openEditModal = async (vehicle) => {
     id_tai_xe_chinh: vehicle.id_tai_xe_chinh || '',
     bien_nhan_dang: vehicle.bien_nhan_dang || '',
     so_ghe_thuc_te: vehicle.so_ghe_thuc_te || '',
+    hinh_anh: null,
+    hinh_anh_url: vehicle.hinh_anh || '',
   })
   formErrors.value = {}
   await ensureDrivers(true)
   isFormModal.value = true
+}
+
+const handleImageChange = (e) => {
+  const file = e.target.files[0]
+  if (file) {
+    formData.hinh_anh = file
+    formData.hinh_anh_url = URL.createObjectURL(file)
+  }
 }
 
 const buildPayload = () => {
@@ -239,6 +252,16 @@ const buildPayload = () => {
 
   if (String(formData.bien_nhan_dang || '').trim()) {
     payload.bien_nhan_dang = String(formData.bien_nhan_dang).trim()
+  }
+
+  // Use FormData if image is present
+  if (formData.hinh_anh) {
+    const fd = new FormData()
+    Object.keys(payload).forEach(key => {
+      fd.append(key, payload[key])
+    })
+    fd.append('hinh_anh', formData.hinh_anh)
+    return fd
   }
 
   return payload
@@ -681,6 +704,15 @@ onMounted(() => {
 
     <div class="table-card">
       <BaseTable :columns="tableColumns" :data="vehicles" :loading="loading">
+        <template #cell(hinh_anh)="{ value }">
+          <div class="table-img-container">
+            <img v-if="value" :src="value" alt="Xe" class="table-img" />
+            <div v-else class="table-img-placeholder">
+              <span class="placeholder-icon">🚌</span>
+            </div>
+          </div>
+        </template>
+
         <template #cell(bien_so)="{ value }">
           <span class="code-chip">{{ value }}</span>
         </template>
@@ -790,6 +822,25 @@ onMounted(() => {
               </option>
             </select>
             <p v-if="formErrors.id_tai_xe_chinh?.[0]" class="field-error">{{ formErrors.id_tai_xe_chinh[0] }}</p>
+          </div>
+
+          <div class="form-group full-width">
+            <label class="base-input-label">Hình ảnh xe</label>
+            <div class="image-upload-wrapper">
+              <div class="image-preview" v-if="formData.hinh_anh_url">
+                <img :src="formData.hinh_anh_url" alt="Preview" />
+                <button type="button" class="remove-img" @click="formData.hinh_anh = null; formData.hinh_anh_url = ''">×</button>
+              </div>
+              <div class="image-dropzone" v-else>
+                <input type="file" accept="image/*" @change="handleImageChange" id="vehicle-img-input" class="hidden-input" />
+                <label for="vehicle-img-input" class="dropzone-label">
+                  <span class="upload-icon">📸</span>
+                  <span class="upload-text">Chọn ảnh xe hoặc kéo thả vào đây</span>
+                  <span class="upload-hint">Định dạng: JPG, PNG, GIF (Max 2MB)</span>
+                </label>
+              </div>
+            </div>
+            <p v-if="formErrors.hinh_anh?.[0]" class="field-error">{{ formErrors.hinh_anh[0] }}</p>
           </div>
 
           <div class="form-group full-width">
@@ -1607,5 +1658,126 @@ onMounted(() => {
   .seat-stats {
     grid-template-columns: 1fr;
   }
+}
+
+/* NEW STYLES FOR VEHICLE IMAGE */
+.table-img-container {
+  width: 50px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
+.table-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.table-img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+}
+
+.placeholder-icon {
+  font-size: 18px;
+}
+
+.image-upload-wrapper {
+  margin-top: 4px;
+}
+
+.image-preview {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+  height: 160px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-img {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+}
+
+.remove-img:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+.image-dropzone {
+  width: 100%;
+  height: 120px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.image-dropzone:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.dropzone-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 20px;
+  width: 100%;
+}
+
+.upload-icon {
+  font-size: 28px;
+}
+
+.upload-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #94a3b8;
 }
 </style>
