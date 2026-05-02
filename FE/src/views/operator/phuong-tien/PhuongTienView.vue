@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import operatorApi from '@/api/operatorApi'
+import { compressImage } from '@/utils/imageCompression'
 import BaseTable from '@/components/common/BaseTable.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
@@ -262,6 +263,12 @@ const submitForm = async () => {
   try {
     formLoading.value = true
     formErrors.value = {}
+    
+    // Nén ảnh trước khi gửi nếu có
+    if (formData.hinh_anh instanceof File) {
+      formData.hinh_anh = await compressImage(formData.hinh_anh, { quality: 0.6 })
+    }
+
     const payload = buildPayload()
 
     if (isEditMode.value) {
@@ -716,6 +723,16 @@ onMounted(() => {
     </div>
 
     <BaseModal v-model="isFormModal" :title="isEditMode ? 'Cập Nhật Xe' : 'Thêm Xe Mới'" maxWidth="760px">
+      <div v-if="formLoading" class="upload-overlay">
+        <div class="upload-spinner-box">
+          <svg class="spinner-main" viewBox="0 0 50 50">
+            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+          </svg>
+          <p>Đang tải ảnh và lưu phương tiện...</p>
+          <span class="sub-tip">Vui lòng không đóng trình duyệt lúc này</span>
+        </div>
+      </div>
+
       <div class="info-banner">
         <span class="info-icon">ℹ️</span>
         <span v-if="isEditMode">Sau khi cập nhật xe, hệ thống sẽ chuyển xe về trạng thái <strong>Chờ
@@ -1713,5 +1730,62 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* UPLOAD OVERLAY & SPINNER */
+.upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  border-radius: inherit;
+}
+
+.upload-spinner-box {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.spinner-main {
+  width: 50px;
+  height: 50px;
+  animation: rotate 2s linear infinite;
+}
+
+.spinner-main .path {
+  stroke: #10b981;
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes dash {
+  0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
+}
+
+.upload-spinner-box p {
+  margin: 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sub-tip {
+  font-size: 12px;
+  color: #64748b;
 }
 </style>

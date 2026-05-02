@@ -30,7 +30,7 @@ class StoreXeRequest extends FormRequest
         return [
             'bien_so' => ['required', 'string', 'max:20', $bienSoUniqueRule],
             'ten_xe' => 'required|string|max:255',
-            'hinh_anh' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'hinh_anh' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'id_loai_xe' => 'required|integer|exists:loai_xes,id',
             'id_tai_xe_chinh' => 'nullable|integer|exists:tai_xes,id',
             'bien_nhan_dang' => 'nullable|string|max:300',
@@ -66,6 +66,7 @@ class StoreXeRequest extends FormRequest
 
     protected function failedValidation(Validator $validator): void
     {
+        \Illuminate\Support\Facades\Log::error('Validation failed for StoreXeRequest: ' . json_encode($validator->errors()->toArray()));
         throw new HttpResponseException(
             response()->json([
                 'success' => false,

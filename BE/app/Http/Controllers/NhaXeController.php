@@ -68,7 +68,7 @@ class NhaXeController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data'    => \App\Models\NhaXe::select('id', 'ten_nha_xe')
+            'data'    => \App\Models\NhaXe::select('id', 'ma_nha_xe', 'ten_nha_xe')
                 ->where('tinh_trang', 'hoat_dong')
                 ->get(),
         ]);

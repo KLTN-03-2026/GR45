@@ -23,37 +23,7 @@ class XeController extends Controller
         $this->xeService = $xeService;
     }
 
-    protected function validatedStoreRequest(Request $request): StoreXeRequest
-    {
-        if ($request instanceof StoreXeRequest) {
-            return $request;
-        }
 
-        $form = StoreXeRequest::createFrom($request);
-        $form->setContainer(app());
-        if (app()->bound('redirect')) {
-            $form->setRedirector(app('redirect'));
-        }
-        $form->validateResolved();
-
-        return $form;
-    }
-
-    protected function validatedUpdateRequest(Request $request): UpdateXeRequest
-    {
-        if ($request instanceof UpdateXeRequest) {
-            return $request;
-        }
-
-        $form = UpdateXeRequest::createFrom($request);
-        $form->setContainer(app());
-        if (app()->bound('redirect')) {
-            $form->setRedirector(app('redirect'));
-        }
-        $form->validateResolved();
-
-        return $form;
-    }
 
     /**
      * @return array{tong_ghe: int, so_do_ghe: array<int, array<int, mixed>>}
@@ -133,11 +103,10 @@ class XeController extends Controller
         }
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreXeRequest $request): JsonResponse
     {
         try {
-            $form = $this->validatedStoreRequest($request);
-            $xe = $this->xeService->create($form->validated());
+            $xe = $this->xeService->create($request->validated());
             $isNhaXe = auth()->user() instanceof NhaXe;
             $seatPayload = $this->seatMapPayloadForResponse($xe->id);
 
@@ -151,6 +120,10 @@ class XeController extends Controller
                 ],
             ], 201);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('XeController@store error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'request' => $request->all()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -158,11 +131,10 @@ class XeController extends Controller
         }
     }
 
-    public function update(Request $request, $id): JsonResponse
+    public function update(UpdateXeRequest $request, $id): JsonResponse
     {
         try {
-            $form = $this->validatedUpdateRequest($request);
-            $xe = $this->xeService->update($id, $form->validated());
+            $xe = $this->xeService->update($id, $request->validated());
             $isNhaXe = auth()->user() instanceof NhaXe;
 
             return response()->json([
@@ -171,6 +143,10 @@ class XeController extends Controller
                 'data' => $xe,
             ]);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('XeController@update error: ' . $e->getMessage(), [
+                'exception' => $e,
+                'request' => $request->all()
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import operatorApi from '@/api/operatorApi'
+import { compressImage } from '@/utils/imageCompression'
 import BaseTable from '@/components/common/BaseTable.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
@@ -201,11 +202,12 @@ const submitForm = async () => {
     }
 
     const fileFields = ['avatar', 'anh_cccd_mat_truoc', 'anh_cccd_mat_sau', 'anh_gplx', 'anh_gplx_mat_sau']
-    fileFields.forEach(field => {
+    for (const field of fileFields) {
       if (formData[field] instanceof File) {
-        payload.append(field, formData[field])
+        const compressed = await compressImage(formData[field], { quality: 0.6 })
+        payload.append(field, compressed)
       }
-    })
+    }
 
     if (isEditMode.value) {
       await operatorApi.updateDriver(currentDriverId.value, payload)

@@ -45,8 +45,8 @@ class UploadXeImageJob implements ShouldQueue
     public function handle(): void
     {
         $cloudName = config('services.cloudinary.cloud_name', env('CLOUDINARY_CLOUD_NAME'));
-        $apiKey    = config('services.cloudinary.api_key',    env('CLOUDINARY_API_KEY'));
-        $apiSecret = config('services.cloudinary.api_secret', env('CLOUDINARY_API_SECRET'));
+        $apiKey    = config('services.cloudinary.api_key',    env('CLOUDINARY_KEY'));
+        $apiSecret = config('services.cloudinary.api_secret', env('CLOUDINARY_SECRET'));
 
         if (!$cloudName || !$apiKey || !$apiSecret) {
             Log::error("UploadXeImageJob: Cloudinary chưa được cấu hình trong .env");
