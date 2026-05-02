@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import adminApi from '@/api/adminApi'
+import { compressImage } from '@/utils/imageCompression'
 import BaseTable from '@/components/common/BaseTable.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
@@ -120,6 +121,22 @@ const loaiXeList = ref([])
 const loaiXeLoading = ref(false)
 const driverList = ref([])
 const driverLoading = ref(false)
+const nhaXeList = ref([])
+const nhaXeLoading = ref(false)
+
+const ensureNhaXe = async (force = false) => {
+  if (!force && nhaXeList.value.length) return
+  try {
+    nhaXeLoading.value = true
+    const res = await adminApi.getOperatorsListMinimal()
+    nhaXeList.value = Array.isArray(res?.data) ? res.data : []
+  } catch (error) {
+    console.error('Lỗi tải danh sách nhà xe:', error)
+    showToast(error.response?.data?.message || 'Không tải được danh sách nhà xe.', 'error')
+  } finally {
+    nhaXeLoading.value = false
+  }
+}
 
 const ensureLoaiXe = async (force = false) => {
   if (!force && loaiXeList.value.length) return
@@ -200,6 +217,7 @@ const onSeatCodeInput = (value) => {
 
 const openCreateModal = async () => {
   await ensureLoaiXe()
+  await ensureNhaXe()
   await ensureDrivers(true)
   isEditMode.value = false
   currentVehicleId.value = null
@@ -210,6 +228,7 @@ const openCreateModal = async () => {
 
 const openEditModal = async (vehicle) => {
   await ensureLoaiXe()
+  await ensureNhaXe()
   isEditMode.value = true
   currentVehicleId.value = vehicle.id
   Object.assign(formData, {
@@ -272,6 +291,12 @@ const submitForm = async () => {
   try {
     formLoading.value = true
     formErrors.value = {}
+    
+    // Nén ảnh trước khi gửi nếu có
+    if (formData.hinh_anh instanceof File) {
+      formData.hinh_anh = await compressImage(formData.hinh_anh, { quality: 0.6 })
+    }
+
     const payload = buildPayload()
 
     if (isEditMode.value) {
@@ -778,6 +803,15 @@ onMounted(() => {
     </div>
 
     <BaseModal v-model="isFormModal" :title="isEditMode ? 'Cập Nhật Xe' : 'Thêm Xe Mới'" maxWidth="760px">
+      <div v-if="formLoading" class="upload-overlay">
+        <div class="upload-spinner-box">
+          <svg class="spinner-main" viewBox="0 0 50 50">
+            <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+          </svg>
+          <p>Đang tải ảnh và lưu phương tiện...</p>
+          <span class="sub-tip">Vui lòng không đóng trình duyệt lúc này</span>
+        </div>
+      </div>
       <div class="info-banner">
         <span class="info-icon">ℹ️</span>
         <span v-if="isEditMode">Sau khi cập nhật, kiểm tra lại thông tin. Có thể đổi trạng thái xe bằng nút
@@ -798,7 +832,13 @@ onMounted(() => {
           </div>
 
           <div class="form-group">
-            <BaseInput v-model="formData.ma_nha_xe" label="Mã nhà xe *" placeholder="VD: NX001" required />
+            <label class="base-input-label">Nhà xe *</label>
+            <select v-model="formData.ma_nha_xe" class="custom-input custom-select" required :disabled="nhaXeLoading" @change="ensureDrivers(true)">
+              <option disabled value="">-- Chọn nhà xe --</option>
+              <option v-for="nx in nhaXeList" :key="nx.ma_nha_xe" :value="nx.ma_nha_xe">
+                {{ nx.ten_nha_xe }} {{ nx.ma_nha_xe ? '- [' + nx.ma_nha_xe + ']' : '' }}
+              </option>
+            </select>
             <p v-if="formErrors.ma_nha_xe?.[0]" class="field-error">{{ formErrors.ma_nha_xe[0] }}</p>
           </div>
 
@@ -1779,5 +1819,62 @@ onMounted(() => {
 .upload-hint {
   font-size: 12px;
   color: #94a3b8;
+}
+
+/* UPLOAD OVERLAY & SPINNER */
+.upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  border-radius: inherit;
+}
+
+.upload-spinner-box {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.spinner-main {
+  width: 50px;
+  height: 50px;
+  animation: rotate 2s linear infinite;
+}
+
+.spinner-main .path {
+  stroke: #3b82f6; /* Admin blue theme */
+  stroke-linecap: round;
+  animation: dash 1.5s ease-in-out infinite;
+}
+
+@keyframes rotate {
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes dash {
+  0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 90, 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 90, 150; stroke-dashoffset: -124; }
+}
+
+.upload-spinner-box p {
+  margin: 0;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.sub-tip {
+  font-size: 12px;
+  color: #64748b;
 }
 </style>

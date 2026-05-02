@@ -28,13 +28,12 @@ const adminApi = {
 
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
   createOperator: (data) => {
-    const isFormData = data instanceof FormData
-    return axiosClient.post('/v1/admin/nha-xe', data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {})
+    return axiosClient.post('/v1/admin/nha-xe', data)
   },
   updateOperator: (id, data) => {
     if (data instanceof FormData) {
       if (!data.has('_method')) data.append('_method', 'PUT')
-      return axiosClient.post(`/v1/admin/nha-xe/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } })
+      return axiosClient.post(`/v1/admin/nha-xe/${id}`, data)
     }
     return axiosClient.put(`/v1/admin/nha-xe/${id}`, data)
   },
@@ -62,13 +61,12 @@ const adminApi = {
   getVehiclesPublic: (params) => axiosClient.get('/v1/xe/public', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/admin/xe/${id}`),
   createVehicle: (data) => {
-    const isFormData = data instanceof FormData;
-    return axiosClient.post('/v1/admin/xe', data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {});
+    return axiosClient.post('/v1/admin/xe', data);
   },
   updateVehicle: (id, data) => {
     if (data instanceof FormData) {
       if (!data.has('_method')) data.append('_method', 'PUT');
-      return axiosClient.post(`/v1/admin/xe/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
+      return axiosClient.post(`/v1/admin/xe/${id}`, data);
     }
     return axiosClient.put(`/v1/admin/xe/${id}`, data);
   },
