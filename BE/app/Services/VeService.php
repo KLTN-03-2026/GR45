@@ -117,13 +117,30 @@ class VeService
 
             // Xử lý Voucher (nếu có)
             $voucher = null;
-            if (!empty($data['id_voucher'])) {
-                $voucher = Voucher::find($data['id_voucher']);
-                if (!$voucher || $voucher->trang_thai !== 'hoat_dong' || $voucher->so_luong_con_lai <= 0) {
-                    throw new Exception("Mã giảm giá không hợp lệ hoặc đã hết lượt sử dụng.");
+            if (!empty($data['id_voucher']) && $role === 'khach_hang') {
+                $voucher = Voucher::whereHas('targetedKhachHangs', function($q) use ($user) {
+                    $q->where('khach_hang_id', $user->id)
+                      ->where('trang_thai', 'chua_dung');
+                })->find($data['id_voucher']);
+
+                if (!$voucher) {
+                    throw new Exception("Mã giảm giá không hợp lệ, đã sử dụng hoặc không thuộc sở hữu của bạn.");
                 }
+
+                if (!in_array($voucher->trang_thai, ['hoat_dong', 'tam_ngung'])) {
+                    throw new Exception("Mã giảm giá hiện không khả dụng.");
+                }
+
                 if ($voucher->ngay_ket_thuc && now()->startOfDay()->gt($voucher->ngay_ket_thuc)) {
                     throw new Exception("Mã giảm giá đã quá hạn.");
+                }
+
+                // Kiểm tra xem voucher có thuộc nhà xe này không (hoặc là Global)
+                if ($voucher->id_nha_xe !== null) {
+                    $nhaXeCuaChuyen = $chuyenXe->tuyenDuong->nhaXe;
+                    if ($voucher->id_nha_xe !== $nhaXeCuaChuyen->id) {
+                        throw new Exception("Mã giảm giá này không áp dụng cho nhà xe " . $nhaXeCuaChuyen->ten_nha_xe);
+                    }
                 }
 
                 if ($voucher->loai_voucher === 'percent') {
@@ -195,9 +212,12 @@ class VeService
                 'tien_diem' => $tienDiem,
             ]);
 
-            // Cập nhật số lượng voucher
-            if ($voucher) {
-                $voucher->decrement('so_luong_con_lai', 1);
+            // Cập nhật trạng thái voucher trong ví khách hàng
+            if ($voucher && $role === 'khach_hang') {
+                $user->vouchers()->updateExistingPivot($voucher->id, [
+                    'trang_thai' => 'da_dung',
+                    'used_at' => now()
+                ]);
             }
 
             $tinhTrangChiTiet = $tinhTrang === 'da_thanh_toan' ? 'da_thanh_toan' : 'dang_cho';
@@ -365,11 +385,14 @@ class VeService
         $ve->tinh_trang = 'huy';
         $ve->save();
 
-        // Hoàn lại voucher
-        if ($ve->id_voucher) {
-            $voucher = Voucher::find($ve->id_voucher);
-            if ($voucher) {
-                $voucher->increment('so_luong_con_lai', 1);
+        // Hoàn lại trạng thái trong ví khách hàng
+        if ($ve->id_voucher && $ve->id_khach_hang) {
+            $kh = KhachHang::find($ve->id_khach_hang);
+            if ($kh) {
+                $kh->vouchers()->updateExistingPivot($ve->id_voucher, [
+                    'trang_thai' => 'chua_dung',
+                    'used_at' => null
+                ]);
             }
         }
 

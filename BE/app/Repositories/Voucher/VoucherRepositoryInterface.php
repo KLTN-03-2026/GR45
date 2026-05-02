@@ -10,5 +10,7 @@ interface VoucherRepositoryInterface
     public function getAllForNhaXe(int $nhaXeId);
     public function createVoucher(array $data);
     public function updateStatus(int $id, string $status);
+    public function updateVoucher(int $id, array $data);
+    public function deleteVoucher(int $id);
     public function findById(int $id);
 }
