@@ -22,52 +22,53 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-                // --- Tang 0: Danh muc tinh thanh ---
-            // TinhThanhSeeder::class,
-                // --- Tang 1: Danh muc goc ---
+            // --- Tang 0: Danh muc tinh thanh ---
+            TinhThanhSeeder::class,
+            PhuongXaSeeder::class,
+            // --- Tang 1: Danh muc goc ---
             ChucVuSeeder::class,
             ChucNangSeeder::class,
 
-                // --- Tang 2: Phu thuoc danh muc ---
+            // --- Tang 2: Phu thuoc danh muc ---
             PhanQuyenSeeder::class,
             AdminSeeder::class,
 
-                // --- Tang 3: Danh muc doc lap ---
+            // --- Tang 3: Danh muc doc lap ---
             KhachHangSeeder::class,
             DiemThanhVienSeeder::class,
 
             LoaiXeSeeder::class,
             LoaiGheSeeder::class,
 
-                // --- Tang 4: Nha xe (phu thuoc Admin + ChucVu) ---
+            // --- Tang 4: Nha xe (phu thuoc Admin + ChucVu) ---
             NhaXeSeeder::class,
             HoSoNhaXeSeeder::class,
             DiaChiNhaXeSeeder::class,
 
-                // --- Tang 4.5: Voucher (co the phu thuoc NhaXe) ---
+            // --- Tang 4.5: Voucher (co the phu thuoc NhaXe) ---
             VoucherSeeder::class,
 
-                // --- Tang 5: Tai xe (phu thuoc NhaXe) ---
+            // --- Tang 5: Tai xe (phu thuoc NhaXe) ---
             TaiXeSeeder::class,
             HoSoTaiXeSeeder::class,
 
-                // --- Tang 6: Xe (phu thuoc NhaXe + LoaiXe + TaiXe) ---
+            // --- Tang 6: Xe (phu thuoc NhaXe + LoaiXe + TaiXe) ---
             XeSeeder::class,
             HoSoXeSeeder::class,
             GheSeeder::class,
 
-                // --- Tang 7: Tuyen duong ---
+            // --- Tang 7: Tuyen duong ---
             TuyenDuongSeeder::class,
             TramDungSeeder::class,
 
-                // --- Tang 8: Chuyen xe (phu thuoc TuyenDuong + Xe + TaiXe) ---
+            // --- Tang 8: Chuyen xe (phu thuoc TuyenDuong + Xe + TaiXe) ---
             ChuyenXeSeeder::class,
 
-                // --- Tang 9: Ve (phu thuoc KhachHang + ChuyenXe) ---
+            // --- Tang 9: Ve (phu thuoc KhachHang + ChuyenXe) ---
             VeSeeder::class,
             ChiTietVeSeeder::class,
 
-                // --- Tang 10: Thanh toan (phu thuoc Ve + KhachHang) ---
+            // --- Tang 10: Thanh toan (phu thuoc Ve + KhachHang) ---
             ThanhToanSeeder::class,
             LichSuThanhToanNhaXe::class,
 
