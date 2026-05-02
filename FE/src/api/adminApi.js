@@ -15,6 +15,7 @@ const adminApi = {
 
   // --- QUẢN LÝ KHÁCH HÀNG ---
   getClients: (params) => axiosClient.get('/v1/admin/khach-hang', { params }),
+  getClientsListMinimal: () => axiosClient.get('/v1/admin/khach-hang/list-minimal'),
   getClientDetails: (id) => axiosClient.get(`/v1/admin/khach-hang/${id}`),
   createClient: (data) => axiosClient.post('/v1/admin/khach-hang', data),
   updateClient: (id, data) => axiosClient.put(`/v1/admin/khach-hang/${id}`, data),
@@ -23,10 +24,20 @@ const adminApi = {
 
   // --- QUẢN LÝ NHÀ XE ---
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
+  getOperatorsListMinimal: () => axiosClient.get('/v1/admin/nha-xe/list-minimal'),
 
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
-  createOperator: (data) => axiosClient.post('/v1/admin/nha-xe', data),
-  updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
+  createOperator: (data) => {
+    const isFormData = data instanceof FormData
+    return axiosClient.post('/v1/admin/nha-xe', data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {})
+  },
+  updateOperator: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT')
+      return axiosClient.post(`/v1/admin/nha-xe/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } })
+    }
+    return axiosClient.put(`/v1/admin/nha-xe/${id}`, data)
+  },
   toggleOperatorStatus: (id) => axiosClient.patch(`/v1/admin/nha-xe/${id}/trang-thai`),
   deleteOperator: (id) => axiosClient.delete(`/v1/admin/nha-xe/${id}`),
 
@@ -50,8 +61,17 @@ const adminApi = {
   getVehicles: (params) => axiosClient.get('/v1/admin/xe', { params }),
   getVehiclesPublic: (params) => axiosClient.get('/v1/xe/public', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/admin/xe/${id}`),
-  createVehicle: (data) => axiosClient.post('/v1/admin/xe', data),
-  updateVehicle: (id, data) => axiosClient.put(`/v1/admin/xe/${id}`, data),
+  createVehicle: (data) => {
+    const isFormData = data instanceof FormData;
+    return axiosClient.post('/v1/admin/xe', data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {});
+  },
+  updateVehicle: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return axiosClient.post(`/v1/admin/xe/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
+    }
+    return axiosClient.put(`/v1/admin/xe/${id}`, data);
+  },
   deleteVehicle: (id) => axiosClient.delete(`/v1/admin/xe/${id}`),
   updateVehicleStatus: (id, data) => axiosClient.patch(`/v1/admin/xe/${id}/trang-thai`, data),
   getLoaiXe: () => axiosClient.get('/v1/admin/loai-xe'),
@@ -99,6 +119,7 @@ const adminApi = {
 
   // --- QUẢN LÝ VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),
+  createVoucher: (data) => axiosClient.post('/v1/admin/voucher', data),
   approveVoucher: (id, data) => axiosClient.patch(`/v1/admin/voucher/${id}/duyet`, data),
 
   // --- QUẢN LÝ ĐÁNH GIÁ ---

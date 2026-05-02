@@ -25,15 +25,16 @@ return new class extends Migration
             $table->integer('so_luong');                  // Tổng số lượng
             $table->integer('so_luong_con_lai');          // Còn lại
 
-            $table->enum('trang_thai', ['hoat_dong', 'vo_hieu', 'het_han', 'tam_ngung', 'cho_duyet'])
+            $table->enum('trang_thai', ['hoat_dong', 'vo_hieu', 'het_han', 'tam_ngung', 'cho_duyet','huy','tu_choi'])
                 ->default('cho_duyet');                   // Trạng thái
+            $table->boolean('is_public')->default(false); 
             $table->text('dieu_kien')->nullable();        // Điều kiện áp dụng
 
             $table->foreignId('id_nha_xe')->nullable()->constrained('nha_xes')->nullOnDelete();
 
             $table->decimal('tong_tien_giam', 15, 2)
                 ->default(0);                           // Tổng tiền đã giảm
-                
+
 
             $table->timestamps();
         });

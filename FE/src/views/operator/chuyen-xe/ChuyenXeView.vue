@@ -60,14 +60,32 @@ const searchQuery = ref(""); // tìm tuyến đường / biển số xe / tên t
 const filterStatus = ref("");
 
 const tableColumns = [
-  { key: "id", label: "ID" },
-  { key: "tuyen_duong", label: "Tuyến Đường" },
+  { key: "stt", label: "STT" },
+  { key: "ten_tuyen_duong", label: "Tuyến đường" },
   { key: "ngay_gio", label: "Ngày / Giờ KH" },
   { key: "xe", label: "Xe" },
-  { key: "tai_xe", label: "Tài Xế" },
+  { key: "tai_xe", label: "Tài xế" },
+  { key: "ten_nha_xe", label: "Nhà xe" },
   { key: "trang_thai", label: "Trạng Thái" },
   { key: "actions", label: "Hành Động" },
 ];
+
+const tripsTableRows = computed(() =>
+  trips.value.map((item, idx) => {
+    const td = item.tuyen_duong;
+    const nx = td?.nha_xe || td?.nhaXe;
+    const line =
+      td?.ten_tuyen_duong ||
+      [td?.diem_bat_dau, td?.diem_ket_thuc].filter(Boolean).join(" → ") ||
+      "—";
+    return {
+      ...item,
+      stt: (pagination.currentPage - 1) * pagination.perPage + idx + 1,
+      ten_tuyen_duong: line,
+      ten_nha_xe: nx?.ten_nha_xe || nx?.tenNhaXe || "—",
+    };
+  }),
+);
 
 const fetchTrips = async (page = 1) => {
   try {
@@ -453,7 +471,10 @@ const fetchRoutesList = async () => {
     if (Array.isArray(dataArr)) {
       routesList.value = dataArr.map((r) => ({
         value: r.id,
-        label: `${r.id} - ${r.ten_tuyen_duong || r.diem_bat_dau + " -> " + r.diem_ket_thuc}`,
+        label:
+          r.ten_tuyen_duong ||
+          `${r.diem_bat_dau || ""} → ${r.diem_ket_thuc || ""}`.trim() ||
+          `Tuyến #${r.id}`,
         ma_nha_xe: r.ma_nha_xe,
       }));
     }
@@ -591,25 +612,10 @@ onMounted(() => {
     <div class="table-card">
       <BaseTable
         :columns="tableColumns"
-        :data="trips"
+        :data="tripsTableRows"
         :loading="loading"
         @row-click="openDetailModal($event.id)"
       >
-        <template #cell(tuyen_duong)="{ item }">
-          <div v-if="item.tuyen_duong" class="route-cell">
-            <span class="route-name">{{
-              item.tuyen_duong.ten_tuyen_duong
-            }}</span>
-            <span class="route-path"
-              >{{ item.tuyen_duong.diem_bat_dau }} →
-              {{ item.tuyen_duong.diem_ket_thuc }}</span
-            >
-          </div>
-          <span v-else class="text-muted"
-            >Tuyến #{{ item.id_tuyen_duong }}</span
-          >
-        </template>
-
         <template #cell(ngay_gio)="{ item }">
           <div class="date-cell">
             <span class="date-main">{{
@@ -765,7 +771,9 @@ onMounted(() => {
               :key="vehicle.id"
               :value="vehicle.id"
             >
-              #{{ vehicle.id }} - {{ vehicle.ten_xe }} ({{ vehicle.bien_so }})
+              {{
+                [vehicle.bien_so || "—", vehicle.ten_xe].filter(Boolean).join(" — ")
+              }}
             </option>
           </select>
         </div>
@@ -778,9 +786,11 @@ onMounted(() => {
               :key="driver.id"
               :value="driver.id"
             >
-              #{{ driver.id }} -
-              {{ driver.ho_ten || driver.ho_va_ten || "Không tên" }} -
-              {{ driver.so_dien_thoai || "Không SĐT" }}
+              {{
+                [driver.ho_ten || driver.ho_va_ten || "Không tên", driver.so_dien_thoai]
+                  .filter(Boolean)
+                  .join(" — ")
+              }}
             </option>
           </select>
         </div>

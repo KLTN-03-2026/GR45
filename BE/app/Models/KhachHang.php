@@ -55,12 +55,20 @@ class KhachHang extends Authenticatable
     /** Toan bo lich su cong/tru diem */
     public function lichSuDiem()
     {
-        return $this->hasMany(LichSuDiem::class, 'id_khach_hang');
+        return $this->hasMany(LichSuDungDiem::class, 'id_khach_hang');
     }
 
     /** Danh gia chuyen xe */
     public function danhGias()
     {
         return $this->hasMany(DanhGia::class, 'id_khach_hang');
+    }
+
+    /** Vouchers cua khach hang */
+    public function vouchers()
+    {
+        return $this->belongsToMany(Voucher::class, 'voucher_khach_hangs', 'khach_hang_id', 'voucher_id')
+                    ->withPivot('trang_thai', 'used_at')
+                    ->withTimestamps();
     }
 }

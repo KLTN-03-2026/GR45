@@ -152,17 +152,30 @@ class RatingController extends Controller
     }
 
     /**
-     * Danh sách đánh giá theo chuyến xe — công khai (mọi người xem được), chỉ trả họ tên khách.
+     * Danh sách đánh giá theo nhà xe của chuyến đang xem (công khai).
+     * FE vẫn gọi bằng tripId nhưng backend sẽ mở rộng ra toàn bộ đánh giá của nhà xe đó.
      */
     public function listRatingsByTrip(Request $request, int $tripId): JsonResponse
     {
-        if (!ChuyenXe::where('id', $tripId)->exists()) {
+        $trip = ChuyenXe::with([
+            'xe:id,ma_nha_xe',
+            'tuyenDuong.nhaXe:id,ma_nha_xe',
+        ])->find($tripId);
+        if (! $trip) {
             return response()->json(['success' => false, 'message' => 'Chuyến xe không tồn tại.'], 404);
+        }
+        $maNhaXe = (string) ($trip->tuyenDuong->nhaXe->ma_nha_xe ?? $trip->xe->ma_nha_xe ?? '');
+        if ($maNhaXe === '') {
+            return response()->json(['success' => false, 'message' => 'Chuyến xe chưa gắn nhà xe hợp lệ.'], 422);
         }
 
         $perPage = min(max((int) $request->input('per_page', 30), 1), 50);
 
-        $stats = DanhGia::where('id_chuyen_xe', $tripId)
+        $baseQuery = DanhGia::query()->whereHas('chuyenXe.tuyenDuong.nhaXe', function ($q) use ($maNhaXe) {
+            $q->where('ma_nha_xe', $maNhaXe);
+        });
+
+        $stats = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_ratings, AVG(diem_so) as avg_diem_so')
             ->first();
 
@@ -171,8 +184,15 @@ class RatingController extends Controller
             ? round((float) $stats->avg_diem_so, 1)
             : null;
 
-        $paginator = DanhGia::with(['khachHang:id,ho_va_ten'])
-            ->where('id_chuyen_xe', $tripId)
+        $paginator = DanhGia::with([
+            'khachHang:id,ho_va_ten',
+            'chuyenXe:id,id_tuyen_duong,id_xe,ngay_khoi_hanh,gio_khoi_hanh',
+            'chuyenXe.tuyenDuong:id,ten_tuyen_duong,diem_bat_dau,diem_ket_thuc',
+            'chuyenXe.xe:id,bien_so,ten_xe',
+        ])
+            ->whereHas('chuyenXe.tuyenDuong.nhaXe', function ($q) use ($maNhaXe) {
+                $q->where('ma_nha_xe', $maNhaXe);
+            })
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
@@ -248,7 +268,11 @@ class RatingController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $ratings = DanhGia::with(['chuyenXe.tuyenDuong', 'khachHang:id,ho_va_ten'])
+        $ratings = DanhGia::with([
+            'chuyenXe.tuyenDuong.nhaXe',
+            'chuyenXe.xe:id,bien_so,ten_xe',
+            'khachHang:id,ho_va_ten',
+        ])
             ->where('id_khach_hang', $khachHang->id)
             ->orderByDesc('created_at')
             ->get();
@@ -259,6 +283,8 @@ class RatingController extends Controller
             $row['route_diem_bat_dau'] = $td?->diem_bat_dau;
             $row['route_diem_ket_thuc'] = $td?->diem_ket_thuc;
             $row['ten_tuyen_duong'] = $td?->ten_tuyen_duong;
+            $row['ten_nha_xe'] = $td?->nhaXe?->ten_nha_xe;
+            $row['bien_so_xe'] = $r->chuyenXe?->xe?->bien_so;
             $row['chuyen_ngay_khoi_hanh'] = $r->chuyenXe?->ngay_khoi_hanh?->format('Y-m-d');
             $row['chuyen_gio_khoi_hanh'] = $r->chuyenXe?->gio_khoi_hanh?->format('H:i');
 
@@ -284,7 +310,7 @@ class RatingController extends Controller
 
         $ratings = DanhGia::with([
             'khachHang:id,ho_va_ten,email,so_dien_thoai',
-            'chuyenXe.tuyenDuong',
+            'chuyenXe.tuyenDuong.nhaXe',
             'chuyenXe.xe:id,bien_so,ten_xe,ma_nha_xe',
         ])
             ->whereHas('chuyenXe.xe', function ($q) use ($nhaXe) {
@@ -310,7 +336,7 @@ class RatingController extends Controller
 
         $query = DanhGia::with([
             'khachHang:id,ho_va_ten,email,so_dien_thoai,avatar',
-            'chuyenXe.tuyenDuong:id,ten_tuyen_duong,diem_bat_dau,diem_ket_thuc',
+            'chuyenXe.tuyenDuong.nhaXe',
             'chuyenXe.xe:id,bien_so,ten_xe,ma_nha_xe,id_loai_xe',
             'chuyenXe.xe.nhaXe:id,ma_nha_xe,ten_nha_xe',
         ])->orderByDesc('created_at');

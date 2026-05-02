@@ -18,8 +18,17 @@ const operatorApi = {
   // --- XE / PHƯƠNG TIỆN ---
   getVehicles: (params) => axiosClient.get('/v1/nha-xe/xe', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/nha-xe/xe/${id}`),
-  createVehicle: (data) => axiosClient.post('/v1/nha-xe/xe', data),
-  updateVehicle: (id, data) => axiosClient.put(`/v1/nha-xe/xe/${id}`, data),
+  createVehicle: (data) => {
+    const isFormData = data instanceof FormData;
+    return axiosClient.post('/v1/nha-xe/xe', data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {});
+  },
+  updateVehicle: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return axiosClient.post(`/v1/nha-xe/xe/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
+    }
+    return axiosClient.put(`/v1/nha-xe/xe/${id}`, data);
+  },
   deleteVehicle: (id) => axiosClient.delete(`/v1/nha-xe/xe/${id}`),
   updateVehicleDocument: (id, formData) => axiosClient.post(`/v1/nha-xe/xe/${id}/ho-so`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -70,6 +79,9 @@ const operatorApi = {
   // --- VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/nha-xe/voucher'),
   createVoucher: (data) => axiosClient.post('/v1/nha-xe/voucher', data),
+  getVoucherDetail: (id) => axiosClient.get(`/v1/nha-xe/voucher/${id}`),
+  updateVoucher: (id, data) => axiosClient.put(`/v1/nha-xe/voucher/${id}`, data),
+  deleteVoucher: (id) => axiosClient.delete(`/v1/nha-xe/voucher/${id}`),
 
   // --- TÀI XẾ ---
   getDrivers: (params) => axiosClient.get('/v1/nha-xe/tai-xe', { params }),
@@ -98,6 +110,7 @@ const operatorApi = {
   updateBankInfo: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/update-bank', data),
   requestTopup: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/topup', data),
   requestWithdraw: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/withdraw', data),
+  getTransactionDetail: (id) => axiosClient.get(`/v1/nha-xe/vi-nha-xe/giao-dich/${id}`),
 };
 
 export default operatorApi;

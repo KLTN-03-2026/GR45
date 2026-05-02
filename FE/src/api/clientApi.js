@@ -24,6 +24,15 @@ const clientApi = {
   getRatingByTrip: (tripId) => axiosClient.get(`/v1/rating/trip/${tripId}`),
   getPendingRatings: () => axiosClient.get('/v1/pending-rating'),
   getMyRatings: () => axiosClient.get('/v1/my-ratings'),
+  
+  // --- LOYALTY POINTS ---
+  getLoyaltyInfo: () => axiosClient.get('/v1/diem-thanh-vien'),
+  getLoyaltyHistory: (params) => axiosClient.get('/v1/lich-su-diem', { params }),
+
+  // --- VOUCHERS ---
+  getMyVouchers: (params) => axiosClient.get('/v1/voucher', { params }),
+  getHuntableVouchers: () => axiosClient.get('/v1/voucher/huntable'),
+  huntVoucher: (id) => axiosClient.post(`/v1/voucher/${id}/hunt`),
 
   // chi tiết vé
   getTicket: (id) => axiosClient.get(`/v1/ve/${id}`),

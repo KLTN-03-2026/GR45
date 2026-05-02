@@ -252,10 +252,21 @@ class KhachHangController extends Controller
             'tinh_trang',
             'per_page',
         ]));
-
+        
         return response()->json([
             'success' => true,
             'data'    => $data,
+        ]);
+    }
+
+    /** GET /api/v1/admin/khach-hang/list-minimal */
+    public function listMinimal(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => \App\Models\KhachHang::select('id', 'ho_va_ten', 'so_dien_thoai')
+                ->where('tinh_trang', 'hoat_dong')
+                ->get(),
         ]);
     }
 
@@ -363,6 +374,26 @@ class KhachHangController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->service->getVoucherCongKhai($request->all()),
+        ]);
+    }
+
+    // ── DIEM THANH VIEN ──────────────────────────────────────────────
+
+    public function getDiemThanhVien(Request $request): JsonResponse
+    {
+        $data = $this->service->getDiemThanhVien($request->user('sanctum'));
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
+        ]);
+    }
+
+    public function getLichSuDiem(Request $request): JsonResponse
+    {
+        $data = $this->service->getLichSuDiem($request->user('sanctum'), $request->all());
+        return response()->json([
+            'success' => true,
+            'data'    => $data,
         ]);
     }
 }

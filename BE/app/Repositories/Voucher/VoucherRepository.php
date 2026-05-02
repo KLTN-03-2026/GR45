@@ -32,6 +32,25 @@ class VoucherRepository implements VoucherRepositoryInterface
         return null;
     }
 
+    public function updateVoucher(int $id, array $data)
+    {
+        $voucher = Voucher::find($id);
+        if ($voucher) {
+            $voucher->update($data);
+            return $voucher;
+        }
+        return null;
+    }
+
+    public function deleteVoucher(int $id)
+    {
+        $voucher = Voucher::find($id);
+        if ($voucher) {
+            return $voucher->delete();
+        }
+        return false;
+    }
+
     public function findById(int $id)
     {
         return Voucher::with('nhaXe')->find($id);

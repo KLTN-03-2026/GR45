@@ -87,7 +87,10 @@
             <tr v-else-if="!transactions.length" class="text-center">
               <td colspan="6" class="p-8 text-gray-500">Chưa có giao dịch nào.</td>
             </tr>
-            <tr v-for="tx in transactions" :key="tx.id" class="hover:bg-gray-50/50 transition-colors">
+            <tr v-for="tx in transactions" :key="tx.id" 
+              class="hover:bg-gray-50/50 transition-colors cursor-pointer"
+              @click="openDetailModal(tx.id)"
+            >
               <td class="p-4 font-mono text-sm text-gray-600">{{ tx.transaction_code }}</td>
               <td class="p-4 text-sm text-gray-600">
                 <div class="flex items-center">
@@ -163,6 +166,19 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Số tiền nạp (VND)</label>
             <input v-model="topupAmount" type="number" min="10000" step="10000" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-lg font-medium" />
+            
+            <div class="grid grid-cols-3 gap-2 mt-3">
+              <button 
+                v-for="amount in [50000, 100000, 200000, 500000, 1000000, 2000000]" 
+                :key="amount"
+                @click="topupAmount = amount"
+                type="button"
+                class="px-2 py-2 text-xs font-medium border rounded-lg transition-colors hover:bg-blue-50 hover:border-blue-200"
+                :class="topupAmount === amount ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-gray-200 text-gray-600'"
+              >
+                {{ formatCurrency(amount) }}
+              </button>
+            </div>
           </div>
           
           <div class="mt-6 flex justify-end gap-3">
@@ -221,18 +237,120 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
               <span>Số tiền rút (VND)</span>
-              <span class="text-green-600 cursor-pointer text-xs" @click="withdrawAmount = wallet.so_du">Rút toàn bộ</span>
+              <span class="text-green-600 cursor-pointer text-xs" @click="withdrawAmount = Math.max(0, wallet.so_du - 1000000)">Rút toàn bộ</span>
             </label>
-            <input v-model="withdrawAmount" type="number" min="10000" :max="wallet?.so_du || 0" step="10000" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 text-lg font-medium" />
-            <p class="text-xs text-gray-500 mt-1">Số dư khả dụng: <span class="font-bold">{{ formatCurrency(wallet?.so_du || 0) }}</span></p>
+            <input v-model="withdrawAmount" type="number" min="10000" :max="Math.max(0, wallet?.so_du - 1000000)" step="10000" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 text-lg font-medium" />
+            <div class="mt-2 space-y-1">
+              <p class="text-xs text-gray-500">Số dư khả dụng: <span class="font-bold">{{ formatCurrency(wallet?.so_du || 0) }}</span></p>
+              <p class="text-xs text-orange-600 font-medium">* Số dư tối thiểu duy trì ví: {{ formatCurrency(1000000) }}</p>
+              <p class="text-xs text-blue-600 font-medium">Số tiền có thể rút: <span class="font-bold">{{ formatCurrency(Math.max(0, wallet?.so_du - 1000000)) }}</span></p>
+            </div>
           </div>
           
           <div class="mt-6 flex justify-end gap-3">
             <button @click="showWithdrawModal = false" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Hủy</button>
-            <button @click="requestWithdraw" :disabled="submitting || withdrawAmount < 10000 || withdrawAmount > wallet?.so_du" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
+            <button @click="requestWithdraw" :disabled="submitting || withdrawAmount < 10000 || withdrawAmount > (wallet?.so_du - 1000000)" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50">
               {{ submitting ? 'Đang xử lý...' : 'Xác nhận rút' }}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transaction Detail Modal -->
+    <div v-if="showDetailModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+        <!-- Modal Header -->
+        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+          <h3 class="font-bold text-gray-800 flex items-center">
+            <History class="w-5 h-5 mr-2 text-blue-600" />
+            Chi tiết giao dịch
+          </h3>
+          <button @click="showDetailModal = false" class="text-gray-400 hover:text-gray-600">
+            <XCircle class="w-6 h-6" />
+          </button>
+        </div>
+
+        <div v-if="loadingDetail" class="p-12 text-center text-gray-500">
+          Đang tải chi tiết...
+        </div>
+
+        <div v-else-if="selectedTransaction" class="p-6">
+          <!-- Transaction Info -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="space-y-1">
+              <p class="text-xs text-gray-500 uppercase font-semibold">Mã giao dịch</p>
+              <p class="font-mono text-sm font-bold text-blue-700">{{ selectedTransaction.transaction_code }}</p>
+            </div>
+            <div class="space-y-1 text-right">
+              <p class="text-xs text-gray-500 uppercase font-semibold">Thời gian</p>
+              <p class="text-sm">{{ formatDate(selectedTransaction.created_at) }}</p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-xs text-gray-500 uppercase font-semibold">Loại giao dịch</p>
+              <span :class="getTypeBadgeClass(selectedTransaction.loai_giao_dich)" class="px-2 py-0.5 rounded text-xs font-bold">
+                {{ formatType(selectedTransaction.loai_giao_dich) }}
+              </span>
+            </div>
+            <div class="space-y-1 text-right">
+              <p class="text-xs text-gray-500 uppercase font-semibold">Trạng thái</p>
+              <span :class="getStatusBadgeClass(selectedTransaction.tinh_trang)" class="px-2 py-0.5 rounded text-xs font-bold">
+                {{ formatTxStatus(selectedTransaction.tinh_trang) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3 mb-6">
+            <div class="flex justify-between items-center pb-2 border-b border-gray-200">
+              <span class="text-sm text-gray-600">Số tiền</span>
+              <span class="text-lg font-bold" :class="selectedTransaction.loai_giao_dich === 'phi_hoa_hong' || selectedTransaction.loai_giao_dich === 'rut_tien' ? 'text-red-600' : 'text-green-600'">
+                {{ selectedTransaction.loai_giao_dich === 'phi_hoa_hong' || selectedTransaction.loai_giao_dich === 'rut_tien' ? '-' : '+' }}{{ formatCurrency(selectedTransaction.so_tien) }}
+              </span>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-gray-500">Số dư trước GD</span>
+              <span class="font-medium">{{ formatCurrency(selectedTransaction.so_du_truoc) }}</span>
+            </div>
+            <div class="flex justify-between items-center text-sm font-bold pt-1">
+              <span class="text-gray-700">Số dư sau GD</span>
+              <span class="text-blue-600">{{ formatCurrency(selectedTransaction.so_du_sau_giao_dich) }}</span>
+            </div>
+          </div>
+
+          <div class="space-y-1 mb-6">
+            <p class="text-xs text-gray-500 uppercase font-semibold">Nội dung</p>
+            <p class="text-sm bg-gray-50 p-3 rounded-lg border border-dashed border-gray-300 italic">
+              {{ selectedTransaction.noi_dung || 'Không có nội dung' }}
+            </p>
+          </div>
+
+          <!-- QR Code for Pending Topup -->
+          <div v-if="selectedTransaction.loai_giao_dich === 'nap_tien' && selectedTransaction.tinh_trang === 'cho_xac_nhan' && detailQrData" 
+               class="mt-4 p-4 border-2 border-dashed border-blue-200 rounded-2xl bg-blue-50/30 text-center">
+            <p class="text-sm font-bold text-blue-800 mb-3">Vui lòng quét mã QR để hoàn tất nạp tiền</p>
+            <div class="p-2 bg-white rounded-xl border inline-block shadow-sm mb-3">
+              <img :src="`https://img.vietqr.io/image/${detailQrData.bank_code}-${detailQrData.account_no}-compact2.jpg?amount=${detailQrData.amount}&addInfo=${detailQrData.content}&accountName=${detailQrData.account_name}`" 
+                   alt="VietQR" class="w-48 h-48 object-contain mx-auto" />
+            </div>
+            <div class="text-left text-xs space-y-1 max-w-[280px] mx-auto text-gray-700">
+              <p><strong>STK:</strong> {{ detailQrData.account_no }} ({{ detailQrData.bank_code }})</p>
+              <p><strong>Số tiền:</strong> <span class="text-red-600 font-bold">{{ formatCurrency(detailQrData.amount) }}</span></p>
+              <p><strong>Nội dung:</strong> <span class="font-mono bg-white px-1 border rounded">{{ detailQrData.content }}</span></p>
+            </div>
+          </div>
+
+          <!-- Trip details if applicable -->
+          <div v-if="selectedTransaction.chuyen_xe" class="mt-4 p-4 bg-orange-50 rounded-xl border border-orange-100">
+            <p class="text-xs text-orange-800 uppercase font-bold mb-2">Chuyến xe liên quan</p>
+            <p class="text-sm">Mã chuyến: <strong>#{{ selectedTransaction.chuyen_xe.id }}</strong></p>
+            <p class="text-xs text-gray-600">Thời gian khởi hành: {{ formatDate(selectedTransaction.chuyen_xe.thoi_gian_bat_dau) }}</p>
+          </div>
+        </div>
+
+        <div class="p-4 bg-gray-50 border-t flex justify-end">
+          <button @click="showDetailModal = false" class="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm">
+            Đóng
+          </button>
         </div>
       </div>
     </div>
@@ -244,6 +362,7 @@ import { ref, onMounted } from 'vue';
 import operatorApi from '@/api/operatorApi';
 import Swal from 'sweetalert2';
 import { Wallet, Building, ArrowDownLeft, ArrowUpRight, CheckCircle2, History, Clock, XCircle, AlertTriangle } from 'lucide-vue-next';
+import { formatCurrency, formatDateTime } from '@/utils/format';
 
 // State
 const wallet = ref(null);
@@ -255,6 +374,12 @@ const submitting = ref(false);
 const showBankInfoModal = ref(false);
 const showTopupModal = ref(false);
 const showWithdrawModal = ref(false);
+const showDetailModal = ref(false);
+
+// Detail state
+const selectedTransaction = ref(null);
+const loadingDetail = ref(false);
+const detailQrData = ref(null);
 
 // Form data
 const bankForm = ref({ ngan_hang: '', so_tai_khoan: '', ten_tai_khoan: '' });
@@ -341,15 +466,29 @@ const requestWithdraw = async () => {
   }
 };
 
-// Helpers
-const formatCurrency = (val) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+const openDetailModal = async (id) => {
+  showDetailModal.value = true;
+  loadingDetail.value = true;
+  selectedTransaction.value = null;
+  detailQrData.value = null;
+
+  try {
+    const res = await operatorApi.getTransactionDetail(id);
+    const data = res.data ?? res;
+    selectedTransaction.value = data.transaction;
+    detailQrData.value = data.qr_data || null;
+  } catch (err) {
+    console.error('Lỗi lấy chi tiết giao dịch:', err);
+    Swal.fire('Lỗi', 'Không thể lấy thông tin chi tiết giao dịch', 'error');
+    showDetailModal.value = false;
+  } finally {
+    loadingDetail.value = false;
+  }
 };
 
+// Helpers
 const formatDate = (val) => {
-  if (!val) return '';
-  const date = new Date(val);
-  return date.toLocaleString('vi-VN');
+  return formatDateTime(val);
 };
 
 const formatStatus = (val) => {

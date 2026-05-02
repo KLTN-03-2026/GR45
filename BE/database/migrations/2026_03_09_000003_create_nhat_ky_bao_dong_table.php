@@ -23,7 +23,7 @@ return new class extends Migration
             $table->unsignedBigInteger('id_xe');
             $table->foreign('id_xe')->references('id')->on('xes')->restrictOnDelete();
 
-            // Loai su co va muc do
+            // Loai su co va muc
             $table->enum('loai_bao_dong', [
                 'ngu_gat',              // AI camera phat hien mat nham / ngu gat
                 'qua_toc_do',          // Vuot van toc gioi han

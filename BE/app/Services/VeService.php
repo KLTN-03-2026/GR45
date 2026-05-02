@@ -112,16 +112,35 @@ class VeService
             $soLuongGhe = count($danhSachIdGhe);
             $tienBanDau = $giaVeCoBan * $soLuongGhe;
             $tienKhuyenMai = 0;
+            $tienDiem = 0;
+            $diemQuyDoi = (int)($data['diem_quy_doi'] ?? 0);
 
             // Xử lý Voucher (nếu có)
             $voucher = null;
-            if (!empty($data['id_voucher'])) {
-                $voucher = Voucher::find($data['id_voucher']);
-                if (!$voucher || $voucher->trang_thai !== 'hoat_dong' || $voucher->so_luong_con_lai <= 0) {
-                    throw new Exception("Mã giảm giá không hợp lệ hoặc đã hết lượt sử dụng.");
+            if (!empty($data['id_voucher']) && $role === 'khach_hang') {
+                $voucher = Voucher::whereHas('targetedKhachHangs', function($q) use ($user) {
+                    $q->where('khach_hang_id', $user->id)
+                      ->where('trang_thai', 'chua_dung');
+                })->find($data['id_voucher']);
+
+                if (!$voucher) {
+                    throw new Exception("Mã giảm giá không hợp lệ, đã sử dụng hoặc không thuộc sở hữu của bạn.");
                 }
+
+                if (!in_array($voucher->trang_thai, ['hoat_dong', 'tam_ngung'])) {
+                    throw new Exception("Mã giảm giá hiện không khả dụng.");
+                }
+
                 if ($voucher->ngay_ket_thuc && now()->startOfDay()->gt($voucher->ngay_ket_thuc)) {
                     throw new Exception("Mã giảm giá đã quá hạn.");
+                }
+
+                // Kiểm tra xem voucher có thuộc nhà xe này không (hoặc là Global)
+                if ($voucher->id_nha_xe !== null) {
+                    $nhaXeCuaChuyen = $chuyenXe->tuyenDuong->nhaXe;
+                    if ($voucher->id_nha_xe !== $nhaXeCuaChuyen->id) {
+                        throw new Exception("Mã giảm giá này không áp dụng cho nhà xe " . $nhaXeCuaChuyen->ten_nha_xe);
+                    }
                 }
 
                 if ($voucher->loai_voucher === 'percent') {
@@ -135,7 +154,17 @@ class VeService
                 }
             }
 
-            $tongTien = $tienBanDau - $tienKhuyenMai;
+            // Xử lý đổi điểm thành viên
+            if ($role === 'khach_hang' && $diemQuyDoi > 0) {
+                $viDiem = $user->diemThanhVien;
+                if (!$viDiem || $viDiem->diem_hien_tai < $diemQuyDoi) {
+                    throw new Exception("Bạn không đủ điểm để thực hiện quy đổi (Cần $diemQuyDoi điểm).");
+                }
+                $tienDiem = $diemQuyDoi * 100; // 1 điểm = 100đ
+            }
+
+            $tongTien = $tienBanDau - $tienKhuyenMai - $tienDiem;
+            if ($tongTien < 0) $tongTien = 0;
 
             $tinhTrang = $data['tinh_trang'] ?? 'dang_cho';
             $phuongThucThanhToan = $data['phuong_thuc_thanh_toan'] ?? 'tien_mat';
@@ -179,11 +208,16 @@ class VeService
                 'tien_ban_dau' => $tienBanDau,
                 'tien_khuyen_mai' => $tienKhuyenMai,
                 'id_voucher' => $voucher ? $voucher->id : null,
+                'diem_quy_doi' => $diemQuyDoi,
+                'tien_diem' => $tienDiem,
             ]);
 
-            // Cập nhật số lượng voucher
-            if ($voucher) {
-                $voucher->decrement('so_luong_con_lai', 1);
+            // Cập nhật trạng thái voucher trong ví khách hàng
+            if ($voucher && $role === 'khach_hang') {
+                $user->vouchers()->updateExistingPivot($voucher->id, [
+                    'trang_thai' => 'da_dung',
+                    'used_at' => now()
+                ]);
             }
 
             $tinhTrangChiTiet = $tinhTrang === 'da_thanh_toan' ? 'da_thanh_toan' : 'dang_cho';
@@ -200,6 +234,15 @@ class VeService
                     'gia_ve' => $giaVeCoBan, // Giá gốc từng ghế
                     'tinh_trang' => $tinhTrangChiTiet,
                 ]);
+            }
+
+            // Trừ điểm thành viên nếu có dùng
+            if ($role === 'khach_hang' && $diemQuyDoi > 0) {
+                $user->diemThanhVien->suDungDiem(
+                    $diemQuyDoi,
+                    "Sử dụng điểm thanh toán cho vé " . $ve->ma_ve,
+                    $ve->ma_ve
+                );
             }
 
             DB::commit();
@@ -242,7 +285,13 @@ class VeService
         }
 
         if (!empty($filters['ngay_khoi_hanh'])) {
-            $query->where('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
+            $query->whereHas('chuyenXe', function ($q) use ($filters) {
+                $q->whereDate('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
+            });
+        }
+
+        if (!empty($filters['id_chuyen_xe'])) {
+            $query->where('id_chuyen_xe', (int) $filters['id_chuyen_xe']);
         }
 
         if (!empty($filters['tinh_trang'])) {
@@ -265,14 +314,25 @@ class VeService
         }
 
         if (!empty($filters['search'])) {
-            $kw = $filters['search'];
+            $kw = trim((string) $filters['search']);
             $query->where(function ($q) use ($kw) {
-                $q->where('ma_ve', 'like', "%$kw%")
-                    ->orWhereHas('khachHang', fn($kh) => $kh->where('so_dien_thoai', 'like', "%$kw%"));
+                $q->where('ma_ve', 'like', '%' . $kw . '%')
+                    ->orWhereHas('khachHang', function ($kh) use ($kw) {
+                        $kh->where('so_dien_thoai', 'like', '%' . $kw . '%')
+                            ->orWhere('ho_va_ten', 'like', '%' . $kw . '%')
+                            ->orWhere('email', 'like', '%' . $kw . '%');
+                    })
+                    ->orWhereHas('chuyenXe.tuyenDuong', function ($td) use ($kw) {
+                        $td->where('ten_tuyen_duong', 'like', '%' . $kw . '%')
+                            ->orWhere('diem_bat_dau', 'like', '%' . $kw . '%')
+                            ->orWhere('diem_ket_thuc', 'like', '%' . $kw . '%');
+                    });
             });
         }
 
-        return $query->paginate($filters['per_page'] ?? 5);
+        $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 15;
+
+        return $query->paginate($perPage > 0 ? $perPage : 15);
     }
 
     public function getChiTietVe($id, string $role)
@@ -343,11 +403,14 @@ class VeService
         $ve->tinh_trang = 'huy';
         $ve->save();
 
-        // Hoàn lại voucher
-        if ($ve->id_voucher) {
-            $voucher = Voucher::find($ve->id_voucher);
-            if ($voucher) {
-                $voucher->increment('so_luong_con_lai', 1);
+        // Hoàn lại trạng thái trong ví khách hàng
+        if ($ve->id_voucher && $ve->id_khach_hang) {
+            $kh = KhachHang::find($ve->id_khach_hang);
+            if ($kh) {
+                $kh->vouchers()->updateExistingPivot($ve->id_voucher, [
+                    'trang_thai' => 'chua_dung',
+                    'used_at' => null
+                ]);
             }
         }
 

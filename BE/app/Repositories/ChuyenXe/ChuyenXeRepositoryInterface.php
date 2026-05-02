@@ -17,4 +17,5 @@ interface ChuyenXeRepositoryInterface
     public function getSeatMap(int $idChuyenXe);
     public function changeVehicle(int $idChuyenXe, int $newIdXe);
     public function autoGenerate();
+    public function hoanThanh(int $id);
 }

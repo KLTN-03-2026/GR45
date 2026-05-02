@@ -51,6 +51,9 @@ const buttonClasses = computed(() => {
     <svg v-if="loading" class="spinner" viewBox="0 0 50 50">
       <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
     </svg>
+    <div v-if="$slots.icon && !loading" class="btn-icon">
+      <slot name="icon"></slot>
+    </div>
     <span :class="{ 'opacity-0': loading }">
       <slot></slot>
     </span>
@@ -71,6 +74,13 @@ const buttonClasses = computed(() => {
   border: 1px solid transparent;
   position: relative;
   overflow: hidden;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .base-btn:disabled {

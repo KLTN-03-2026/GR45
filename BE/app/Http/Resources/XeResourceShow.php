@@ -13,7 +13,8 @@ class XeResourceShow extends JsonResource
             'id'                 => $this->id,
             'bien_so'            => $this->bien_so,
             'ten_xe'             => $this->ten_xe,
-            'tinh_trang'         => $this->tinh_trang,
+            'hinh_anh'           => $this->hinh_anh,
+            'trang_thai'         => $this->trang_thai,
             // Thong tin nha xe (neu da load)
             'nha_xe' => $this->whenLoaded('nhaXe', function () {
                 return [

@@ -66,6 +66,7 @@ onMounted(() => {
         headers: {
           Authorization: `Bearer ${operatorStore.token}`,
           Accept: "application/json",
+          "ngrok-skip-browser-warning": "true",
         },
       },
     });
@@ -117,6 +118,39 @@ onMounted(() => {
           title: 'Cảnh báo vi phạm',
           message: msg,
           icon: 'alert'
+        });
+      })
+      .listen(".yeu_cau_rut_tien.approved", (event) => {
+        console.log("💰 Nhận thông báo duyệt rút tiền:", event);
+        const msg = event.message || `Yêu cầu rút tiền ${event.transaction_code} đã được duyệt.`;
+        showToast(msg, "success");
+        operatorStore.addNotification({
+          type: 'wallet',
+          title: 'Rút tiền thành công',
+          message: msg,
+          icon: 'success'
+        });
+      })
+      .listen(".yeu_cau_rut_tien.rejected", (event) => {
+        console.log("❌ Nhận thông báo từ chối rút tiền:", event);
+        const msg = event.message || `Yêu cầu rút tiền ${event.transaction_code} đã bị từ chối.`;
+        showToast(msg, "error");
+        operatorStore.addNotification({
+          type: 'wallet',
+          title: 'Rút tiền bị từ chối',
+          message: msg,
+          icon: 'alert'
+        });
+      })
+      .listen(".nha_xe.topup_success", (event) => {
+        console.log("💎 Nhận thông báo nạp tiền thành công:", event);
+        const msg = event.message || `Nạp tiền thành công ${event.amount} VNĐ.`;
+        showToast(msg, "success");
+        operatorStore.addNotification({
+          type: 'wallet',
+          title: 'Nạp tiền thành công',
+          message: msg,
+          icon: 'success'
         });
       });
   }

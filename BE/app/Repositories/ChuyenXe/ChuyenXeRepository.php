@@ -93,7 +93,7 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
         }
 
         $query = $this->model->query()
-            ->with(['tuyenDuong', 'xe', 'taiXe'])
+            ->with(['tuyenDuong.nhaXe', 'xe', 'taiXe'])
             ->whereHas('tuyenDuong', function ($q) use ($nhaXe) {
                 $q->where('ma_nha_xe', $nhaXe->ma_nha_xe);
             });
@@ -636,5 +636,63 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
         }
 
         return $count;
+    }
+
+    public function hoanThanh(int $id)
+    {
+        return DB::transaction(function () use ($id) {
+            $chuyenXe = $this->model->with(['tuyenDuong'])->findOrFail($id);
+
+            // 1. Cập nhật trạng thái chuyến xe
+            $chuyenXe->update(['trang_thai' => 'hoan_thanh']);
+
+            // 2. Lấy tất cả vé ĐÃ THANH TOÁN của chuyến xe này để tích điểm
+            // Vé chưa thanh toán hoặc đã hủy thì không được tích điểm
+            $ves = \App\Models\Ve::where('id_chuyen_xe', $id)
+                ->where('tinh_trang', 'da_thanh_toan')
+                ->get();
+
+            foreach ($ves as $ve) {
+                // Cập nhật trạng thái vé
+                $ve->update(['tinh_trang' => 'da_hoan_thanh']);
+
+                // Cập nhật chi tiết vé
+                \App\Models\ChiTietVe::where('ma_ve', $ve->ma_ve)
+                    ->update(['tinh_trang' => 'da_hoan_thanh']);
+
+                // Tích điểm cho khách hàng
+                if ($ve->id_khach_hang) {
+                    $khachHang = \App\Models\KhachHang::find($ve->id_khach_hang);
+                    if ($khachHang) {
+                        // Tỉ lệ: 10.000đ = 10 điểm -> 1.000đ = 1 điểm
+                        $diemThuong = floor($ve->tong_tien / 1000);
+
+                        if ($diemThuong > 0) {
+                            $viDiem = $khachHang->diemThanhVien ?: \App\Models\DiemThanhVien::create([
+                                'id_khach_hang' => $khachHang->id,
+                                'diem_hien_tai' => 0,
+                                'tong_diem_tich_luy' => 0,
+                                'hang_thanh_vien' => 'dong'
+                            ]);
+
+                            $viDiem->thayDoiDiem(
+                                $diemThuong,
+                                'tich_diem',
+                                "Tích điểm hoàn thành chuyến xe {$chuyenXe->ma_chuyen_xe} (Vé {$ve->ma_ve})",
+                                $ve->ma_ve
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Đối với các vé đang chờ (chưa thanh toán) nhưng chuyến xe đã hoàn thành -> Hủy luôn?
+            // Hoặc giữ nguyên? Thông thường sẽ đánh dấu là hủy hoặc không hợp lệ.
+            \App\Models\Ve::where('id_chuyen_xe', $id)
+                ->where('tinh_trang', 'dang_cho')
+                ->update(['tinh_trang' => 'huy']);
+
+            return $chuyenXe;
+        });
     }
 }

@@ -63,6 +63,17 @@ class NhaXeController extends Controller
         ]);
     }
 
+    /** GET /api/v1/admin/nha-xe/list-minimal */
+    public function listMinimal(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => \App\Models\NhaXe::select('id', 'ten_nha_xe')
+                ->where('tinh_trang', 'hoat_dong')
+                ->get(),
+        ]);
+    }
+
     /** GET /api/v1/admin/nha-xe/{id} */
     public function show(int $id): JsonResponse
     {
@@ -77,10 +88,13 @@ class NhaXeController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            // $request->all() trong Laravel đã bao gồm UploadedFile objects
             $nhaXe = $this->service->create($request->all());
             return response()->json(['success' => true, 'message' => 'Tạo nhà xe thành công.', 'data' => $nhaXe], 201);
         } catch (ValidationException $e) {
             return response()->json(['success' => false, 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Đã xảy ra lỗi: ' . $e->getMessage()], 500);
         }
     }
 

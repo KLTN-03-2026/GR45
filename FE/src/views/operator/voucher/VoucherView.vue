@@ -9,6 +9,7 @@ import BaseModal from "@/components/common/BaseModal.vue";
 import BaseToast from "@/components/common/BaseToast.vue";
 import { formatCurrency, formatDateOnly } from "@/utils/format";
 import { getVoucherStatus } from "@/utils/status";
+import { Eye, Pencil, Trash2 } from "lucide-vue-next";
 
 // --- TOAST ---
 const toast = reactive({ visible: false, message: "", type: "success" });
@@ -38,6 +39,7 @@ const tableColumns = [
   { key: "thoi_gian", label: "Thời Gian" },
   { key: "trang_thai", label: "Trạng Thái" },
   { key: "tong_giam", label: "Tổng Giảm" },
+  { key: "actions", label: "Thao Tác" },
 ];
 
 // --- LỌC DỮ LIỆU ---
@@ -88,6 +90,7 @@ const createForm = reactive({
   ngay_bat_dau: "",
   ngay_ket_thuc: "",
   dieu_kien: "",
+  is_public: false,
 });
 
 const openCreateModal = () => {
@@ -99,6 +102,7 @@ const openCreateModal = () => {
     ngay_bat_dau: "",
     ngay_ket_thuc: "",
     dieu_kien: "",
+    is_public: false,
   });
   isCreateModal.value = true;
 };
@@ -131,6 +135,7 @@ const submitCreate = async () => {
       so_luong: Number(createForm.so_luong),
       ngay_bat_dau: createForm.ngay_bat_dau,
       ngay_ket_thuc: createForm.ngay_ket_thuc,
+      is_public: createForm.is_public,
     };
     if (createForm.dieu_kien.trim()) {
       payload.dieu_kien = createForm.dieu_kien.trim();
@@ -154,6 +159,61 @@ const submitCreate = async () => {
     }
   } finally {
     createLoading.value = false;
+  }
+};
+
+// --- MODAL CHỈNH SỬA VOUCHER ---
+const isEditModal = ref(false);
+const editLoading = ref(false);
+const editId = ref(null);
+const editForm = reactive({
+  ten_voucher: "",
+  loai_voucher: "percent",
+  gia_tri: "",
+  so_luong: "",
+  ngay_bat_dau: "",
+  ngay_ket_thuc: "",
+  dieu_kien: "",
+});
+
+const openEditModal = (voucher) => {
+  editId.value = voucher.id;
+  Object.assign(editForm, {
+    ten_voucher: voucher.ten_voucher,
+    loai_voucher: voucher.loai_voucher,
+    gia_tri: voucher.gia_tri,
+    so_luong: voucher.so_luong,
+    ngay_bat_dau: voucher.ngay_bat_dau ? voucher.ngay_bat_dau.split('T')[0] : "",
+    ngay_ket_thuc: voucher.ngay_ket_thuc ? voucher.ngay_ket_thuc.split('T')[0] : "",
+    dieu_kien: voucher.dieu_kien || "",
+  });
+  isEditModal.value = true;
+};
+
+const submitEdit = async () => {
+  try {
+    editLoading.value = true;
+    await operatorApi.updateVoucher(editId.value, editForm);
+    showToast("Cập nhật voucher thành công, đang chờ duyệt lại!");
+    isEditModal.value = false;
+    fetchVouchers();
+  } catch (error) {
+    showToast(error.response?.data?.message || "Cập nhật thất bại!", "error");
+  } finally {
+    editLoading.value = false;
+  }
+};
+
+// --- XÓA VOUCHER ---
+const deleteVoucher = async (id) => {
+  if (!confirm("Bạn có chắc chắn muốn xóa voucher này không?")) return;
+
+  try {
+    await operatorApi.deleteVoucher(id);
+    showToast("Xóa voucher thành công!");
+    fetchVouchers();
+  } catch (error) {
+    showToast(error.response?.data?.message || "Xóa thất bại!", "error");
   }
 };
 
@@ -287,6 +347,18 @@ onMounted(() => {
             formatCurrency(item.tong_tien_giam)
           }}</span>
         </template>
+
+        <!-- Thao Tác -->
+        <template #cell(actions)="{ item }">
+          <div class="action-buttons">
+            <button class="btn-icon" title="Sửa" @click="openEditModal(item)">
+              <Pencil class="w-4 h-4" />
+            </button>
+            <button class="btn-icon text-red-500" title="Xóa" @click="deleteVoucher(item.id)">
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
+        </template>
       </BaseTable>
 
       <!-- Thông tin tổng -->
@@ -351,6 +423,16 @@ onMounted(() => {
           <input type="date" v-model="createForm.ngay_ket_thuc" class="custom-input" required />
         </div>
 
+        <div class="form-group full-width">
+          <label class="checkbox-item public-toggle">
+            <input type="checkbox" v-model="createForm.is_public" />
+            <div class="toggle-text">
+              <span class="toggle-title">Voucher Công Khai (Săn Voucher)</span>
+              <span class="toggle-desc">Khách hàng có thể nhìn thấy và "săn" voucher này vào ví cá nhân.</span>
+            </div>
+          </label>
+        </div>
+
         <!-- Điều kiện -->
         <div class="form-group full-width">
           <label class="form-label">
@@ -366,6 +448,59 @@ onMounted(() => {
         <BaseButton variant="secondary" @click="isCreateModal = false">Hủy</BaseButton>
         <BaseButton variant="primary" :loading="createLoading" @click="submitCreate">
           🎟️ Gửi Yêu Cầu
+        </BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- ===== MODAL CHỈNH SỬA VOUCHER ===== -->
+    <BaseModal v-model="isEditModal" title="Chỉnh Sửa Voucher" maxWidth="620px">
+      <div class="info-banner" style="margin-bottom: 16px">
+        💡 Sau khi cập nhật, voucher sẽ quay về trạng thái <strong>Chờ duyệt</strong>.
+      </div>
+
+      <form @submit.prevent="submitEdit" class="form-grid-2">
+        <div class="form-group full-width">
+          <label class="form-label">Tên Voucher *</label>
+          <input type="text" v-model="editForm.ten_voucher" class="custom-input" required />
+        </div>
+
+        <div class="form-group">
+          <BaseSelect v-model="editForm.loai_voucher" label="Loại Voucher *" :options="[
+            { value: 'percent', label: '📊 Phần trăm (%)' },
+            { value: 'fixed', label: '💰 Cố định (VNĐ)' },
+          ]" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Giá Trị *</label>
+          <input type="number" v-model="editForm.gia_tri" class="custom-input" min="1" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Số Lượng Phát Hành *</label>
+          <input type="number" v-model="editForm.so_luong" class="custom-input" min="1" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ngày Bắt Đầu *</label>
+          <input type="date" v-model="editForm.ngay_bat_dau" class="custom-input" required />
+        </div>
+
+        <div class="form-group full-width-half">
+          <label class="form-label">Ngày Kết Thúc *</label>
+          <input type="date" v-model="editForm.ngay_ket_thuc" class="custom-input" required />
+        </div>
+
+        <div class="form-group full-width">
+          <label class="form-label">Điều Kiện Áp Dụng</label>
+          <input type="text" v-model="editForm.dieu_kien" class="custom-input" />
+        </div>
+      </form>
+
+      <template #footer>
+        <BaseButton variant="secondary" @click="isEditModal = false">Hủy</BaseButton>
+        <BaseButton variant="primary" :loading="editLoading" @click="submitEdit">
+          💾 Lưu Thay Đổi
         </BaseButton>
       </template>
     </BaseModal>
@@ -620,6 +755,37 @@ onMounted(() => {
   font-size: 0.85rem;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+
+.btn-icon.text-red-500:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #ef4444;
+}
+
 /* Form modal */
 .form-grid-2 {
   display: grid;
@@ -689,5 +855,29 @@ onMounted(() => {
   .operator-page {
     padding: 1rem;
   }
+}
+
+.public-toggle {
+  background: #f0f9ff;
+  border: 1px dashed #0ea5e9;
+  padding: 1rem !important;
+  border-radius: 12px;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+}
+.toggle-title {
+  font-weight: 700;
+  color: #0369a1;
+}
+.toggle-desc {
+  font-size: 0.8rem;
+  color: #0c4a6e;
 }
 </style>

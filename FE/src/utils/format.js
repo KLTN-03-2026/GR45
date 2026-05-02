@@ -1,27 +1,25 @@
-export const formatCurrency = (amount) => {
-  if (amount === null || amount === undefined) return '0 đ';
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  }).format(amount);
+console.log('format.js loaded');
+
+export const formatDate = (dateStr) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("vi-VN");
 };
 
-/**
- * Format ngày giờ đầy đủ — hỗ trợ ISO timestamp (UTC) và chuỗi giờ thuần HH:mm:ss
- * VD: "2026-04-18T00:00:00.000000Z" → "18/04/2026, 07:00"
- * VD: "08:00:00" → "08:00"
- */
+export const formatCurrency = (amount, suffix = 'VNĐ') => {
+  if (amount === null || amount === undefined || isNaN(amount)) return `0 ${suffix}`;
+  const formattedNumber = Number(amount).toLocaleString('vi-VN');
+  return `${formattedNumber} ${suffix}`;
+};
+
 export const formatDateTime = (value) => {
   if (!value) return '—';
-
-  // Nếu là chuỗi giờ thuần HH:mm:ss hoặc HH:mm (không có ngày)
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
-    return value.slice(0, 5); // Chỉ lấy HH:mm
+    return value.slice(0, 5);
   }
-
   const date = new Date(value);
-  if (isNaN(date.getTime())) return value; // Trả về nguyên bản nếu không parse được
-
+  if (isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('vi-VN', {
     timeZone: 'Asia/Ho_Chi_Minh',
     day:    '2-digit',
@@ -33,9 +31,6 @@ export const formatDateTime = (value) => {
   }).format(date);
 };
 
-/**
- * Chỉ lấy phần ngày — VD: "2026-04-18T00:00:00.000000Z" → "18/04/2026"
- */
 export const formatDateOnly = (value) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -48,18 +43,11 @@ export const formatDateOnly = (value) => {
   }).format(date);
 };
 
-/**
- * Chỉ lấy phần giờ — VD: "2026-04-18T01:00:00.000000Z" → "08:00"
- * VD: "08:00:00" → "08:00"
- */
 export const formatTimeOnly = (value) => {
   if (!value) return '—';
-
-  // Chuỗi giờ thuần
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(value)) {
     return value.slice(0, 5);
   }
-
   const date = new Date(value);
   if (isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('vi-VN', {
@@ -70,8 +58,25 @@ export const formatTimeOnly = (value) => {
   }).format(date);
 };
 
-/**
- * @deprecated Dùng formatDateTime thay thế
- */
-export const formatDate = (dateString) => formatDateTime(dateString);
+export const calcArrivalTime = (gioKhoiHanh, gioDuKien) => {
+  if (!gioKhoiHanh || !gioDuKien) return "--:--";
+  const parts = gioKhoiHanh.split(":");
+  const h = parseInt(parts[0]) + parseInt(gioDuKien);
+  const m = parts[1] || "00";
+  return `${String(h % 24).padStart(2, "0")}:${m}`;
+};
 
+export const formatTime = (timeStr) => {
+  if (!timeStr) return "--:--";
+  return timeStr.slice(0, 5);
+};
+
+export const formatFullDate = (isoStr) => {
+  if (!isoStr) return "...";
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return isoStr;
+  const days = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+  const dayName = days[d.getDay()];
+  const dateStr = d.toLocaleDateString("vi-VN");
+  return `${dayName}, ${dateStr}`;
+};

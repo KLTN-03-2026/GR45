@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref, nextTick } from 'vue'
+import { computed, onMounted, reactive, ref, nextTick, watch } from 'vue'
 import adminApi from '@/api/adminApi'
 import { Modal } from 'bootstrap'
 import {
@@ -8,6 +8,7 @@ import {
   Building2,
   CheckCircle,
   Eye,
+  ImageIcon,
   Info,
   Lock,
   Mail,
@@ -69,11 +70,48 @@ const form = reactive({
   so_dien_thoai: '',
   nguoi_dai_dien: '',
   giay_phep_kinh_doanh: '',
+  ma_so_thue: '',
   dia_chi_van_phong: '',
   tai_khoan_ngan_hang: '',
   ty_le_chiet_khau: 0,
+  anh_logo: '',
+  anh_tru_so: '',
   dia_chi_nha_xe_label: ''
 })
+
+// Tự động đồng bộ ma_so_thue từ giay_phep_kinh_doanh
+watch(() => form.giay_phep_kinh_doanh, (val) => {
+  form.ma_so_thue = val
+})
+
+// File objects cho upload
+const fileAnhLogo = ref(null)
+const fileAnhTruSo = ref(null)
+const fileGiayPhep = ref(null)
+const fileCccd = ref(null)
+// Preview / info URLs
+const previewAnhLogo = ref('')
+const previewAnhTruSo = ref('')
+const previewGiayPhep = ref('')   // tên file PDF hiện tại
+const previewCccd = ref('')       // URL ảnh CCCD hiện tại
+
+const onFileChange = (field, event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  if (field === 'anh_logo') {
+    fileAnhLogo.value = file
+    previewAnhLogo.value = URL.createObjectURL(file)
+  } else if (field === 'anh_tru_so') {
+    fileAnhTruSo.value = file
+    previewAnhTruSo.value = URL.createObjectURL(file)
+  } else if (field === 'file_giay_phep_kinh_doanh') {
+    fileGiayPhep.value = file
+    previewGiayPhep.value = file.name
+  } else if (field === 'file_cccd_dai_dien') {
+    fileCccd.value = file
+    previewCccd.value = URL.createObjectURL(file)
+  }
+}
 
 const statusOptions = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -194,7 +232,15 @@ const fetchOperators = async (page = 1) => {
 
 /** Đặt lại toàn bộ dữ liệu form về trạng thái trống ban đầu */
 const resetForm = () => {
-  Object.assign(form, { id: null, ten_nha_xe: '', email: '', password: '', so_dien_thoai: '', nguoi_dai_dien: '', giay_phep_kinh_doanh: '', dia_chi_van_phong: '', tai_khoan_ngan_hang: '', ty_le_chiet_khau: 0, dia_chi_nha_xe_label: '' })
+  Object.assign(form, { id: null, ten_nha_xe: '', email: '', password: '', so_dien_thoai: '', nguoi_dai_dien: '', giay_phep_kinh_doanh: '', ma_so_thue: '', dia_chi_van_phong: '', tai_khoan_ngan_hang: '', ty_le_chiet_khau: 0, anh_logo: '', anh_tru_so: '', dia_chi_nha_xe_label: '' })
+  fileAnhLogo.value = null
+  fileAnhTruSo.value = null
+  fileGiayPhep.value = null
+  fileCccd.value = null
+  previewAnhLogo.value = ''
+  previewAnhTruSo.value = ''
+  previewGiayPhep.value = ''
+  previewCccd.value = ''
   formError.value = ''
 }
 
@@ -206,7 +252,22 @@ const openAddModal = async () => { formMode.value = 'add'; resetForm(); await ne
  * @param {Object} item - Nhà xe cần chỉnh sửa
  */
 const openEditModal = async (item) => {
-  formMode.value = 'edit'; resetForm(); Object.assign(form, item, { dia_chi_nha_xe_label: item.dia_chi_van_phong || item.ho_so?.dia_chi || '' }); await nextTick(); formModalInstance?.show()
+  formMode.value = 'edit'
+  resetForm()
+  Object.assign(form, item, { dia_chi_nha_xe_label: item.dia_chi_van_phong || item.ho_so?.dia_chi || '' })
+  // Điền giấy phép và mã số thuế từ ho_so
+  form.giay_phep_kinh_doanh = item.ho_so?.so_dang_ky_kinh_doanh || item.giay_phep_kinh_doanh || ''
+  form.ma_so_thue = item.ho_so?.ma_so_thue || form.giay_phep_kinh_doanh
+  // Điền sẵn ảnh hiện tại nếu có
+  previewAnhLogo.value = item.ho_so?.anh_logo || item.anh_logo || ''
+  previewAnhTruSo.value = item.ho_so?.anh_tru_so || item.anh_tru_so || ''
+  // Điền tên file giấy tờ hiện tại
+  previewGiayPhep.value = item.ho_so?.file_giay_phep_kinh_doanh
+    ? item.ho_so.file_giay_phep_kinh_doanh.split('/').pop()
+    : ''
+  previewCccd.value = item.ho_so?.file_cccd_dai_dien || ''
+  await nextTick()
+  formModalInstance?.show()
 }
 
 /**
@@ -215,18 +276,22 @@ const openEditModal = async (item) => {
  * @returns {Object} Payload sẵn sàng gửi API
  */
 const buildFormPayload = () => {
-  const payload = {
-    ten_nha_xe:            form.ten_nha_xe,
-    email:                 form.email,
-    so_dien_thoai:         form.so_dien_thoai,
-    nguoi_dai_dien:        form.nguoi_dai_dien,
-    so_dang_ky_kinh_doanh: form.giay_phep_kinh_doanh,
-    dia_chi_chi_tiet:      form.dia_chi_van_phong,
-    tai_khoan_nhan_tien:   form.tai_khoan_ngan_hang,
-    ty_le_chiet_khau:      safeNumber(form.ty_le_chiet_khau)
-  }
-  if (formMode.value === 'add') payload.password = form.password
-  return payload
+  const fd = new FormData()
+  fd.append('ten_nha_xe', form.ten_nha_xe)
+  fd.append('email', form.email)
+  fd.append('so_dien_thoai', form.so_dien_thoai || '')
+  fd.append('nguoi_dai_dien', form.nguoi_dai_dien || '')
+  fd.append('so_dang_ky_kinh_doanh', form.giay_phep_kinh_doanh || '')
+  fd.append('ma_so_thue', form.giay_phep_kinh_doanh || '')  // luôn bằng so_dang_ky_kinh_doanh
+  fd.append('dia_chi_chi_tiet', form.dia_chi_van_phong || '')
+  fd.append('tai_khoan_nhan_tien', form.tai_khoan_ngan_hang || '')
+  fd.append('ty_le_chiet_khau', safeNumber(form.ty_le_chiet_khau))
+  if (formMode.value === 'add') fd.append('password', form.password)
+  if (fileAnhLogo.value) fd.append('anh_logo', fileAnhLogo.value)
+  if (fileAnhTruSo.value) fd.append('anh_tru_so', fileAnhTruSo.value)
+  if (fileGiayPhep.value) fd.append('file_giay_phep_kinh_doanh', fileGiayPhep.value)
+  if (fileCccd.value) fd.append('file_cccd_dai_dien', fileCccd.value)
+  return fd
 }
 
 /**
@@ -564,6 +629,84 @@ onMounted(async () => {
               <div class="full-width">
                 <label>Tài khoản nhận tiền</label>
                 <textarea v-model="form.tai_khoan_ngan_hang" rows="3" class="custom-input"></textarea>
+              </div>
+
+              <!-- Nhóm 4 ô upload: 2 cột x 2 hàng -->
+              <div class="full-width">
+                <div class="upload-grid">
+
+                  <!-- Ảnh logo -->
+                  <div class="upload-cell">
+                    <label class="img-field-label"><ImageIcon size="13" /> Ảnh Logo</label>
+                    <div class="img-upload-wrap">
+                      <label class="img-upload-btn">
+                        <ImageIcon size="14" />
+                        Chọn ảnh logo
+                        <input type="file" accept="image/*" class="hidden-input" @change="onFileChange('anh_logo', $event)" />
+                      </label>
+                      <div v-if="previewAnhLogo" class="img-preview-wrap">
+                        <img :src="previewAnhLogo" class="img-preview" alt="Logo preview" />
+                        <span class="img-preview-label">{{ fileAnhLogo ? fileAnhLogo.name : 'Ảnh hiện tại' }}</span>
+                      </div>
+                      <span v-else class="img-placeholder">Chưa có ảnh logo</span>
+                    </div>
+                  </div>
+
+                  <!-- Ảnh trụ sở -->
+                  <div class="upload-cell">
+                    <label class="img-field-label"><ImageIcon size="13" /> Ảnh Trụ sở</label>
+                    <div class="img-upload-wrap">
+                      <label class="img-upload-btn">
+                        <ImageIcon size="14" />
+                        Chọn ảnh trụ sở
+                        <input type="file" accept="image/*" class="hidden-input" @change="onFileChange('anh_tru_so', $event)" />
+                      </label>
+                      <div v-if="previewAnhTruSo" class="img-preview-wrap">
+                        <img :src="previewAnhTruSo" class="img-preview" alt="Trụ sở preview" />
+                        <span class="img-preview-label">{{ fileAnhTruSo ? fileAnhTruSo.name : 'Ảnh hiện tại' }}</span>
+                      </div>
+                      <span v-else class="img-placeholder">Chưa có ảnh trụ sở</span>
+                    </div>
+                  </div>
+
+                  <!-- Giấy phép kinh doanh (PDF) -->
+                  <div class="upload-cell">
+                    <label class="img-field-label">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                      Giấy phép KD (PDF)
+                    </label>
+                    <div class="img-upload-wrap">
+                      <label class="img-upload-btn pdf-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Chọn file PDF
+                        <input type="file" accept="application/pdf" class="hidden-input" @change="onFileChange('file_giay_phep_kinh_doanh', $event)" />
+                      </label>
+                      <div v-if="previewGiayPhep" class="pdf-info-wrap">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                        <span class="pdf-name">{{ previewGiayPhep }}</span>
+                      </div>
+                      <span v-else class="img-placeholder">Chưa có file PDF</span>
+                    </div>
+                  </div>
+
+                  <!-- CCCD đại diện -->
+                  <div class="upload-cell">
+                    <label class="img-field-label"><ImageIcon size="13" /> Ảnh CCCD Đại diện</label>
+                    <div class="img-upload-wrap">
+                      <label class="img-upload-btn">
+                        <ImageIcon size="14" />
+                        Chọn ảnh CCCD
+                        <input type="file" accept="image/*" class="hidden-input" @change="onFileChange('file_cccd_dai_dien', $event)" />
+                      </label>
+                      <div v-if="previewCccd" class="img-preview-wrap">
+                        <img :src="previewCccd" class="img-preview" alt="CCCD preview" />
+                        <span class="img-preview-label">{{ fileCccd ? fileCccd.name : 'Ảnh hiện tại' }}</span>
+                      </div>
+                      <span v-else class="img-placeholder">Chưa có ảnh CCCD</span>
+                    </div>
+                  </div>
+
+                </div>
               </div>
             </div>
           </div>
@@ -1135,4 +1278,127 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Image upload ─────────────────────────────────────────────── */
+.img-field-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.img-upload-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.img-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.45rem 0.9rem;
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1.5px dashed #a5b4fc;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.img-upload-btn:hover {
+  background: #e0e7ff;
+  border-color: #6366f1;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.img-preview-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.img-preview {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1.5px solid #c7d2fe;
+  box-shadow: 0 2px 6px rgba(99,102,241,0.12);
+}
+
+.img-preview-label {
+  font-size: 0.76rem;
+  color: #64748b;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.img-placeholder {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* PDF upload specific */
+.pdf-btn {
+  background: #fff5f5;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+.pdf-btn:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+.pdf-info-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pdf-name {
+  font-size: 0.78rem;
+  color: #334155;
+  font-weight: 600;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 2×2 upload grid */
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.upload-cell {
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upload-cell:hover {
+  border-color: #818cf8;
+  background: #f5f3ff;
+}
 </style>
+

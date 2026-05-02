@@ -5,7 +5,10 @@ namespace App\Services;
 use App\Http\Resources\NhaXeResource;
 use App\Models\NhaXe;
 use App\Repositories\NhaXe\NhaXeRepositoryInterface;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -136,16 +139,30 @@ class NhaXeService
     protected function buildHoSoPayload(array $data, ?NhaXe $nhaXe = null): array
     {
         return array_filter([
-            'ten_cong_ty' => $data['ten_cong_ty'] ?? $data['ten_nha_xe'] ?? null,
-            'ma_so_thue' => $data['ma_so_thue'] ?? null,
+            'ten_cong_ty'            => $data['ten_cong_ty'] ?? $data['ten_nha_xe'] ?? null,
+            'ma_so_thue'             => $data['ma_so_thue'] ?? null,
             'so_dang_ky_kinh_doanh' => $data['so_dang_ky_kinh_doanh'] ?? null,
-            'nguoi_dai_dien' => $data['nguoi_dai_dien'] ?? null,
-            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
-            'email' => $data['email'] ?? null,
-            'id_phuong_xa' => $data['id_phuong_xa'] ?? null,
-            'dia_chi_chi_tiet' => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? null,
-            'trang_thai' => $data['trang_thai'] ?? null,
+            'nguoi_dai_dien'         => $data['nguoi_dai_dien'] ?? null,
+            'so_dien_thoai'          => $data['so_dien_thoai'] ?? null,
+            'email'                  => $data['email'] ?? null,
+            'id_phuong_xa'           => $data['id_phuong_xa'] ?? null,
+            'dia_chi_chi_tiet'       => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? null,
+            'trang_thai'             => $data['trang_thai'] ?? null,
+            // Ảnh / file — chỉ set khi đã upload và có đường dẫn
+            'anh_logo'                    => $data['_anh_logo_path'] ?? null,
+            'anh_tru_so'                  => $data['_anh_tru_so_path'] ?? null,
+            'file_giay_phep_kinh_doanh'   => $data['_file_giay_phep_path'] ?? null,
+            'file_cccd_dai_dien'          => $data['_file_cccd_path'] ?? null,
         ], static fn($value) => $value !== null);
+    }
+
+    /**
+     * Lưu file ảnh vào storage/public/nha-xe, trả về path tương đối.
+     */
+    protected function storeImage(UploadedFile $file, string $subFolder = 'nha-xe'): string
+    {
+        $path = $file->store($subFolder, 'public');
+        return $path; // e.g. "nha-xe/abc123.jpg"
     }
 
     /**
@@ -155,21 +172,47 @@ class NhaXeService
     public function create(array $data): NhaXeResource
     {
         $validator = Validator::make($data, [
-            'ten_nha_xe' => 'required|string|max:100',
-            'email' => 'required|email|unique:nha_xes,email',
-            'password' => 'required|string|min:6',
-            'so_dien_thoai' => 'nullable|string|max:15',
-            'giay_phep_kinh_doanh' => 'nullable|string|max:255',
-            'nguoi_dai_dien' => 'nullable|string|max:100',
-            'ty_le_chiet_khau' => 'nullable|numeric|min:0|max:100',
-            'tai_khoan_nhan_tien' => 'nullable|string|max:255',
+            'ten_nha_xe'                 => 'required|string|max:100',
+            'email'                      => 'required|email|unique:nha_xes,email',
+            'password'                   => 'required|string|min:6',
+            'so_dien_thoai'              => 'nullable|string|max:15',
+            'giay_phep_kinh_doanh'       => 'nullable|string|max:255',
+            'nguoi_dai_dien'             => 'nullable|string|max:100',
+            'ty_le_chiet_khau'           => 'nullable|numeric|min:0|max:100',
+            'tai_khoan_nhan_tien'        => 'nullable|string|max:255',
+            'anh_logo'                   => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'anh_tru_so'                 => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'file_giay_phep_kinh_doanh'  => 'nullable|file|mimes:pdf|max:10240',
+            'file_cccd_dai_dien'         => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ], [
-            'ten_nha_xe.required' => 'Tên nhà xe không được để trống.',
-            'email.unique' => 'Email đã được sử dụng.',
+            'ten_nha_xe.required'               => 'Tên nhà xe không được để trống.',
+            'email.unique'                      => 'Email đã được sử dụng.',
+            'anh_logo.image'                    => 'Ảnh logo phải là file hình ảnh.',
+            'anh_logo.max'                      => 'Ảnh logo không được vượt quá 5MB.',
+            'anh_tru_so.image'                  => 'Ảnh trụ sở phải là file hình ảnh.',
+            'anh_tru_so.max'                    => 'Ảnh trụ sở không được vượt quá 5MB.',
+            'file_giay_phep_kinh_doanh.mimes'   => 'Giấy phép kinh doanh phải là file PDF.',
+            'file_giay_phep_kinh_doanh.max'     => 'File giấy phép không được vượt quá 10MB.',
+            'file_cccd_dai_dien.image'          => 'Ảnh CCCD phải là file hình ảnh.',
+            'file_cccd_dai_dien.max'            => 'Ảnh CCCD không được vượt quá 5MB.',
         ]);
 
         if ($validator->fails())
             throw new ValidationException($validator);
+
+        // Xử lý upload ảnh/file
+        if (isset($data['anh_logo']) && $data['anh_logo'] instanceof UploadedFile) {
+            $data['_anh_logo_path'] = $this->storeImage($data['anh_logo']);
+        }
+        if (isset($data['anh_tru_so']) && $data['anh_tru_so'] instanceof UploadedFile) {
+            $data['_anh_tru_so_path'] = $this->storeImage($data['anh_tru_so']);
+        }
+        if (isset($data['file_giay_phep_kinh_doanh']) && $data['file_giay_phep_kinh_doanh'] instanceof UploadedFile) {
+            $data['_file_giay_phep_path'] = $data['file_giay_phep_kinh_doanh']->store('nha-xe/giay-phep', 'public');
+        }
+        if (isset($data['file_cccd_dai_dien']) && $data['file_cccd_dai_dien'] instanceof UploadedFile) {
+            $data['_file_cccd_path'] = $this->storeImage($data['file_cccd_dai_dien'], 'nha-xe/cccd');
+        }
 
         // Sinh mã nhà xe tuần tự: NX001, NX002, ...
         $lastMaNhaXe = NhaXe::where('ma_nha_xe', 'like', 'NX%')
@@ -249,26 +292,68 @@ class NhaXeService
         }
 
         $validator = Validator::make($data, [
-            'ten_nha_xe' => 'sometimes|required|string|max:100',
-            'email' => ['sometimes', 'required', 'email', Rule::unique('nha_xes', 'email')->ignore($id)],
-            'so_dien_thoai' => 'nullable|string|max:15',
-            'ty_le_chiet_khau' => 'nullable|numeric|min:0|max:100',
-            'tai_khoan_nhan_tien' => 'nullable|string|max:255',
-            'ten_cong_ty' => 'nullable|string|max:255',
-            'ma_so_thue' => 'nullable|string|max:255',
-            'so_dang_ky_kinh_doanh' => 'nullable|string|max:255',
-            'nguoi_dai_dien' => 'nullable|string|max:100',
-            'dia_chi_chi_tiet' => 'nullable|string|max:255',
-            'dia_chi' => 'nullable|string|max:255',
+            'ten_nha_xe'                 => 'sometimes|required|string|max:100',
+            'email'                      => ['sometimes', 'required', 'email', Rule::unique('nha_xes', 'email')->ignore($id)],
+            'so_dien_thoai'              => 'nullable|string|max:15',
+            'ty_le_chiet_khau'           => 'nullable|numeric|min:0|max:100',
+            'tai_khoan_nhan_tien'        => 'nullable|string|max:255',
+            'ten_cong_ty'                => 'nullable|string|max:255',
+            'ma_so_thue'                 => 'nullable|string|max:255',
+            'so_dang_ky_kinh_doanh'      => 'nullable|string|max:255',
+            'nguoi_dai_dien'             => 'nullable|string|max:100',
+            'dia_chi_chi_tiet'           => 'nullable|string|max:255',
+            'dia_chi'                    => 'nullable|string|max:255',
+            'anh_logo'                   => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'anh_tru_so'                 => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'file_giay_phep_kinh_doanh'  => 'nullable|file|mimes:pdf|max:10240',
+            'file_cccd_dai_dien'         => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
         ], [
-            'ten_nha_xe.required' => 'Tên nhà xe không được để trống.',
-            'email.required' => 'Email không được để trống.',
-            'email.email' => 'Email không đúng định dạng.',
-            'email.unique' => 'Email đã được sử dụng.',
+            'ten_nha_xe.required'               => 'Tên nhà xe không được để trống.',
+            'email.required'                    => 'Email không được để trống.',
+            'email.email'                       => 'Email không đúng định dạng.',
+            'email.unique'                      => 'Email đã được sử dụng.',
+            'anh_logo.image'                    => 'Ảnh logo phải là file hình ảnh.',
+            'anh_logo.max'                      => 'Ảnh logo không được vượt quá 5MB.',
+            'anh_tru_so.image'                  => 'Ảnh trụ sở phải là file hình ảnh.',
+            'anh_tru_so.max'                    => 'Ảnh trụ sở không được vượt quá 5MB.',
+            'file_giay_phep_kinh_doanh.mimes'   => 'Giấy phép kinh doanh phải là file PDF.',
+            'file_giay_phep_kinh_doanh.max'     => 'File giấy phép không được vượt quá 10MB.',
+            'file_cccd_dai_dien.image'          => 'Ảnh CCCD phải là file hình ảnh.',
+            'file_cccd_dai_dien.max'            => 'Ảnh CCCD không được vượt quá 5MB.',
         ]);
 
         if ($validator->fails()) {
             throw new ValidationException($validator);
+        }
+
+        // Xử lý upload ảnh/file nếu có file mới
+        if (isset($data['anh_logo']) && $data['anh_logo'] instanceof UploadedFile) {
+            $oldLogo = $nhaXe->hoSo?->anh_logo;
+            if ($oldLogo && Storage::disk('public')->exists($oldLogo)) {
+                Storage::disk('public')->delete($oldLogo);
+            }
+            $data['_anh_logo_path'] = $this->storeImage($data['anh_logo']);
+        }
+        if (isset($data['anh_tru_so']) && $data['anh_tru_so'] instanceof UploadedFile) {
+            $oldTruSo = $nhaXe->hoSo?->anh_tru_so;
+            if ($oldTruSo && Storage::disk('public')->exists($oldTruSo)) {
+                Storage::disk('public')->delete($oldTruSo);
+            }
+            $data['_anh_tru_so_path'] = $this->storeImage($data['anh_tru_so']);
+        }
+        if (isset($data['file_giay_phep_kinh_doanh']) && $data['file_giay_phep_kinh_doanh'] instanceof UploadedFile) {
+            $oldGp = $nhaXe->hoSo?->file_giay_phep_kinh_doanh;
+            if ($oldGp && Storage::disk('public')->exists($oldGp)) {
+                Storage::disk('public')->delete($oldGp);
+            }
+            $data['_file_giay_phep_path'] = $data['file_giay_phep_kinh_doanh']->store('nha-xe/giay-phep', 'public');
+        }
+        if (isset($data['file_cccd_dai_dien']) && $data['file_cccd_dai_dien'] instanceof UploadedFile) {
+            $oldCccd = $nhaXe->hoSo?->file_cccd_dai_dien;
+            if ($oldCccd && Storage::disk('public')->exists($oldCccd)) {
+                Storage::disk('public')->delete($oldCccd);
+            }
+            $data['_file_cccd_path'] = $this->storeImage($data['file_cccd_dai_dien'], 'nha-xe/cccd');
         }
 
         $mainPayload = $this->buildNhaXePayload($data);
@@ -279,13 +364,18 @@ class NhaXeService
         }
 
         $profilePayload = array_filter([
-            'ten_cong_ty' => $data['ten_cong_ty'] ?? $data['ten_nha_xe'] ?? null,
-            'ma_so_thue' => $data['ma_so_thue'] ?? null,
-            'so_dien_thoai' => $data['so_dien_thoai'] ?? null,
-            'email' => $data['email'] ?? null,
-            'nguoi_dai_dien' => $data['nguoi_dai_dien'] ?? null,
-            'so_dang_ky_kinh_doanh' => $data['so_dang_ky_kinh_doanh'] ?? null,
-            'dia_chi_chi_tiet' => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? null,
+            'ten_cong_ty'                => $data['ten_cong_ty'] ?? $data['ten_nha_xe'] ?? null,
+            'ma_so_thue'                 => $data['ma_so_thue'] ?? null,
+            'so_dien_thoai'              => $data['so_dien_thoai'] ?? null,
+            'email'                      => $data['email'] ?? null,
+            'nguoi_dai_dien'             => $data['nguoi_dai_dien'] ?? null,
+            'so_dang_ky_kinh_doanh'      => $data['so_dang_ky_kinh_doanh'] ?? null,
+            'dia_chi_chi_tiet'           => $data['dia_chi_chi_tiet'] ?? $data['dia_chi'] ?? null,
+            // Ảnh và file — chỉ set khi có file mới được upload
+            'anh_logo'                   => $data['_anh_logo_path'] ?? null,
+            'anh_tru_so'                 => $data['_anh_tru_so_path'] ?? null,
+            'file_giay_phep_kinh_doanh'  => $data['_file_giay_phep_path'] ?? null,
+            'file_cccd_dai_dien'         => $data['_file_cccd_path'] ?? null,
         ], static fn($value) => $value !== null);
 
         if (!empty($profilePayload)) {
