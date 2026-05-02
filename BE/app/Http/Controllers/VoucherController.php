@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Voucher\StoreVoucherRequest;
+use App\Http\Requests\Voucher\UpdateVoucherRequest;
 use App\Http\Requests\Voucher\UpdateVoucherStatusRequest;
+use App\Http\Requests\Voucher\StoreVoucherAdminRequest;
 use App\Services\VoucherService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+
 
 class VoucherController extends Controller
 {
@@ -54,7 +57,108 @@ class VoucherController extends Controller
             ], 500);
         }
     }
+    public function showNhaXe($id)
+    {
+        $nhaXe = Auth::user();
+        $voucher = $this->voucherService->findByIdAndNhaXe($id, $nhaXe->id);
 
+        if (!$voucher) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy voucher.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $voucher
+        ]);
+    }
+
+    public function updateNhaXe(UpdateVoucherRequest $request, $id)
+    {
+        $nhaXe = Auth::user();
+        try {
+            $voucher = $this->voucherService->updateVoucherForNhaXe($id, $nhaXe->id, $request->validated());
+            return response()->json([
+                'success' => true,
+                'message' => 'Cập nhật voucher thành công, đang chờ duyệt lại.',
+                'data' => $voucher
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    public function destroyNhaXe($id)
+    {
+        $nhaXe = Auth::user();
+        try {
+            $this->voucherService->deleteVoucherForNhaXe($id, $nhaXe->id);
+            return response()->json([
+                'success' => true,
+                'message' => 'Xóa voucher thành công.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+
+    // ========== API CHO KHÁCH HÀNG ==========
+    public function indexKhachHang(Request $request)
+    {
+        $khachHang = Auth::user();
+        $vouchers = $this->voucherService->getAllForKhachHang($khachHang->id, $request->all());
+        return response()->json([
+            'success' => true,
+            'data' => $vouchers
+        ]);
+    }
+
+    public function indexHuntable()
+    {
+        $khachHang = Auth::user();
+        $vouchers = $this->voucherService->getHuntableVouchers($khachHang->id);
+        return response()->json([
+            'success' => true,
+            'data' => $vouchers
+        ]);
+    }
+
+    public function huntVoucher($id)
+    {
+        $khachHang = Auth::user();
+        try {
+            $result = $this->voucherService->huntVoucher($id, $khachHang->id);
+            return response()->json([
+                'success' => true,
+                'message' => 'Lưu voucher thành công!',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    public function showKhachHang($id)
+    {
+        $khachHang = Auth::user();
+        $voucher = $this->voucherService->findByIdAndKhachHang($id, $khachHang->id);
+        if (!$voucher) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy voucher.'], 404);
+        }
+        return response()->json([
+            'success' => true,
+            'data' => $voucher
+        ]);
+    }
 
     // ========== API CHO ADMIN ==========
 
@@ -81,6 +185,23 @@ class VoucherController extends Controller
             'message' => 'Cập nhật trạng thái voucher thành công.',
             'data' => $voucher
         ]);
+    }
+
+    public function storeAdmin(StoreVoucherAdminRequest $request)
+    {
+        try {
+            $voucher = $this->voucherService->createVoucherForAdmin($request->validated());
+            return response()->json([
+                'success' => true,
+                'message' => 'Admin tạo voucher thành công.',
+                'data' => $voucher->load(['targetedNhaXes', 'targetedKhachHangs'])
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lỗi khi tạo voucher admin: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
 }

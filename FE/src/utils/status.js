@@ -28,6 +28,8 @@ export const getVoucherStatus = (status) => {
     case 'vo_hieu':     return { text: 'Vô hiệu', class: 'status-rejected' };
     case 'het_han':
     case 'expired':     return { text: 'Hết hiệu lực', class: 'status-expired' };
+    case 'tu_choi':     return { text: 'Bị từ chối', class: 'status-rejected' };
+    case 'huy':         return { text: 'Đã hủy', class: 'status-rejected' };
     default:            return { text: 'Không rõ', class: '' };
   }
 };

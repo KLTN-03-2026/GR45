@@ -14,15 +14,12 @@ class UpdateVoucherRequest extends FormRequest
     public function rules()
     {
         return [
-            'id'            => 'required|exists:vouchers,id',
-            'ma_voucher'    => 'required|string|unique:vouchers,ma_voucher,' . $this->id,
-            'ten_voucher'   => 'required|string',
+            'ten_voucher'   => 'required|string|max:255',
             'loai_voucher'  => 'required|in:percent,fixed',
             'gia_tri'       => 'required|numeric|min:0',
             'ngay_bat_dau'  => 'required|date',
             'ngay_ket_thuc' => 'required|date|after_or_equal:ngay_bat_dau',
             'so_luong'      => 'required|integer|min:0',
-            'trang_thai'    => 'required|string|in:active,pending,expired,stopped',
             'dieu_kien'     => 'nullable|string',
         ];
     }
@@ -30,13 +27,9 @@ class UpdateVoucherRequest extends FormRequest
     public function messages()
     {
         return [
-            'id.required' => 'ID voucher là bắt buộc.',
-            'id.exists' => 'Voucher không tồn tại.',
-            'ma_voucher.required' => 'Mã voucher là bắt buộc.',
-            'ma_voucher.string' => 'Mã voucher phải là chuỗi.',
-            'ma_voucher.unique' => 'Mã voucher đã tồn tại.',
             'ten_voucher.required' => 'Tên voucher là bắt buộc.',
             'ten_voucher.string' => 'Tên voucher phải là chuỗi.',
+            'ten_voucher.max' => 'Tên voucher tối đa 255 ký tự.',
             'loai_voucher.required' => 'Loại voucher là bắt buộc.',
             'loai_voucher.in' => 'Loại voucher không hợp lệ.',
             'gia_tri.required' => 'Giá trị là bắt buộc.',
@@ -50,8 +43,6 @@ class UpdateVoucherRequest extends FormRequest
             'so_luong.required' => 'Số lượng là bắt buộc.',
             'so_luong.integer' => 'Số lượng phải là số nguyên.',
             'so_luong.min' => 'Số lượng không được nhỏ hơn 0.',
-            'trang_thai.required' => 'Trạng thái là bắt buộc.',
-            'trang_thai.in' => 'Trạng thái không hợp lệ.',
             'dieu_kien.string' => 'Điều kiện phải là chuỗi.',
         ];
     }

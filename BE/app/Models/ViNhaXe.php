@@ -65,9 +65,9 @@ class ViNhaXe extends Model
     public function taoYeuCauNapTien(float $soTien, string $noiDung = 'Nạp tiền vào ví', ?int $nguoiThucHienId = null, string $tinhTrang = 'cho_xac_nhan', ?string $hinhAnhGiaoDich = null): LichSuThanhToanNhaXe
     {
         $truoc = $this->so_du;
-        
+
         $giaoDich = $this->lichSu()->create([
-            'transaction_code' => 'TOPUP_' . time() . '_' . rand(1000, 9999),
+            'transaction_code' => 'TOPUP' . time() . rand(1000, 9999),
             'loai_giao_dich'   => 'nap_tien',
             'so_tien'          => $soTien,
             'so_du_truoc'      => $truoc,
@@ -77,7 +77,7 @@ class ViNhaXe extends Model
             'tinh_trang'       => $tinhTrang,
             'hinh_anh_giao_dich' => $hinhAnhGiaoDich,
         ]);
-        
+
         if ($tinhTrang === 'thanh_toan_thanh_cong') {
             $this->increment('so_du', $soTien);
             $this->increment('tong_nap', $soTien);
@@ -97,7 +97,7 @@ class ViNhaXe extends Model
 
         // Trừ tiền ngay lập tức khi yêu cầu (tạm giữ)
         $this->decrement('so_du', $soTien);
-        
+
         return $this->lichSu()->create([
             'transaction_code' => 'WITHDRAW_' . time() . '_' . rand(1000, 9999),
             'loai_giao_dich'   => 'rut_tien',

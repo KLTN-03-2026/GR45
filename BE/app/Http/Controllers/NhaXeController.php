@@ -63,6 +63,17 @@ class NhaXeController extends Controller
         ]);
     }
 
+    /** GET /api/v1/admin/nha-xe/list-minimal */
+    public function listMinimal(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data'    => \App\Models\NhaXe::select('id', 'ten_nha_xe')
+                ->where('tinh_trang', 'hoat_dong')
+                ->get(),
+        ]);
+    }
+
     /** GET /api/v1/admin/nha-xe/{id} */
     public function show(int $id): JsonResponse
     {

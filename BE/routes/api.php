@@ -53,6 +53,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('ve/{id}/huy', [VeController::class, 'huyVeKhachHang']);
 
         Route::get('voucher', [VoucherController::class, 'indexKhachHang']);
+        Route::get('voucher/huntable', [VoucherController::class, 'indexHuntable']);
+        Route::post('voucher/{id}/hunt', [VoucherController::class, 'huntVoucher']);
         Route::get('voucher/{id}', [VoucherController::class, 'showKhachHang']);
 
         Route::get('chuyen-xe/{id}/tracking', [ChuyenXeController::class, 'getTracking']);
@@ -151,6 +153,9 @@ Route::prefix('v1')->group(function () {
 
             Route::get('voucher', [VoucherController::class, 'indexNhaXe']);
             Route::post('voucher', [VoucherController::class, 'storeNhaXe']);
+            Route::get('voucher/{id}', [VoucherController::class, 'showNhaXe']);
+            Route::put('voucher/{id}', [VoucherController::class, 'updateNhaXe']);
+            Route::delete('voucher/{id}', [VoucherController::class, 'destroyNhaXe']);
 
             Route::get('xe', [XeController::class, 'index']);
             Route::get('xe/{id}', [XeController::class, 'show']);
@@ -195,6 +200,7 @@ Route::prefix('v1')->group(function () {
             Route::post('vi-nha-xe/update-bank', [\App\Http\Controllers\ViNhaXeController::class, 'updateBankInfo']);
             Route::post('vi-nha-xe/withdraw', [\App\Http\Controllers\ViNhaXeController::class, 'requestWithdraw']);
             Route::post('vi-nha-xe/topup', [\App\Http\Controllers\ViNhaXeController::class, 'requestTopup']);
+            Route::get('vi-nha-xe/giao-dich/{id}', [\App\Http\Controllers\ViNhaXeController::class, 'getTransactionDetail']);
         });
     });
 
@@ -225,6 +231,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('nhan-vien/{id}/trang-thai', [AdminController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-nhan-vien');
 
             // Khách hàng
+            Route::get('khach-hang/list-minimal', [KhachHangController::class, 'listMinimal']);
             Route::get('khach-hang', [KhachHangController::class, 'index'])->middleware('permission:xem-khach-hang');
             Route::get('khach-hang/{id}', [KhachHangController::class, 'show'])->middleware('permission:xem-khach-hang');
             Route::patch('khach-hang/{id}/trang-thai', [KhachHangController::class, 'toggleStatus'])->middleware('permission:cap-nhat-trang-thai-khach-hang');
@@ -240,6 +247,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('tai-xe/{id}', [TaiXeController::class, 'destroy'])->middleware('permission:xoa-tai-xe');
 
             // Nhà xe
+            Route::get('nha-xe/list-minimal', [NhaXeController::class, 'listMinimal']);
             Route::get('nha-xe', [NhaXeController::class, 'index'])->middleware('permission:xem-nha-xe');
             Route::get('nha-xe/{id}', [NhaXeController::class, 'show'])->middleware('permission:xem-nha-xe');
             Route::post('nha-xe', [NhaXeController::class, 'store'])->middleware('permission:them-nha-xe');
@@ -297,6 +305,7 @@ Route::prefix('v1')->group(function () {
 
             // Voucher
             Route::get('voucher', [VoucherController::class, 'indexAdmin'])->middleware('permission:xem-voucher');
+            Route::post('voucher', [VoucherController::class, 'storeAdmin'])->middleware('permission:them-voucher');
             Route::patch('voucher/{id}/duyet', [VoucherController::class, 'duyetVoucherAdmin'])->middleware('permission:duyet-voucher');
 
             // Báo động

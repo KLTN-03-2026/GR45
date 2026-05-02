@@ -8,6 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Models\Transaction;
 use App\Models\Ve;
+use App\Models\ViNhaXe;
+use App\Models\LichSuThanhToanNhaXe;
+use App\Events\NhaXeTopupSuccessEvent;
+use Illuminate\Support\Facades\DB;
 
 class ThanhToanController extends Controller
 {
@@ -132,7 +136,7 @@ class ThanhToanController extends Controller
             // 5. Update Ticket Status
             if (isset($data['transferType']) && $data['transferType'] === 'in' && !empty($data['content'])) {
                 $content = strtoupper($data['content']);
-                
+
                 // Find ticket by matching ma_ve inside the transaction content
                 $ve = Ve::where('tinh_trang', 'dang_cho')
                     ->whereRaw("? LIKE CONCAT('%', ma_ve, '%')", [$content])
@@ -140,7 +144,7 @@ class ThanhToanController extends Controller
 
                 if ($ve) {
                     $amountRequired = $ve->tong_tien > 0 ? $ve->tong_tien : ($ve->tien_ban_dau - $ve->tien_khuyen_mai);
-                    
+
                     if ($data['transferAmount'] >= $amountRequired) {
                         $ve->tinh_trang = 'da_thanh_toan';
                         $ve->phuong_thuc_thanh_toan = 'chuyen_khoan';
@@ -153,10 +157,61 @@ class ThanhToanController extends Controller
                         Log::info('SePay Webhook: Ticket paid successfully', ['ma_ve' => $ve->ma_ve, 'sepay_id' => $data['id']]);
                     } else {
                         Log::warning('SePay Webhook: Insufficient amount', [
-                            'ma_ve' => $ve->ma_ve, 
-                            'expected' => $amountRequired, 
+                            'ma_ve' => $ve->ma_ve,
+                            'expected' => $amountRequired,
                             'received' => $data['transferAmount']
                         ]);
+                    }
+                }
+
+                // 5.2 Xử lý nạp tiền ví nhà xe qua mã TOPUP_
+                if (preg_match('/(TOPUP_\d+_\d+)/i', $content, $matches)) {
+                    $transactionCode = strtoupper($matches[1]);
+                    $amount = $data['transferAmount'];
+
+                    $lichSu = LichSuThanhToanNhaXe::where('transaction_code', $transactionCode)
+                        ->where('loai_giao_dich', 'nap_tien')
+                        ->where('tinh_trang', 'cho_xac_nhan')
+                        ->first();
+
+                    if ($lichSu) {
+                        $vi = $lichSu->viNhaXe;
+                        if ($vi) {
+                            DB::beginTransaction();
+                            try {
+                                // Cập nhật ví
+                                $vi->increment('so_du', $amount);
+                                $vi->increment('tong_nap', $amount);
+
+                                // Cập nhật lịch sử
+                                $lichSu->update([
+                                    'tinh_trang' => 'thanh_toan_thanh_cong',
+                                    'so_du_sau_giao_dich' => $vi->fresh()->so_du,
+                                    'noi_dung' => $lichSu->noi_dung . ' (Đã khớp qua SePay)',
+                                ]);
+
+                                DB::commit();
+
+                                // Phát sự kiện realtime cho nhà xe
+                                event(new NhaXeTopupSuccessEvent(
+                                    $vi->ma_nha_xe,
+                                    $amount,
+                                    $transactionCode,
+                                    "Bạn đã nạp thành công " . number_format($amount, 0, ',', '.') . " VNĐ vào ví (Mã: $transactionCode)."
+                                ));
+
+                                Log::info('SePay Webhook: TOPUP processed successfully', [
+                                    'code' => $transactionCode,
+                                    'amount' => $amount,
+                                    'sepay_id' => $data['id']
+                                ]);
+                            } catch (\Exception $e) {
+                                DB::rollBack();
+                                Log::error('SePay Webhook: Error processing TOPUP ' . $transactionCode . ': ' . $e->getMessage());
+                            }
+                        }
+                    } else {
+                        Log::warning('SePay Webhook: TOPUP code not found or already processed', ['code' => $transactionCode]);
                     }
                 }
             }

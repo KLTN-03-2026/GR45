@@ -16,7 +16,6 @@ return new class extends Migration {
             $table->enum('hang_thanh_vien', ['dong', 'bac', 'vang', 'bach_kim'])->default('dong');
             $table->date('ngay_cap_nhat_hang')->nullable();
             $table->timestamps();
-
             $table->index('hang_thanh_vien');
         });
 

@@ -70,6 +70,9 @@ const operatorApi = {
   // --- VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/nha-xe/voucher'),
   createVoucher: (data) => axiosClient.post('/v1/nha-xe/voucher', data),
+  getVoucherDetail: (id) => axiosClient.get(`/v1/nha-xe/voucher/${id}`),
+  updateVoucher: (id, data) => axiosClient.put(`/v1/nha-xe/voucher/${id}`, data),
+  deleteVoucher: (id) => axiosClient.delete(`/v1/nha-xe/voucher/${id}`),
 
   // --- TÀI XẾ ---
   getDrivers: (params) => axiosClient.get('/v1/nha-xe/tai-xe', { params }),
@@ -98,6 +101,7 @@ const operatorApi = {
   updateBankInfo: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/update-bank', data),
   requestTopup: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/topup', data),
   requestWithdraw: (data) => axiosClient.post('/v1/nha-xe/vi-nha-xe/withdraw', data),
+  getTransactionDetail: (id) => axiosClient.get(`/v1/nha-xe/vi-nha-xe/giao-dich/${id}`),
 };
 
 export default operatorApi;
