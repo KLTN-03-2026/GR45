@@ -41,12 +41,15 @@ const onInput = (event) => {
       {{ label }}
     </label>
     <div class="input-container">
+      <div v-if="$slots.prefix" class="input-prefix">
+        <slot name="prefix"></slot>
+      </div>
       <input
         :type="type"
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
-        :class="['base-input', { 'has-error': !!error }]"
+        :class="['base-input', { 'has-error': !!error, 'has-prefix': $slots.prefix }]"
         @input="onInput"
       />
     </div>
@@ -75,6 +78,19 @@ const onInput = (event) => {
 .input-container {
   position: relative;
   width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.input-prefix {
+  position: absolute;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .base-input {
@@ -87,6 +103,10 @@ const onInput = (event) => {
   color: #1f2937;
   transition: all 0.2s ease-in-out;
   box-sizing: border-box;
+}
+
+.base-input.has-prefix {
+  padding-left: 40px;
 }
 
 .base-input::placeholder {

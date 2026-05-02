@@ -30,6 +30,7 @@ class StoreXeRequest extends FormRequest
         return [
             'bien_so' => ['required', 'string', 'max:20', $bienSoUniqueRule],
             'ten_xe' => 'required|string|max:255',
+            'hinh_anh' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'id_loai_xe' => 'required|integer|exists:loai_xes,id',
             'id_tai_xe_chinh' => 'nullable|integer|exists:tai_xes,id',
             'bien_nhan_dang' => 'nullable|string|max:300',
@@ -37,6 +38,7 @@ class StoreXeRequest extends FormRequest
             'so_ghe_thuc_te' => 'nullable|integer|min:1|max:100',
             'so_tang' => 'nullable|integer|min:1|max:2',
             'tien_nghi' => 'nullable|string|max:500',
+            
         ];
     }
 

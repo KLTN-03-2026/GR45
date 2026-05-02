@@ -61,8 +61,17 @@ const adminApi = {
   getVehicles: (params) => axiosClient.get('/v1/admin/xe', { params }),
   getVehiclesPublic: (params) => axiosClient.get('/v1/xe/public', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/admin/xe/${id}`),
-  createVehicle: (data) => axiosClient.post('/v1/admin/xe', data),
-  updateVehicle: (id, data) => axiosClient.put(`/v1/admin/xe/${id}`, data),
+  createVehicle: (data) => {
+    const isFormData = data instanceof FormData;
+    return axiosClient.post('/v1/admin/xe', data, isFormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {});
+  },
+  updateVehicle: (id, data) => {
+    if (data instanceof FormData) {
+      if (!data.has('_method')) data.append('_method', 'PUT');
+      return axiosClient.post(`/v1/admin/xe/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
+    }
+    return axiosClient.put(`/v1/admin/xe/${id}`, data);
+  },
   deleteVehicle: (id) => axiosClient.delete(`/v1/admin/xe/${id}`),
   updateVehicleStatus: (id, data) => axiosClient.patch(`/v1/admin/xe/${id}/trang-thai`, data),
   getLoaiXe: () => axiosClient.get('/v1/admin/loai-xe'),

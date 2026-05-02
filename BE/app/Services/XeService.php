@@ -20,6 +20,8 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use App\Http\Resources\XeResourceShow;
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
+use Illuminate\Http\UploadedFile;
 
 class XeService
 {
@@ -62,6 +64,21 @@ class XeService
         return null;
     }
 
+    private function uploadToCloudinary($file): ?string
+    {
+        if (!$file) return null;
+        try {
+            $uploaded = Cloudinary::uploadApi()->upload($file->getRealPath(), [
+                'folder' => 'do_an_kltn/phuong_tien',
+            ]);
+
+            return is_array($uploaded) ? ($uploaded['secure_url'] ?? null) : ($uploaded->offsetGet('secure_url') ?? null);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Cloudinary upload error (Xe): ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function create(array $data)
     {
         $user = Auth::user();
@@ -79,6 +96,10 @@ class XeService
             if ($loaiXe) {
                 $data['so_ghe_thuc_te'] = (int) $loaiXe->so_ghe_mac_dinh;
             }
+        }
+
+        if (isset($data['hinh_anh']) && $data['hinh_anh'] instanceof UploadedFile) {
+            $data['hinh_anh'] = $this->uploadToCloudinary($data['hinh_anh']);
         }
 
         $xe = $this->xeRepo->create($data);
@@ -119,6 +140,10 @@ class XeService
             if ($hasNotCancelledSeatTickets) {
                 throw new \Exception('Chỉ có thể đổi sơ đồ ghế khi toàn bộ vé liên quan đã hủy.');
             }
+        }
+
+        if (isset($data['hinh_anh']) && $data['hinh_anh'] instanceof UploadedFile) {
+            $data['hinh_anh'] = $this->uploadToCloudinary($data['hinh_anh']);
         }
 
         $updated = $this->xeRepo->update($id, $data);

@@ -14,6 +14,7 @@ class Xe extends Model
     protected $fillable = [
         'bien_so',
         'ten_xe',
+        'hinh_anh',
         'ma_nha_xe',
         'id_loai_xe',
         'id_tai_xe_chinh',
@@ -22,6 +23,7 @@ class Xe extends Model
         'so_ghe_thuc_te',
         'so_cho',
         'thong_tin_cai_dat',
+        
     ];
 
     protected $casts = [

@@ -269,11 +269,14 @@ class VeService
 
     public function getDanhSachVe(array $filters, string $role)
     {
-        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.tinhThanh', 'chiTietVes.tramTra.phuongXa.tinhThanh'])->orderByDesc('created_at');
+        $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chuyenXe.xe.loaiXe', 'chuyenXe.taiXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.quanHuyen.tinhThanh', 'chiTietVes.tramTra.phuongXa.quanHuyen.tinhThanh'])->orderByDesc('created_at');
 
         if ($role === 'khach_hang') {
             $user = auth('khach_hang')->user();
-            $query->where('id_khach_hang', $user->id)->orWhere('nguoi_dat', $user->id);
+            $query->where(function ($q) use ($user) {
+                $q->where('id_khach_hang', $user->id)
+                    ->orWhere('nguoi_dat', $user->id);
+            });
         } elseif ($role === 'nha_xe') {
             $nhaXe = auth('nha_xe')->user();
             $query->whereHas('chuyenXe.tuyenDuong', function ($q) use ($nhaXe) {
@@ -292,7 +295,22 @@ class VeService
         }
 
         if (!empty($filters['tinh_trang'])) {
-            $query->where('tinh_trang', $filters['tinh_trang']);
+            $status = $filters['tinh_trang'];
+            if ($status === 'hoan_thanh') {
+                $query->where('tinh_trang', 'da_thanh_toan')
+                    ->whereHas('chuyenXe', function ($q) {
+                        $q->where('ngay_khoi_hanh', '<', now()->toDateString());
+                    });
+            } elseif ($status === 'da_thanh_toan') {
+                $query->where('tinh_trang', 'da_thanh_toan')
+                    ->whereHas('chuyenXe', function ($q) {
+                        $q->where('ngay_khoi_hanh', '>=', now()->toDateString());
+                    });
+            } elseif ($status === 'huy' || $status === 'da_huy') {
+                $query->whereIn('tinh_trang', ['huy', 'da_huy']);
+            } else {
+                $query->where('tinh_trang', $status);
+            }
         }
 
         if (!empty($filters['search'])) {
@@ -319,7 +337,7 @@ class VeService
 
     public function getChiTietVe($id, string $role)
     {
-        $ve = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.tinhThanh', 'chiTietVes.tramTra.phuongXa.tinhThanh'])->findOrFail($id);
+        $ve = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chuyenXe.xe.loaiXe', 'chuyenXe.taiXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.quanHuyen.tinhThanh', 'chiTietVes.tramTra.phuongXa.quanHuyen.tinhThanh'])->findOrFail($id);
 
         if ($role === 'khach_hang') {
             $user = auth('khach_hang')->user();

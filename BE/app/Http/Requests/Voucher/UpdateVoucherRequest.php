@@ -21,6 +21,7 @@ class UpdateVoucherRequest extends FormRequest
             'ngay_ket_thuc' => 'required|date|after_or_equal:ngay_bat_dau',
             'so_luong'      => 'required|integer|min:0',
             'dieu_kien'     => 'nullable|string',
+            'is_public'     => 'nullable|boolean',
         ];
     }
 
