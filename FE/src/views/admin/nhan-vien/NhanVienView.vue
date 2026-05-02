@@ -3,7 +3,8 @@ import { ref, reactive, onMounted, watch, computed } from 'vue';
 import { 
   Plus, Search, Filter, Edit, Trash2, 
   Lock, Unlock, UserCheck, Mail, Phone, MapPin, 
-  ShieldCheck, MoreHorizontal, X, Calendar, Eye
+  ShieldCheck, MoreHorizontal, X, Calendar, Eye,
+  UserPlus
 } from 'lucide-vue-next';
 import adminApi from '@/api/adminApi';
 import { getStaffStatus } from '@/utils/status';
@@ -320,7 +321,7 @@ onMounted(() => {
         </div>
         <div class="header-actions">
           <BaseButton variant="primary" @click="openCreateModal" class="btn-add-staff">
-            <template #icon><Plus :size="18" /></template>
+            <template #icon><UserPlus :size="18" /></template>
             Thêm nhân viên
           </BaseButton>
         </div>
