@@ -23,7 +23,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
                 // --- Tang 0: Danh muc tinh thanh ---
-            // TinhThanhSeeder::class,
+                // TinhThanhSeeder::class,
                 // --- Tang 1: Danh muc goc ---
             ChucVuSeeder::class,
             ChucNangSeeder::class,
