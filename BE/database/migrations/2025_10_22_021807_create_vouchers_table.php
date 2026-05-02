@@ -27,6 +27,7 @@ return new class extends Migration
 
             $table->enum('trang_thai', ['hoat_dong', 'vo_hieu', 'het_han', 'tam_ngung', 'cho_duyet','huy','tu_choi'])
                 ->default('cho_duyet');                   // Trạng thái
+            $table->boolean('is_public')->default(false); 
             $table->text('dieu_kien')->nullable();        // Điều kiện áp dụng
 
             $table->foreignId('id_nha_xe')->nullable()->constrained('nha_xes')->nullOnDelete();
