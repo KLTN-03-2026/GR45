@@ -3,6 +3,7 @@ import { computed, ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useClientStore } from "@/stores/clientStore.js";
 import authApi from "@/api/authApi.js";
+import clientApi from "@/api/clientApi.js";
 
 const router = useRouter();
 const route = useRoute();

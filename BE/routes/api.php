@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AdminChatAiKnowledgeController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ChatAiController;
 use App\Http\Controllers\ChucNangController;
 use App\Http\Controllers\ChucVuController;
 use Illuminate\Http\Request;
@@ -11,7 +13,6 @@ use App\Http\Controllers\NhaXeController;
 use App\Http\Controllers\TuyenDuongController;
 use App\Http\Controllers\ChuyenXeController;
 use App\Http\Controllers\ThanhToanController;
-use App\Http\Controllers\OperatorThongKeController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\VeController;
 use App\Http\Controllers\XeController;
@@ -39,6 +40,9 @@ Route::prefix('v1')->group(function () {
     Route::post('quen-mat-khau', [KhachHangController::class, 'requestPasswordReset']);
     Route::post('dat-lai-mat-khau', [KhachHangController::class, 'resetPassword']);
 
+    // Đặt vé: Bearer tùy chọn — có token gắn vé tài khoản; không token thì khách vãng lai (SĐT + họ tên).
+    Route::post('ve/dat-ve', [VeController::class, 'datVeKhachHang']);
+
     Route::get('voucher/public',           [KhachHangController::class, 'getVoucherCongKhai']);
     Route::middleware('auth.khach-hang')->group(function () {
         Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
@@ -49,7 +53,6 @@ Route::prefix('v1')->group(function () {
 
         Route::get('ve',            [VeController::class, 'indexKhachHang']);
         Route::get('ve/{id}',       [VeController::class, 'showKhachHang']);
-        Route::post('ve/dat-ve',    [VeController::class, 'datVeKhachHang']);
         Route::patch('ve/{id}/huy', [VeController::class, 'huyVeKhachHang']);
 
         Route::get('voucher', [VoucherController::class, 'indexKhachHang']);
@@ -80,6 +83,9 @@ Route::prefix('v1')->group(function () {
     Route::get('chuyen-xe/{id}/danh-gia', [RatingController::class, 'listRatingsByTrip']);
     Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
     Route::post('tracking/lookup-by-phone', [ChuyenXeController::class, 'lookupTripsByPhone']);
+
+    // Chat AI — widget khách; Bearer tùy chọn để gắn session khách.
+    Route::post('chat/ai/message', [ChatAiController::class, 'message']);
 
     // quản lý tài xế (DRIVER APP)
     Route::prefix('tai-xe')->group(function () {
@@ -313,6 +319,15 @@ Route::prefix('v1')->group(function () {
 
             // Đánh giá
             Route::get('ratings', [RatingController::class, 'getAdminRatings']);
+
+            // Chat AI — tri thức / log (admin UI)
+            Route::prefix('ai')->group(function () {
+                Route::get('stats', [AdminChatAiKnowledgeController::class, 'stats']);
+                Route::get('chat-logs', [AdminChatAiKnowledgeController::class, 'chatLogs']);
+                Route::get('ingest-logs', [AdminChatAiKnowledgeController::class, 'ingestLogs']);
+                Route::delete('ingest-logs/{id}', [AdminChatAiKnowledgeController::class, 'destroyIngestLog']);
+                Route::post('upload-pdf-sync', [AdminChatAiKnowledgeController::class, 'uploadPdfSync']);
+            });
 
             // Thanh toán và thống kê
             Route::get('thanh-toan/thong-ke', [ThanhToanController::class, 'thongKe']);
