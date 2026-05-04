@@ -13,9 +13,11 @@ import { useRoute, useRouter } from "vue-router";
 import clientApi from "@/api/clientApi";
 import ClientHeader from "@/components/layout/ClientHeader.vue";
 import ClientFooter from "@/components/layout/ClientFooter.vue";
+import ChatAiWidget from "@/components/chat/ChatAiWidget.vue";
 
 const router = useRouter();
 const route = useRoute();
+
 const pendingRatings = ref([]);
 const showRatingPopup = ref(false);
 const showDetailedRatingModal = ref(false);
@@ -238,6 +240,7 @@ onUnmounted(() => {
       <RouterView />
     </main>
     <ClientFooter />
+    <ChatAiWidget />
 
     <Teleport to="body">
       <Transition name="rt-rating-modal-fade">

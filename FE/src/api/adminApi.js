@@ -15,7 +15,6 @@ const adminApi = {
 
   // --- QUẢN LÝ KHÁCH HÀNG ---
   getClients: (params) => axiosClient.get('/v1/admin/khach-hang', { params }),
-  getClientsListMinimal: () => axiosClient.get('/v1/admin/khach-hang/list-minimal'),
   getClientDetails: (id) => axiosClient.get(`/v1/admin/khach-hang/${id}`),
   createClient: (data) => axiosClient.post('/v1/admin/khach-hang', data),
   updateClient: (id, data) => axiosClient.put(`/v1/admin/khach-hang/${id}`, data),
@@ -24,33 +23,22 @@ const adminApi = {
 
   // --- QUẢN LÝ NHÀ XE ---
   getOperators: (params) => axiosClient.get('/v1/admin/nha-xe', { params }),
-  getOperatorsListMinimal: () => axiosClient.get('/v1/admin/nha-xe/list-minimal'),
-
   getOperatorDetails: (id) => axiosClient.get(`/v1/admin/nha-xe/${id}`),
-  createOperator: (data) => {
-    return axiosClient.post('/v1/admin/nha-xe', data)
-  },
-  updateOperator: (id, data) => {
-    if (data instanceof FormData) {
-      if (!data.has('_method')) data.append('_method', 'PUT')
-      return axiosClient.post(`/v1/admin/nha-xe/${id}`, data)
-    }
-    return axiosClient.put(`/v1/admin/nha-xe/${id}`, data)
-  },
+  createOperator: (data) => axiosClient.post('/v1/admin/nha-xe', data),
+  updateOperator: (id, data) => axiosClient.put(`/v1/admin/nha-xe/${id}`, data),
   toggleOperatorStatus: (id) => axiosClient.patch(`/v1/admin/nha-xe/${id}/trang-thai`),
   deleteOperator: (id) => axiosClient.delete(`/v1/admin/nha-xe/${id}`),
 
   // --- QUẢN LÝ TÀI XẾ ---
   getDrivers: (params) => axiosClient.get('/v1/admin/tai-xe', { params }),
-  getDriversPublic: (params) => axiosClient.get('/v1/tai-xe/public', { params }),
   getDriverDetails: (id) => axiosClient.get(`/v1/admin/tai-xe/${id}`),
-  createDriver: (data) => axiosClient.post('/v1/admin/tai-xe', data, { timeout: 60000 }),
+  createDriver: (data) => axiosClient.post('/v1/admin/tai-xe', data),
   updateDriver: (id, data) => {
     if (data instanceof FormData) {
       if (!data.has('_method')) data.append('_method', 'PUT');
-      return axiosClient.post(`/v1/admin/tai-xe/${id}`, data, { timeout: 60000 });
+      return axiosClient.post(`/v1/admin/tai-xe/${id}`, data);
     }
-    return axiosClient.put(`/v1/admin/tai-xe/${id}`, data, { timeout: 60000 });
+    return axiosClient.put(`/v1/admin/tai-xe/${id}`, data);
   },
   toggleDriverStatus: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/trang-thai`),
   approveDriver: (id) => axiosClient.patch(`/v1/admin/tai-xe/${id}/duyet`),
@@ -58,18 +46,9 @@ const adminApi = {
 
   // --- QUẢN LÝ XE ---
   getVehicles: (params) => axiosClient.get('/v1/admin/xe', { params }),
-  getVehiclesPublic: (params) => axiosClient.get('/v1/xe/public', { params }),
   getVehicleDetails: (id) => axiosClient.get(`/v1/admin/xe/${id}`),
-  createVehicle: (data) => {
-    return axiosClient.post('/v1/admin/xe', data);
-  },
-  updateVehicle: (id, data) => {
-    if (data instanceof FormData) {
-      if (!data.has('_method')) data.append('_method', 'PUT');
-      return axiosClient.post(`/v1/admin/xe/${id}`, data);
-    }
-    return axiosClient.put(`/v1/admin/xe/${id}`, data);
-  },
+  createVehicle: (data) => axiosClient.post('/v1/admin/xe', data),
+  updateVehicle: (id, data) => axiosClient.put(`/v1/admin/xe/${id}`, data),
   deleteVehicle: (id) => axiosClient.delete(`/v1/admin/xe/${id}`),
   updateVehicleStatus: (id, data) => axiosClient.patch(`/v1/admin/xe/${id}/trang-thai`, data),
   getLoaiXe: () => axiosClient.get('/v1/admin/loai-xe'),
@@ -112,12 +91,9 @@ const adminApi = {
   getTripTrackingHistory: (id, params) =>
     axiosClient.get(`/v1/admin/chuyen-xe/${id}/tracking`, { params }),
   getTripTrackingLive: (id) => axiosClient.get(`/v1/admin/chuyen-xe/${id}/tracking/live`),
-  getActiveTrips: () => axiosClient.get('/v1/admin/chuyen-xe/dang-chay'),
-  getCompletedTrips: (params) => axiosClient.get('/v1/admin/chuyen-xe/da-hoan-thanh', { params }),
 
   // --- QUẢN LÝ VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/admin/voucher'),
-  createVoucher: (data) => axiosClient.post('/v1/admin/voucher', data),
   approveVoucher: (id, data) => axiosClient.patch(`/v1/admin/voucher/${id}/duyet`, data),
 
   // --- QUẢN LÝ ĐÁNH GIÁ ---
@@ -147,23 +123,12 @@ const adminApi = {
   // --- TIỆN ÍCH ---
   autoGenerateSeats: () => axiosClient.post('/v1/admin/xe/auto-generate-seats'),
 
-  // --- DASHBOARD KPIs ---
-  getDashboardKpis: () => axiosClient.get('/v1/admin/dashboard-kpis'),
-
-  // --- BÁO CÁO (BaoCaoController) ---
-  getBaoCaoDashboard: (params) => axiosClient.get('/v1/admin/bao-cao/dashboard', { params }),
-  getBaoCaoTheoTuyenDuong: (params) => axiosClient.get('/v1/admin/bao-cao/theo-tuyen', { params }),
-  getBaoCaoTrangThaiVe: (params) => axiosClient.get('/v1/admin/bao-cao/trang-thai-ve', { params }),
-
-  // --- BÁO ĐỘNG ---
-  getAlerts: (params) => axiosClient.get('/v1/admin/bao-dong', { params }),
-
-  // --- QUẢN LÝ VÍ NHÀ XE ---
-  getOperatorWallets: (params) => axiosClient.get('/v1/admin/vi-nha-xe', { params }),
-  getOperatorWalletDetail: (id) => axiosClient.get(`/v1/admin/vi-nha-xe/${id}`),
-  getWithdrawRequests: (params) => axiosClient.get('/v1/admin/vi-nha-xe/yeu-cau-rut-tien', { params }),
-  approveWithdraw: (id) => axiosClient.patch(`/v1/admin/vi-nha-xe/yeu-cau-rut-tien/${id}/duyet`),
-  rejectWithdraw: (id, data) => axiosClient.patch(`/v1/admin/vi-nha-xe/yeu-cau-rut-tien/${id}/tu-choi`, data),
+  /** Chat AI: upload PDF sync */
+  ingestAiPdf: (formData) => axiosClient.post('/v1/admin/ai/upload-pdf-sync', formData),
+  deleteAiIngestLog: (id) => axiosClient.delete(`/v1/admin/ai/ingest-logs/${id}`),
+  getAiStats: (params) => axiosClient.get('/v1/admin/ai/stats', { params }),
+  getAiChatLogs: (params) => axiosClient.get('/v1/admin/ai/chat-logs', { params }),
+  getAiIngestLogs: (params) => axiosClient.get('/v1/admin/ai/ingest-logs', { params }),
 };
 
 export default adminApi;
