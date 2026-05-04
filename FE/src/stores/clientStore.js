@@ -83,6 +83,27 @@ export const useClientStore = defineStore('client', () => {
     localStorage.removeItem(USER_KEY);
   }
 
+  // Lấy thông tin cá nhân hiện tại
+  async function fetchProfile() {
+    if (!token.value) return false;
+    loading.value = true;
+    try {
+      // Giả sử có endpoint /me hoặc profile trong authApi
+      const res = await authApi.getClientProfile(); 
+      user.value = res.data || res;
+      localStorage.setItem(USER_KEY, JSON.stringify(user.value));
+      isTokenVerified.value = true;
+      return true;
+    } catch (err) {
+      console.error('Fetch profile failed:', err);
+      // Nếu token hết hạn hoặc lỗi, logout luôn
+      logout();
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   // Cập nhật thông tin user locally
   function updateUser(newData) {
     if (user.value) {
@@ -94,6 +115,7 @@ export const useClientStore = defineStore('client', () => {
   return { 
     token, user, loading, error, isTokenVerified, isLoggedIn, 
     isAuthModalOpen, authMode,
-    login, logout, updateUser, openAuthModal, closeAuthModal 
+    login, logout, updateUser, openAuthModal, closeAuthModal,
+    fetchProfile 
   };
 });
