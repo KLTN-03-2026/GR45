@@ -16,10 +16,17 @@ export default defineConfig({
     },
   },
   server: {
-    // Cho phép tất cả các host truy cập (giải quyết lỗi ngrok bị block)
+    // Cho phép mọi host (ngrok / tunnel) — giữ từ cấu hình cũ
     allowedHosts: true,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['onnxruntime-web']
   }
 })
+
