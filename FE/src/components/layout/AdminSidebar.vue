@@ -19,7 +19,7 @@ import {
   Database,
   Gift,
   Star,
-  Sparkles,
+  Wallet
 } from 'lucide-vue-next'
 
 // Inject từ AdminLayout
@@ -69,12 +69,6 @@ const closeSidebarSafely = () => {
 const menuList = [
   { id: 'dashboard', name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
   {
-    id: 'chat-ai-tri-thuc',
-    name: 'Tri thức Chat AI',
-    path: '/admin/chat-ai-tri-thuc',
-    icon: Sparkles,
-  },
-  {
     id: 'tuyen-duong',
     name: 'Quản lý tuyến đường',
     path: '/admin/tuyen-duong',
@@ -92,11 +86,15 @@ const menuList = [
   },
   {
     id: 'tracking',
-    name: 'Live tracking',
-    path: '/admin/tracking',
+    name: 'Giám sát xe',
     icon: Map,
     permissionSlugs: ['xem-tracking-chuyen-xe', 'xem-chuyen-xe'],
     permissionHints: ['tracking'],
+    children: [
+      { name: '📡 Live Tracking', path: '/admin/live-tracking', icon: Map },
+      { name: '📋 Lịch sử hành trình', path: '/admin/lich-su-hanh-trinh', icon: Map },
+    ],
+    paths: ['/admin/live-tracking', '/admin/lich-su-hanh-trinh'],
   },
   {
     id: 've',
@@ -205,6 +203,12 @@ const menuList = [
     icon: TrendingUp,
     permissionSlugs: ['xem-thong-ke'],
     permissionHints: ['thong-ke', 'doanh-thu'],
+  },
+  {
+    id: 'vi-nha-xe',
+    name: 'Quản lý ví nhà xe',
+    path: '/admin/vi-nha-xe',
+    icon: Wallet,
   },
 ]
 

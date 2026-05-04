@@ -2,9 +2,7 @@
 
 namespace App\Http\Requests\Ve;
 
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class DatVeRequest extends FormRequest
 {
@@ -19,12 +17,10 @@ class DatVeRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, ValidationRule|array<mixed>|string>
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        $guest = ! auth('khach_hang')->check();
-
         return [
             'id_chuyen_xe' => 'required|integer|exists:chuyen_xes,id',
             'danh_sach_ghe' => 'required|array|min:1',
@@ -34,22 +30,12 @@ class DatVeRequest extends FormRequest
             'ghi_chu' => 'nullable|string|max:255',
             'id_voucher' => 'nullable|integer|exists:vouchers,id',
             'phuong_thuc_thanh_toan' => 'nullable|string|in:tien_mat,chuyen_khoan,vi_dien_tu',
-            'sdt_khach_hang' => [
-                Rule::requiredIf($guest),
-                'nullable',
-                'string',
-                'max:20',
-            ],
-            'ten_khach_hang' => [
-                Rule::requiredIf($guest),
-                'nullable',
-                'string',
-                'max:191',
-            ],
+            'sdt_khach_hang' => 'nullable|string|max:20',
             'tinh_trang' => 'nullable|string|in:dang_cho,da_thanh_toan',
-            'diem_quy_doi' => 'nullable|integer|min:0',
+            'diem_quy_doi' => 'nullable|integer|min:0'
         ];
     }
+
 
     public function messages(): array
     {
@@ -63,9 +49,7 @@ class DatVeRequest extends FormRequest
             'id_tram_don.exists' => 'Trạm đón không tồn tại.',
             'id_tram_tra.required' => 'Vui lòng chọn trạm trả.',
             'id_tram_tra.exists' => 'Trạm trả không tồn tại.',
-            'id_voucher.exists' => 'Mã giảm giá không tồn tại hoặc đã hết hạn.',
-            'sdt_khach_hang.required' => 'Vui lòng nhập số điện thoại (hoặc đăng nhập để đặt vé).',
-            'ten_khach_hang.required' => 'Vui lòng nhập họ tên (hoặc đăng nhập để đặt vé).',
+            'id_voucher.exists' => 'Mã giảm giá không tồn tại hoặc đã hết hạn.'
         ];
     }
 }

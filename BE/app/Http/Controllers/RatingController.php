@@ -2,12 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Admin;
 use App\Models\ChuyenXe;
 use App\Models\DanhGia;
 use App\Models\NhaXe;
 use App\Models\Ve;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +15,7 @@ class RatingController extends Controller
     public function submitRating(Request $request): JsonResponse
     {
         $khachHang = Auth::guard('khach_hang')->user();
-        if (! $khachHang) {
+        if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
@@ -37,11 +35,11 @@ class RatingController extends Controller
 
         $tripId = $data['trip_id'] ?? null;
         $ticketCodes = $data['ma_ve_list'] ?? [];
-        if (! $tripId && empty($ticketCodes) && ! empty($data['ma_ve'])) {
+        if (!$tripId && empty($ticketCodes) && !empty($data['ma_ve'])) {
             $ticketCodes = [$data['ma_ve']];
         }
 
-        if (! $tripId && empty($ticketCodes)) {
+        if (!$tripId && empty($ticketCodes)) {
             return response()->json(['success' => false, 'message' => 'Thiếu thông tin chuyến hoặc vé để đánh giá.'], 422);
         }
 
@@ -49,7 +47,7 @@ class RatingController extends Controller
         if ($tripId) {
             $vesQuery->where('id_chuyen_xe', $tripId);
         }
-        if (! empty($ticketCodes)) {
+        if (!empty($ticketCodes)) {
             $vesQuery->whereIn('ma_ve', $ticketCodes);
         }
         $ves = $vesQuery->get();
@@ -62,14 +60,14 @@ class RatingController extends Controller
         $effectiveTripId = $tripId ?: $firstTicket->id_chuyen_xe;
 
         $hasPaidTicket = $ves->contains(fn ($ve) => $ve->tinh_trang === 'da_thanh_toan');
-        if (! $hasPaidTicket) {
+        if (!$hasPaidTicket) {
             return response()->json(['success' => false, 'message' => 'Chỉ có thể đánh giá cho vé đã thanh toán.'], 400);
         }
 
         $existing = DanhGia::where('id_khach_hang', $khachHang->id)
             ->where(function ($q) use ($effectiveTripId, $ticketCodes, $firstTicket) {
                 $q->where('id_chuyen_xe', $effectiveTripId);
-                $q->orWhereIn('ma_ve', ! empty($ticketCodes) ? $ticketCodes : [$firstTicket->ma_ve]);
+                $q->orWhereIn('ma_ve', !empty($ticketCodes) ? $ticketCodes : [$firstTicket->ma_ve]);
             })
             ->first();
 
@@ -111,12 +109,12 @@ class RatingController extends Controller
     public function getRating(Request $request, string $ticketCode): JsonResponse
     {
         $khachHang = Auth::guard('khach_hang')->user();
-        if (! $khachHang) {
+        if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $ve = Ve::where('ma_ve', $ticketCode)->where('id_khach_hang', $khachHang->id)->first();
-        if (! $ve) {
+        if (!$ve) {
             return response()->json(['success' => false, 'message' => 'Không tìm thấy vé.'], 404);
         }
 
@@ -127,7 +125,7 @@ class RatingController extends Controller
             })
             ->first();
 
-        if (! $danhGia) {
+        if (!$danhGia) {
             return response()->json(['success' => false, 'message' => 'Chưa có đánh giá.'], 404);
         }
 
@@ -137,7 +135,7 @@ class RatingController extends Controller
     public function getRatingByTrip(Request $request, int $tripId): JsonResponse
     {
         $khachHang = Auth::guard('khach_hang')->user();
-        if (! $khachHang) {
+        if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
@@ -146,7 +144,7 @@ class RatingController extends Controller
             ->where('id_chuyen_xe', $tripId)
             ->first();
 
-        if (! $danhGia) {
+        if (!$danhGia) {
             return response()->json(['success' => false, 'message' => 'Chưa có đánh giá.'], 404);
         }
 
@@ -154,17 +152,30 @@ class RatingController extends Controller
     }
 
     /**
-     * Danh sách đánh giá theo chuyến xe — công khai (mọi người xem được), chỉ trả họ tên khách.
+     * Danh sách đánh giá theo nhà xe của chuyến đang xem (công khai).
+     * FE vẫn gọi bằng tripId nhưng backend sẽ mở rộng ra toàn bộ đánh giá của nhà xe đó.
      */
     public function listRatingsByTrip(Request $request, int $tripId): JsonResponse
     {
-        if (! ChuyenXe::where('id', $tripId)->exists()) {
+        $trip = ChuyenXe::with([
+            'xe:id,ma_nha_xe',
+            'tuyenDuong.nhaXe:id,ma_nha_xe',
+        ])->find($tripId);
+        if (! $trip) {
             return response()->json(['success' => false, 'message' => 'Chuyến xe không tồn tại.'], 404);
+        }
+        $maNhaXe = (string) ($trip->tuyenDuong->nhaXe->ma_nha_xe ?? $trip->xe->ma_nha_xe ?? '');
+        if ($maNhaXe === '') {
+            return response()->json(['success' => false, 'message' => 'Chuyến xe chưa gắn nhà xe hợp lệ.'], 422);
         }
 
         $perPage = min(max((int) $request->input('per_page', 30), 1), 50);
 
-        $stats = DanhGia::where('id_chuyen_xe', $tripId)
+        $baseQuery = DanhGia::query()->whereHas('chuyenXe.tuyenDuong.nhaXe', function ($q) use ($maNhaXe) {
+            $q->where('ma_nha_xe', $maNhaXe);
+        });
+
+        $stats = (clone $baseQuery)
             ->selectRaw('COUNT(*) as total_ratings, AVG(diem_so) as avg_diem_so')
             ->first();
 
@@ -173,8 +184,15 @@ class RatingController extends Controller
             ? round((float) $stats->avg_diem_so, 1)
             : null;
 
-        $paginator = DanhGia::with(['khachHang:id,ho_va_ten'])
-            ->where('id_chuyen_xe', $tripId)
+        $paginator = DanhGia::with([
+            'khachHang:id,ho_va_ten',
+            'chuyenXe:id,id_tuyen_duong,id_xe,ngay_khoi_hanh,gio_khoi_hanh',
+            'chuyenXe.tuyenDuong:id,ten_tuyen_duong,diem_bat_dau,diem_ket_thuc',
+            'chuyenXe.xe:id,bien_so,ten_xe',
+        ])
+            ->whereHas('chuyenXe.tuyenDuong.nhaXe', function ($q) use ($maNhaXe) {
+                $q->where('ma_nha_xe', $maNhaXe);
+            })
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
@@ -191,7 +209,7 @@ class RatingController extends Controller
     public function getPendingRating(Request $request): JsonResponse
     {
         $khachHang = Auth::guard('khach_hang')->user();
-        if (! $khachHang) {
+        if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
@@ -212,11 +230,10 @@ class RatingController extends Controller
 
         $pending = $paidTickets->filter(function ($group) use ($khachHang) {
             $tripId = $group->first()?->id_chuyen_xe;
-            if (! $tripId) {
+            if (!$tripId) {
                 return false;
             }
-
-            return ! DanhGia::where('id_khach_hang', $khachHang->id)->where('id_chuyen_xe', $tripId)->exists();
+            return !DanhGia::where('id_khach_hang', $khachHang->id)->where('id_chuyen_xe', $tripId)->exists();
         })->map(function ($group) {
             $first = $group->first();
             $cx = $first->chuyenXe;
@@ -237,9 +254,7 @@ class RatingController extends Controller
                 'ten_xe' => $xe?->ten_xe,
                 'trang_thai_chuyen' => $cx?->trang_thai,
                 'ngay_khoi_hanh' => $cx?->ngay_khoi_hanh?->format('Y-m-d'),
-                'gio_khoi_hanh' => $cx?->gio_khoi_hanh !== null && $cx->gio_khoi_hanh !== ''
-                    ? Carbon::parse($cx->gio_khoi_hanh)->format('H:i')
-                    : null,
+                'gio_khoi_hanh' => $cx?->gio_khoi_hanh?->format('H:i'),
             ];
         })->values();
 
@@ -249,11 +264,15 @@ class RatingController extends Controller
     public function getMyRatings(Request $request): JsonResponse
     {
         $khachHang = Auth::guard('khach_hang')->user();
-        if (! $khachHang) {
+        if (!$khachHang) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $ratings = DanhGia::with(['chuyenXe.tuyenDuong', 'khachHang:id,ho_va_ten'])
+        $ratings = DanhGia::with([
+            'chuyenXe.tuyenDuong.nhaXe',
+            'chuyenXe.xe:id,bien_so,ten_xe',
+            'khachHang:id,ho_va_ten',
+        ])
             ->where('id_khach_hang', $khachHang->id)
             ->orderByDesc('created_at')
             ->get();
@@ -264,10 +283,10 @@ class RatingController extends Controller
             $row['route_diem_bat_dau'] = $td?->diem_bat_dau;
             $row['route_diem_ket_thuc'] = $td?->diem_ket_thuc;
             $row['ten_tuyen_duong'] = $td?->ten_tuyen_duong;
+            $row['ten_nha_xe'] = $td?->nhaXe?->ten_nha_xe;
+            $row['bien_so_xe'] = $r->chuyenXe?->xe?->bien_so;
             $row['chuyen_ngay_khoi_hanh'] = $r->chuyenXe?->ngay_khoi_hanh?->format('Y-m-d');
-            $row['chuyen_gio_khoi_hanh'] = ($r->chuyenXe?->gio_khoi_hanh !== null && $r->chuyenXe->gio_khoi_hanh !== '')
-                ? Carbon::parse($r->chuyenXe->gio_khoi_hanh)->format('H:i')
-                : null;
+            $row['chuyen_gio_khoi_hanh'] = $r->chuyenXe?->gio_khoi_hanh?->format('H:i');
 
             return $row;
         });
@@ -285,13 +304,13 @@ class RatingController extends Controller
     public function getCompanyRatings(Request $request): JsonResponse
     {
         $nhaXe = Auth::guard('nha_xe')->user();
-        if (! $nhaXe || ! ($nhaXe instanceof NhaXe)) {
+        if (!$nhaXe || !($nhaXe instanceof NhaXe)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $ratings = DanhGia::with([
             'khachHang:id,ho_va_ten,email,so_dien_thoai',
-            'chuyenXe.tuyenDuong',
+            'chuyenXe.tuyenDuong.nhaXe',
             'chuyenXe.xe:id,bien_so,ten_xe,ma_nha_xe',
         ])
             ->whereHas('chuyenXe.xe', function ($q) use ($nhaXe) {
@@ -311,13 +330,13 @@ class RatingController extends Controller
     public function getAdminRatings(Request $request): JsonResponse
     {
         $admin = Auth::guard('admin')->user();
-        if (! $admin || ! ($admin instanceof Admin)) {
+        if (!$admin || !($admin instanceof \App\Models\Admin)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $query = DanhGia::with([
             'khachHang:id,ho_va_ten,email,so_dien_thoai,avatar',
-            'chuyenXe.tuyenDuong:id,ten_tuyen_duong,diem_bat_dau,diem_ket_thuc',
+            'chuyenXe.tuyenDuong.nhaXe',
             'chuyenXe.xe:id,bien_so,ten_xe,ma_nha_xe,id_loai_xe',
             'chuyenXe.xe.nhaXe:id,ma_nha_xe,ten_nha_xe',
         ])->orderByDesc('created_at');
