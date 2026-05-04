@@ -43,7 +43,10 @@ class BaoCaoThongKeService
 
     public function getDashboardKpis(?string $maNhaXe = null, ?string $tuNgay = null, ?string $denNgay = null): array
     {
-        $tickets = $this->baseTicketQuery($maNhaXe, $tuNgay, $denNgay)->get();
+        $allTickets = $this->baseTicketQuery($maNhaXe, $tuNgay, $denNgay)->get();
+        
+        // Chỉ tính cho các vé đã thanh toán / hoàn thành
+        $tickets = $allTickets->filter(fn($ve) => in_array(strtolower($ve->tinh_trang), ['da_thanh_toan', 'hoan_thanh', 'confirmed', '1'], true));
 
         $tongDoanhThu = (float) $tickets->sum(function ($ve) {
             return (float) ($ve->tong_tien ?? 0);
@@ -135,7 +138,8 @@ class BaoCaoThongKeService
 
     public function getTheoTuyenDuong(?string $maNhaXe = null, ?string $tuNgay = null, ?string $denNgay = null): array
     {
-        $tickets = $this->baseTicketQuery($maNhaXe, $tuNgay, $denNgay)->get();
+        $allTickets = $this->baseTicketQuery($maNhaXe, $tuNgay, $denNgay)->get();
+        $tickets = $allTickets->filter(fn($ve) => in_array(strtolower($ve->tinh_trang), ['da_thanh_toan', 'hoan_thanh', 'confirmed', '1'], true));
 
         return $tickets
             ->groupBy('id_chuyen_xe')

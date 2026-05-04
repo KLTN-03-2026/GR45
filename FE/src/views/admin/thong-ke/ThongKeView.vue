@@ -135,23 +135,30 @@ const fetchBaoCaoAdmin = async (tuNgay, denNgay, gen) => {
 
     const d = unwrapApi(dashRes)
     if (d && typeof d === 'object') {
+      const thoiGianData = d.theo_thoi_gian || d.theo_thang || []
+      const tongVeBan = d.tong_ve_da_ban ?? d.tong_ve_ban
+
       baoCaoSetsPrimaryKpi.value =
-        (Array.isArray(d.theo_thang) && d.theo_thang.length > 0) ||
+        (Array.isArray(thoiGianData) && thoiGianData.length > 0) ||
         (Array.isArray(d.theo_nha_xe) && d.theo_nha_xe.length > 0) ||
-        (d.tong_ve_da_ban != null && d.tong_ve_da_ban !== '')
-      if (d.tong_ve_da_ban != null) totalStats.value.tongVeDaBan = Number(d.tong_ve_da_ban)
+        (tongVeBan != null && tongVeBan !== '')
+
+      if (tongVeBan != null) totalStats.value.tongVeDaBan = Number(tongVeBan)
+      if (d.tong_doanh_thu != null) totalStats.value.tongDoanhThu = Number(d.tong_doanh_thu)
       if (d.ty_le_lap_day_tb != null) totalStats.value.tyLeLapDay = Number(d.ty_le_lap_day_tb)
       if (d.khach_hang_moi != null) totalStats.value.khachHangMoi = Number(d.khach_hang_moi)
       if (d.tong_ve != null) totalStats.value.tongVe = Number(d.tong_ve)
       if (d.tong_giao_dich != null) totalStats.value.tongVe = Number(d.tong_giao_dich)
-      if (Array.isArray(d.theo_thang) && d.theo_thang.length) {
+
+      if (Array.isArray(thoiGianData) && thoiGianData.length) {
         const arrR = Array(12).fill(0)
         const arrV = Array(12).fill(0)
-        d.theo_thang.forEach((item) => {
+        thoiGianData.forEach((item) => {
+          const mStr = item.period || item.thang || ''
           const m =
-            typeof item.thang === 'string'
-              ? parseInt(item.thang.split('-')[1], 10) - 1
-              : Number(item.thang) - 1
+            typeof mStr === 'string'
+              ? parseInt(mStr.split('-')[1], 10) - 1
+              : Number(mStr) - 1
           if (m >= 0 && m < 12) {
             arrR[m] = Number(item.doanh_thu ?? item.doanhThu ?? 0)
             arrV[m] = Number(item.so_ve ?? item.soVe ?? 0)
