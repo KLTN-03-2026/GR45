@@ -267,15 +267,21 @@ class VeService
 
     // ─── PHẦN 2: LẤY DANH SÁCH VÉ VÀ CHI TIẾT ──────────────────────────
 
-    public function getDanhSachVe(array $filters, string $role)
+    public function getDanhSachVe(array $filters, string $role, ?int $toolKhachHangId = null)
     {
         $query = Ve::with(['khachHang', 'chuyenXe.tuyenDuong.nhaXe', 'chuyenXe.xe.loaiXe', 'chuyenXe.taiXe', 'chiTietVes.ghe', 'chiTietVes.tramDon.phuongXa.quanHuyen.tinhThanh', 'chiTietVes.tramTra.phuongXa.quanHuyen.tinhThanh'])->orderByDesc('created_at');
 
         if ($role === 'khach_hang') {
-            $user = auth('khach_hang')->user();
-            $query->where(function ($q) use ($user) {
-                $q->where('id_khach_hang', $user->id)
-                    ->orWhere('nguoi_dat', $user->id);
+            $khId = $toolKhachHangId;
+            if ($khId === null) {
+                $user = auth('khach_hang')->user();
+                $khId = $user?->id;
+            }
+            if ($khId === null) {
+                throw new Exception('Vui lòng đăng nhập để xem danh sách vé.');
+            }
+            $query->where(function ($q) use ($khId) {
+                $q->where('id_khach_hang', $khId)->orWhere('nguoi_dat', $khId);
             });
         } elseif ($role === 'nha_xe') {
             $nhaXe = auth('nha_xe')->user();

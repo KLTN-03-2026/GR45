@@ -1,5 +1,18 @@
 import axios from 'axios';
 
+/**
+ * Base cho mọi request dạng `/v1/...` (prefix Laravel là `/api`).
+ * Nếu `VITE_API_URL` kết thúc bằng `/api/v1` (file .env.exemple), bỏ `/v1` để không thành `/api/v1/v1/...`.
+ */
+function resolveAxiosBaseUrl() {
+  let u = String(import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/').trim();
+  u = u.replace(/\/+$/, '');
+  if (/\/v1$/i.test(u)) {
+    u = u.replace(/\/v1$/i, '');
+  }
+  return u.endsWith('/') ? u : `${u}/`;
+}
+
 // Mapping từ role → token key trong localStorage
 const ROLE_TOKEN_MAP = {
   admin: 'auth.admin.token',
@@ -8,30 +21,41 @@ const ROLE_TOKEN_MAP = {
   driver: 'auth.driver.token',
 };
 
-// Hàm xác định role từ URL
+/** Fallback khi chưa set auth.active_role (vd: ngrok / gọi URL trực tiếp). */
 function getRoleFromUrl(url) {
   if (!url) return 'client';
-  if (url.includes('/admin/')) return 'admin';
-  if (url.includes('/nha-xe/')) return 'operator';
-  if (url.includes('/tai-xe/')) return 'driver';
+  const u = String(url);
+  if (u.includes('/admin/')) return 'admin';
+  if (u.includes('/nha-xe/')) return 'operator';
+  if (u.includes('/tai-xe/')) return 'driver';
   return 'client';
 }
 
+// Giữ sàn tối thiểu 60s như bản cũ; env có thể tăng (vd: 180000).
+const apiTimeoutMs = (() => {
+  const raw = String(import.meta.env.VITE_API_TIMEOUT_MS || '').trim();
+  const n = Number.parseInt(raw, 10);
+  if (Number.isFinite(n) && n >= 5000) {
+    return Math.max(n, 60000);
+  }
+  return 60000;
+})();
+
 const axiosClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/',
-  headers: { 
+  baseURL: resolveAxiosBaseUrl(),
+  headers: {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true'
+    'ngrok-skip-browser-warning': 'true',
   },
-  timeout: 60000,
+  timeout: apiTimeoutMs,
 });
 
 // --- REQUEST INTERCEPTOR ---
-// Tự động đính Bearer Token của role phù hợp vào mỗi request
+// Tự động đính Bearer: ưu tiên auth.active_role; không có thì suy ra từ URL (hành vi cũ, hợp ngrok).
 axiosClient.interceptors.request.use(
   (config) => {
-    // Xác định role từ URL thay vì dùng 'auth.active_role' chung
-    const activeRole = getRoleFromUrl(config.url);
+    const storedRole = localStorage.getItem('auth.active_role');
+    const activeRole = storedRole || getRoleFromUrl(config.url);
     const tokenKey = ROLE_TOKEN_MAP[activeRole];
     const token = tokenKey ? localStorage.getItem(tokenKey) : null;
 
@@ -44,7 +68,7 @@ axiosClient.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
 
-    // Gắn role vào config để dùng ở response interceptor
+    // Gắn role vào config để response interceptor 401 xóa đúng token
     config._role = activeRole;
 
     return config;
@@ -56,9 +80,12 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    // Nếu 401 → xóa token của đúng role gọi API
+    // Nếu 401 → xóa token của đúng role gọi API (bản cũ không xóa auth.active_role)
     if (error.response?.status === 401) {
-      const activeRole = error.config?._role || getRoleFromUrl(error.config?.url);
+      const activeRole =
+        error.config?._role ||
+        localStorage.getItem('auth.active_role') ||
+        getRoleFromUrl(error.config?.url);
       const tokenKey = ROLE_TOKEN_MAP[activeRole];
       if (tokenKey) {
         localStorage.removeItem(tokenKey);

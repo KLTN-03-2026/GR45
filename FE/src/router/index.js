@@ -94,6 +94,11 @@ const router = createRouter({
           component: () => import('../views/admin/dashboard/AdminDashboardView.vue'),
         },
         {
+          path: 'chat-ai-tri-thuc',
+          name: 'admin-chat-ai-tri-thuc',
+          component: () => import('../views/admin/chat-ai/AdminChatAiTriThucView.vue'),
+        },
+        {
           path: 'tuyen-duong',
           name: 'admin-tuyen-duong',
           component: () => import('../views/admin/tuyen-duong/TuyenDuongView.vue'),

@@ -19,7 +19,8 @@ import {
   Database,
   Gift,
   Star,
-  Wallet
+  Sparkles,
+  Wallet,
 } from 'lucide-vue-next'
 
 // Inject từ AdminLayout
@@ -68,6 +69,12 @@ const closeSidebarSafely = () => {
 
 const menuList = [
   { id: 'dashboard', name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+  {
+    id: 'chat-ai-tri-thuc',
+    name: 'Tri thức Chat AI',
+    path: '/admin/chat-ai-tri-thuc',
+    icon: Sparkles,
+  },
   {
     id: 'tuyen-duong',
     name: 'Quản lý tuyến đường',
