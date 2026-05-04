@@ -220,7 +220,7 @@ const handleChangePassword = async () => {
     resetPasswordForm()
     setTimeout(() => {
       adminStore.logout()
-      router.replace({ name: 'admin-login' })
+      router.push('/auth/admin-login')
     }, 700)
   } catch (error) {
     passwordErrors.value = error?.response?.data?.errors || {}
@@ -317,13 +317,10 @@ onMounted(() => {
         <div class="field">
           <label>Mật khẩu hiện tại</label>
           <div class="pw-field">
-            <input
-              v-model="passwordForm.mat_khau_cu"
-              :type="showPwCu ? 'text' : 'password'"
-              placeholder="Nhập mật khẩu hiện tại"
-              autocomplete="current-password"
-            />
-            <button type="button" class="pw-toggle" :aria-label="showPwCu ? 'Ẩn' : 'Hiện'" @click="showPwCu = !showPwCu">
+            <input v-model="passwordForm.mat_khau_cu" :type="showPwCu ? 'text' : 'password'"
+              placeholder="Nhập mật khẩu hiện tại" autocomplete="current-password" />
+            <button type="button" class="pw-toggle" :aria-label="showPwCu ? 'Ẩn' : 'Hiện'"
+              @click="showPwCu = !showPwCu">
               <span class="material-symbols-outlined">{{ showPwCu ? 'visibility_off' : 'visibility' }}</span>
             </button>
           </div>
@@ -333,13 +330,10 @@ onMounted(() => {
         <div class="field">
           <label>Mật khẩu mới</label>
           <div class="pw-field">
-            <input
-              v-model="passwordForm.mat_khau_moi"
-              :type="showPwMoi ? 'text' : 'password'"
-              placeholder="Ít nhất 6 ký tự"
-              autocomplete="new-password"
-            />
-            <button type="button" class="pw-toggle" :aria-label="showPwMoi ? 'Ẩn' : 'Hiện'" @click="showPwMoi = !showPwMoi">
+            <input v-model="passwordForm.mat_khau_moi" :type="showPwMoi ? 'text' : 'password'"
+              placeholder="Ít nhất 6 ký tự" autocomplete="new-password" />
+            <button type="button" class="pw-toggle" :aria-label="showPwMoi ? 'Ẩn' : 'Hiện'"
+              @click="showPwMoi = !showPwMoi">
               <span class="material-symbols-outlined">{{ showPwMoi ? 'visibility_off' : 'visibility' }}</span>
             </button>
           </div>
@@ -349,13 +343,10 @@ onMounted(() => {
         <div class="field">
           <label>Xác nhận mật khẩu mới</label>
           <div class="pw-field">
-            <input
-              v-model="passwordForm.mat_khau_moi_confirmation"
-              :type="showPwConf ? 'text' : 'password'"
-              placeholder="Nhập lại mật khẩu mới"
-              autocomplete="new-password"
-            />
-            <button type="button" class="pw-toggle" :aria-label="showPwConf ? 'Ẩn' : 'Hiện'" @click="showPwConf = !showPwConf">
+            <input v-model="passwordForm.mat_khau_moi_confirmation" :type="showPwConf ? 'text' : 'password'"
+              placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" />
+            <button type="button" class="pw-toggle" :aria-label="showPwConf ? 'Ẩn' : 'Hiện'"
+              @click="showPwConf = !showPwConf">
               <span class="material-symbols-outlined">{{ showPwConf ? 'visibility_off' : 'visibility' }}</span>
             </button>
           </div>
@@ -613,6 +604,7 @@ th {
 }
 
 @media (max-width: 1024px) {
+
   .settings-grid,
   .profile-grid {
     grid-template-columns: 1fr;

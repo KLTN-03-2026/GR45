@@ -547,11 +547,7 @@ onMounted(() => {
 
 <template>
   <div class="operator-page">
-    <BaseToast
-      :visible="toast.visible"
-      :message="toast.message"
-      :type="toast.type"
-    />
+    <BaseToast :visible="toast.visible" :message="toast.message" :type="toast.type" />
 
     <!-- Tiêu đề -->
     <div class="page-header">
@@ -561,69 +557,44 @@ onMounted(() => {
           Tạo, điều hành và theo dõi toàn bộ chuyến xe của nhà xe
         </p>
       </div>
-      <BaseButton @click="openCreateModal" variant="primary"
-        >+ Thêm Chuyến Xe</BaseButton
-      >
+      <BaseButton @click="openCreateModal" variant="primary">+ Thêm Chuyến Xe</BaseButton>
     </div>
 
     <!-- Bộ lọc -->
     <div class="filter-card">
       <div class="filter-row">
         <div class="search-box">
-          <BaseInput
-            v-model="searchQuery"
-            placeholder="Tìm tuyến đường, biển số xe, tên tài xế..."
-            @keyup.enter="fetchTrips(1)"
-          />
-          <BaseButton @click="fetchTrips(1)" variant="secondary"
-            >Tìm</BaseButton
-          >
+          <BaseInput v-model="searchQuery" placeholder="Tìm tuyến đường, biển số xe, tên tài xế..."
+            @keyup.enter="fetchTrips(1)" />
+          <BaseButton @click="fetchTrips(1)" variant="secondary">Tìm</BaseButton>
         </div>
         <div class="filter-group">
           <label class="filter-label">Trạng thái</label>
-          <select
-            v-model="filterStatus"
-            @change="fetchTrips(1)"
-            class="custom-select"
-          >
+          <select v-model="filterStatus" @change="fetchTrips(1)" class="custom-select">
             <option value="">Tất cả</option>
-            <option
-              v-for="s in tripStatusOptions"
-              :key="s.value"
-              :value="s.value"
-            >
+            <option v-for="s in tripStatusOptions" :key="s.value" :value="s.value">
               {{ s.label }}
             </option>
           </select>
         </div>
-        <BaseButton
-          @click="
-            searchQuery = '';
-            filterStatus = '';
-            fetchTrips(1);
-          "
-          variant="outline"
-          >Đặt lại</BaseButton
-        >
+        <BaseButton @click="
+          searchQuery = '';
+        filterStatus = '';
+        fetchTrips(1);
+        " variant="outline">Đặt lại</BaseButton>
       </div>
     </div>
 
     <!-- Bảng — sắp xếp server-side: ngay_khoi_hanh DESC, created_at DESC -->
     <div class="table-card">
-      <BaseTable
-        :columns="tableColumns"
-        :data="tripsTableRows"
-        :loading="loading"
-        @row-click="openDetailModal($event.id)"
-      >
+      <BaseTable :columns="tableColumns" :data="tripsTableRows" :loading="loading"
+        @row-click="openDetailModal($event.id)">
         <template #cell(ngay_gio)="{ item }">
           <div class="date-cell">
             <span class="date-main">{{
               formatDateOnly(item.ngay_khoi_hanh)
             }}</span>
-            <span class="date-time"
-              >🕐 {{ formatTimeOnly(item.gio_khoi_hanh) }}</span
-            >
+            <span class="date-time">🕐 {{ formatTimeOnly(item.gio_khoi_hanh) }}</span>
           </div>
         </template>
 
@@ -647,49 +618,24 @@ onMounted(() => {
 
         <template #cell(actions)="{ item }">
           <div class="action-buttons">
-            <BaseButton
-              size="sm"
-              variant="outline"
-              title="Sơ đồ ghế"
-              @click.stop="openSeatModal(item)"
-              class="btn-icon"
-            >
+            <BaseButton size="sm" variant="outline" title="Sơ đồ ghế" @click.stop="openSeatModal(item)"
+              class="btn-icon">
               <Armchair size="16" class="text-info" />
             </BaseButton>
-            <BaseButton
-              size="sm"
-              variant="outline"
-              title="Sửa chuyến"
-              @click.stop="openEditModal(item)"
-              class="btn-icon"
-            >
+            <BaseButton size="sm" variant="outline" title="Sửa chuyến" @click.stop="openEditModal(item)"
+              class="btn-icon">
               <Edit size="16" class="text-warning" />
             </BaseButton>
-            <BaseButton
-              size="sm"
-              variant="outline"
-              title="Đổi xe"
-              class="btn-icon"
-              @click.stop="openChangeBusModal(item)"
-            >
+            <BaseButton size="sm" variant="outline" title="Đổi xe" class="btn-icon"
+              @click.stop="openChangeBusModal(item)">
               <ArrowRightLeft size="16" class="text-secondary" />
             </BaseButton>
-            <BaseButton
-              size="sm"
-              variant="outline"
-              title="Toggle trạng thái"
-              class="btn-icon"
-              @click.stop="openConfirm('toggle', item)"
-            >
+            <BaseButton size="sm" variant="outline" title="Toggle trạng thái" class="btn-icon"
+              @click.stop="openConfirm('toggle', item)">
               <StepForward size="16" class="text-primary" />
             </BaseButton>
-            <BaseButton
-              size="sm"
-              variant="outline"
-              class="btn-icon border-danger"
-              title="Xóa chuyến"
-              @click.stop="openConfirm('delete', item)"
-            >
+            <BaseButton size="sm" variant="outline" class="btn-icon border-danger" title="Xóa chuyến"
+              @click.stop="openConfirm('delete', item)">
               <Trash2 size="16" class="text-danger" />
             </BaseButton>
           </div>
@@ -700,64 +646,34 @@ onMounted(() => {
       <div class="pagination-container">
         <div class="page-info-left">
           <span>Hiển thị:</span>
-          <select
-            v-model="pagination.perPage"
-            @change="fetchTrips(1)"
-            class="custom-select per-page-select"
-          >
+          <select v-model="pagination.perPage" @change="fetchTrips(1)" class="custom-select per-page-select">
             <option :value="10">10</option>
             <option :value="15">15</option>
             <option :value="20">20</option>
             <option :value="30">30</option>
           </select>
           <span>dòng / trang</span>
-          <span v-if="pagination.total > 0" class="total-label"
-            >(Tổng: {{ pagination.total }})</span
-          >
+          <span v-if="pagination.total > 0" class="total-label">(Tổng: {{ pagination.total }})</span>
         </div>
         <div class="pagination-controls">
-          <BaseButton
-            size="sm"
-            variant="outline"
-            :disabled="pagination.currentPage <= 1"
-            @click="fetchTrips(pagination.currentPage - 1)"
-            >← Trước</BaseButton
-          >
-          <span class="page-number"
-            >Trang {{ pagination.currentPage }} /
-            {{ pagination.lastPage }}</span
-          >
-          <BaseButton
-            size="sm"
-            variant="outline"
-            :disabled="pagination.currentPage >= pagination.lastPage"
-            @click="fetchTrips(pagination.currentPage + 1)"
-            >Sau →</BaseButton
-          >
+          <BaseButton size="sm" variant="outline" :disabled="pagination.currentPage <= 1"
+            @click="fetchTrips(pagination.currentPage - 1)">← Trước</BaseButton>
+          <span class="page-number">Trang {{ pagination.currentPage }} /
+            {{ pagination.lastPage }}</span>
+          <BaseButton size="sm" variant="outline" :disabled="pagination.currentPage >= pagination.lastPage"
+            @click="fetchTrips(pagination.currentPage + 1)">Sau →</BaseButton>
         </div>
       </div>
     </div>
 
     <!-- ===== MODAL THÊM / SỬA ===== -->
-    <BaseModal
-      v-model="isShowModal"
-      :title="isEditMode ? 'Cập Nhật Chuyến Xe' : 'Thêm Chuyến Xe Mới'"
-      maxWidth="680px"
-    >
+    <BaseModal v-model="isShowModal" :title="isEditMode ? 'Cập Nhật Chuyến Xe' : 'Thêm Chuyến Xe Mới'" maxWidth="680px">
       <form @submit.prevent="submitForm" class="form-grid-2">
         <div class="form-group full-width">
           <label class="form-label">Tuyến Đường *</label>
-          <select
-            v-model="formData.id_tuyen_duong"
-            class="custom-select"
-            required
-          >
+          <select v-model="formData.id_tuyen_duong" class="custom-select" required>
             <option value="" disabled>-- Chọn Tuyến Đường --</option>
-            <option
-              v-for="route in routesList"
-              :key="route.value"
-              :value="route.value"
-            >
+            <option v-for="route in routesList" :key="route.value" :value="route.value">
               {{ route.label }}
             </option>
           </select>
@@ -766,11 +682,7 @@ onMounted(() => {
           <label class="form-label">Xe *</label>
           <select v-model="formData.id_xe" class="custom-select" required>
             <option value="" disabled>-- Chọn Xe --</option>
-            <option
-              v-for="vehicle in vehiclesList"
-              :key="vehicle.id"
-              :value="vehicle.id"
-            >
+            <option v-for="vehicle in vehiclesList" :key="vehicle.id" :value="vehicle.id">
               {{
                 [vehicle.bien_so || "—", vehicle.ten_xe].filter(Boolean).join(" — ")
               }}
@@ -781,11 +693,7 @@ onMounted(() => {
           <label class="form-label">Tài Xế *</label>
           <select v-model="formData.id_tai_xe" class="custom-select" required>
             <option value="" disabled>-- Chọn Tài Xế --</option>
-            <option
-              v-for="driver in driversList"
-              :key="driver.id"
-              :value="driver.id"
-            >
+            <option v-for="driver in driversList" :key="driver.id" :value="driver.id">
               {{
                 [driver.ho_ten || driver.ho_va_ten || "Không tên", driver.so_dien_thoai]
                   .filter(Boolean)
@@ -796,31 +704,16 @@ onMounted(() => {
         </div>
         <div class="form-group">
           <label class="form-label">Ngày Khởi Hành *</label>
-          <input
-            type="date"
-            v-model="formData.ngay_khoi_hanh"
-            class="custom-input"
-            required
-          />
+          <input type="date" v-model="formData.ngay_khoi_hanh" class="custom-input" required />
         </div>
         <div class="form-group">
           <label class="form-label">Giờ Khởi Hành *</label>
-          <input
-            type="time"
-            v-model="formData.gio_khoi_hanh"
-            class="custom-input"
-            required
-          />
+          <input type="time" v-model="formData.gio_khoi_hanh" class="custom-input" required />
         </div>
         <div class="form-group">
           <label class="form-label">Tổng Tiền (tùy chọn)</label>
-          <input
-            type="number"
-            v-model="formData.tong_tien"
-            class="custom-input"
-            min="0"
-            placeholder="Để trống = theo giá tuyến"
-          />
+          <input type="number" v-model="formData.tong_tien" class="custom-input" min="0"
+            placeholder="Để trống = theo giá tuyến" />
         </div>
         <div class="form-group">
           <label class="form-label">Thanh Toán Sau</label>
@@ -832,18 +725,9 @@ onMounted(() => {
         <div class="form-group full-width" v-if="isEditMode">
           <label class="form-label">Trạng Thái</label>
           <div class="status-radios">
-            <label
-              v-for="s in tripStatusOptions"
-              :key="s.value"
-              class="radio-option"
-              :class="{ 'radio-active': formData.trang_thai === s.value }"
-            >
-              <input
-                type="radio"
-                :value="s.value"
-                v-model="formData.trang_thai"
-                style="display: none"
-              />
+            <label v-for="s in tripStatusOptions" :key="s.value" class="radio-option"
+              :class="{ 'radio-active': formData.trang_thai === s.value }">
+              <input type="radio" :value="s.value" v-model="formData.trang_thai" style="display: none" />
               <span :class="['status-badge', getTripStatus(s.value).cls]">{{
                 s.label
               }}</span>
@@ -852,25 +736,15 @@ onMounted(() => {
         </div>
       </form>
       <template #footer>
-        <BaseButton variant="secondary" @click="isShowModal = false"
-          >Hủy</BaseButton
-        >
-        <BaseButton
-          variant="primary"
-          :loading="modalLoading"
-          @click="submitForm"
-        >
+        <BaseButton variant="secondary" @click="isShowModal = false">Hủy</BaseButton>
+        <BaseButton variant="primary" :loading="modalLoading" @click="submitForm">
           {{ isEditMode ? "Lưu Thay Đổi" : "Thêm Chuyến Xe" }}
         </BaseButton>
       </template>
     </BaseModal>
 
     <!-- ===== MODAL ĐỔI XE ===== -->
-    <BaseModal
-      v-model="isChangeBusModal"
-      title="Đổi Xe Cho Chuyến"
-      maxWidth="420px"
-    >
+    <BaseModal v-model="isChangeBusModal" title="Đổi Xe Cho Chuyến" maxWidth="420px">
       <div class="info-banner">
         ℹ️ Các ghế đã đặt sẽ được giữ nguyên, hệ thống tự cập nhật ghế sang xe
         mới.
@@ -879,34 +753,19 @@ onMounted(() => {
         <label class="form-label">Chọn xe mới *</label>
         <select v-model="newBusId" class="custom-select" required>
           <option value="" disabled>-- Chọn Xe --</option>
-          <option
-            v-for="vehicle in vehiclesList"
-            :key="vehicle.id"
-            :value="vehicle.id"
-          >
+          <option v-for="vehicle in vehiclesList" :key="vehicle.id" :value="vehicle.id">
             #{{ vehicle.id }} - {{ vehicle.ten_xe }} ({{ vehicle.bien_so }})
           </option>
         </select>
       </div>
       <template #footer>
-        <BaseButton variant="secondary" @click="isChangeBusModal = false"
-          >Hủy</BaseButton
-        >
-        <BaseButton
-          variant="primary"
-          :loading="changeBusLoading"
-          @click="submitChangeBus"
-          >Xác Nhận Đổi Xe</BaseButton
-        >
+        <BaseButton variant="secondary" @click="isChangeBusModal = false">Hủy</BaseButton>
+        <BaseButton variant="primary" :loading="changeBusLoading" @click="submitChangeBus">Xác Nhận Đổi Xe</BaseButton>
       </template>
     </BaseModal>
 
     <!-- ===== MODAL CHI TIẾT CHUYẾN XE ===== -->
-    <BaseModal
-      v-model="isDetailModal"
-      title="Chi Tiết Chuyến Xe"
-      maxWidth="800px"
-    >
+    <BaseModal v-model="isDetailModal" title="Chi Tiết Chuyến Xe" maxWidth="800px">
       <div v-if="detailLoading" class="text-center p-4">
         <span>Đang tải thông tin chuyến xe...</span>
       </div>
@@ -932,11 +791,7 @@ onMounted(() => {
                 <tr>
                   <th>Thanh Toán:</th>
                   <td>
-                    <span
-                      v-if="detailData.thanh_toan_sau === 0"
-                      class="badge bg-info"
-                      >Trả trước</span
-                    >
+                    <span v-if="detailData.thanh_toan_sau === 0" class="badge bg-info">Trả trước</span>
                     <span v-else class="badge bg-warning">Trả sau</span>
                   </td>
                 </tr>
@@ -949,12 +804,10 @@ onMounted(() => {
                 <tr>
                   <th>Trạng Thái:</th>
                   <td>
-                    <span
-                      :class="[
-                        'status-badge',
-                        getTripStatus(detailData.trang_thai).cls,
-                      ]"
-                    >
+                    <span :class="[
+                      'status-badge',
+                      getTripStatus(detailData.trang_thai).cls,
+                    ]">
                       {{ getTripStatus(detailData.trang_thai).text }}
                     </span>
                   </td>
@@ -1023,16 +876,9 @@ onMounted(() => {
                 <tr v-if="detailData.xe.thong_tin_cai_dat">
                   <th>Cài Đặt:</th>
                   <td>
-                    <span
-                      v-if="detailData.xe.thong_tin_cai_dat.camera_ai"
-                      class="badge bg-success me-1"
-                      >Camera AI</span
-                    >
-                    <span
-                      v-if="detailData.xe.thong_tin_cai_dat.gps"
-                      class="badge bg-primary"
-                      >GPS</span
-                    >
+                    <span v-if="detailData.xe.thong_tin_cai_dat.camera_ai" class="badge bg-success me-1">Camera
+                      AI</span>
+                    <span v-if="detailData.xe.thong_tin_cai_dat.gps" class="badge bg-primary">GPS</span>
                   </td>
                 </tr>
               </tbody>
@@ -1041,10 +887,7 @@ onMounted(() => {
 
           <div class="col-md-6" v-if="detailData.tai_xe">
             <h5 class="text-primary mb-3">Tài Xế</h5>
-            <table
-              class="table table-sm table-bordered"
-              v-if="detailData.tai_xe.id"
-            >
+            <table class="table table-sm table-bordered" v-if="detailData.tai_xe.id">
               <tbody>
                 <tr>
                   <th style="width: 40%">ID Tài Xế:</th>
@@ -1077,18 +920,12 @@ onMounted(() => {
         </div>
       </div>
       <template #footer>
-        <BaseButton variant="secondary" @click="isDetailModal = false"
-          >Đóng</BaseButton
-        >
+        <BaseButton variant="secondary" @click="isDetailModal = false">Đóng</BaseButton>
       </template>
     </BaseModal>
 
     <!-- ===== MODAL SƠ ĐỒ GHẾ + ĐẶT VÉ ===== -->
-    <BaseModal
-      v-model="isSeatModal"
-      :title="`Sơ Đồ Ghế — Chuyến #${selectedTrip?.id || ''}`"
-      maxWidth="820px"
-    >
+    <BaseModal v-model="isSeatModal" :title="`Sơ Đồ Ghế — Chuyến #${selectedTrip?.id || ''}`" maxWidth="820px">
       <div v-if="seatLoading" class="loading-state">
         ⏳ Đang tải sơ đồ ghế...
       </div>
@@ -1116,50 +953,25 @@ onMounted(() => {
 
         <!-- Chú thích -->
         <div class="seat-legend">
-          <span class="legend-item"
-            ><span class="seat-dot dot-active"></span> Hoạt động (bấm để
-            chọn)</span
-          >
-          <span class="legend-item"
-            ><span class="seat-dot dot-booked"></span> Đã đặt</span
-          >
-          <span class="legend-item"
-            ><span class="seat-dot dot-locked"></span> Khóa / bảo trì</span
-          >
-          <span class="legend-item"
-            ><span class="seat-dot dot-selected"></span> Đang chọn</span
-          >
+          <span class="legend-item"><span class="seat-dot dot-active"></span> Hoạt động (bấm để
+            chọn)</span>
+          <span class="legend-item"><span class="seat-dot dot-booked"></span> Đã đặt</span>
+          <span class="legend-item"><span class="seat-dot dot-locked"></span> Khóa / bảo trì</span>
+          <span class="legend-item"><span class="seat-dot dot-selected"></span> Đang chọn</span>
         </div>
 
         <!-- Sơ đồ từng tầng -->
-        <div
-          v-for="floor in seatsByFloor"
-          :key="floor.floor"
-          class="floor-section"
-        >
+        <div v-for="floor in seatsByFloor" :key="floor.floor" class="floor-section">
           <h4 class="floor-title">Tầng {{ floor.floor }}</h4>
-          <div
-            v-for="(row, ri) in splitSeatsIntoRows(floor.seats, 2)"
-            :key="ri"
-            class="seat-row"
-            :style="{ '--seat-cols': Math.max(row.length, 1) }"
-          >
-            <button
-              v-for="seat in row"
-              :key="seat.id_ghe || seat.ma_ghe"
-              type="button"
-              class="seat-tile"
-              :disabled="
-                seat.trang_thai === 'da_dat' ||
-                seat.trang_thai === 'bao_tri_hoac_khoa'
-              "
-              :class="{
+          <div v-for="(row, ri) in splitSeatsIntoRows(floor.seats, 2)" :key="ri" class="seat-row"
+            :style="{ '--seat-cols': Math.max(row.length, 1) }">
+            <button v-for="seat in row" :key="seat.id_ghe || seat.ma_ghe" type="button" class="seat-tile" :disabled="seat.trang_thai === 'da_dat' ||
+              seat.trang_thai === 'bao_tri_hoac_khoa'
+              " :class="{
                 booked: seat.trang_thai === 'da_dat',
                 blocked: seat.trang_thai === 'bao_tri_hoac_khoa',
                 selected: isSeatSelected(seat),
-              }"
-              @click="toggleSeat(seat)"
-            >
+              }" @click="toggleSeat(seat)">
               {{ seat.ma_ghe }}
             </button>
           </div>
@@ -1177,10 +989,7 @@ onMounted(() => {
         <!-- Panel đặt vé (hiện khi chọn >= 1 ghế) -->
         <transition name="slide-down">
           <div v-if="selectedSeats.length > 0" class="book-panel">
-            <div
-              class="book-panel-header"
-              @click="isBookPanelOpen = !isBookPanelOpen"
-            >
+            <div class="book-panel-header" @click="isBookPanelOpen = !isBookPanelOpen">
               <span class="book-panel-title">
                 🎫 Đặt {{ selectedSeats.length }} vé:
                 <strong>{{ selectedSeats.join(", ") }}</strong>
@@ -1194,60 +1003,35 @@ onMounted(() => {
               <div class="book-form-grid">
                 <div class="form-group">
                   <label class="form-label">Trạm Đón *</label>
-                  <select
-                    v-model="bookFormTrip.id_tram_don"
-                    class="custom-select"
-                  >
+                  <select v-model="bookFormTrip.id_tram_don" class="custom-select">
                     <option value="" disabled>-- Chọn trạm đón --</option>
-                    <option
-                      v-for="stop in pickupStops"
-                      :key="stop.id"
-                      :value="stop.id"
-                    >
+                    <option v-for="stop in pickupStops" :key="stop.id" :value="stop.id">
                       {{ stop.ten_tram }} ({{ stop.dia_chi }})
                     </option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Trạm Trả *</label>
-                  <select
-                    v-model="bookFormTrip.id_tram_tra"
-                    class="custom-select"
-                  >
+                  <select v-model="bookFormTrip.id_tram_tra" class="custom-select">
                     <option value="" disabled>-- Chọn trạm trả --</option>
-                    <option
-                      v-for="stop in dropoffStops"
-                      :key="stop.id"
-                      :value="stop.id"
-                    >
+                    <option v-for="stop in dropoffStops" :key="stop.id" :value="stop.id">
                       {{ stop.ten_tram }} ({{ stop.dia_chi }})
                     </option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">SĐT Khách</label>
-                  <input
-                    type="tel"
-                    v-model="bookFormTrip.sdt_khach_hang"
-                    class="custom-input"
-                    placeholder="0901234567"
-                  />
+                  <input type="tel" v-model="bookFormTrip.sdt_khach_hang" class="custom-input"
+                    placeholder="0901234567" />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Tên Khách</label>
-                  <input
-                    type="text"
-                    v-model="bookFormTrip.ten_khach_hang"
-                    class="custom-input"
-                    placeholder="Nguyễn Văn A..."
-                  />
+                  <input type="text" v-model="bookFormTrip.ten_khach_hang" class="custom-input"
+                    placeholder="Nguyễn Văn A..." />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Thanh Toán</label>
-                  <select
-                    v-model="bookFormTrip.phuong_thuc_thanh_toan"
-                    class="custom-select"
-                  >
+                  <select v-model="bookFormTrip.phuong_thuc_thanh_toan" class="custom-select">
                     <option value="tien_mat">💵 Tiền mặt</option>
                     <option value="chuyen_khoan">🏦 Chuyển khoản</option>
                     <option value="vi_dien_tu">📱 Ví điện tử</option>
@@ -1255,37 +1039,21 @@ onMounted(() => {
                 </div>
                 <div class="form-group">
                   <label class="form-label">Trạng Thái Vé</label>
-                  <select
-                    v-model="bookFormTrip.tinh_trang"
-                    class="custom-select"
-                  >
+                  <select v-model="bookFormTrip.tinh_trang" class="custom-select">
                     <option value="da_thanh_toan">✅ Đã thanh toán ngay</option>
                     <option value="dang_cho">⏳ Chờ thanh toán</option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Ghi Chú</label>
-                  <input
-                    type="text"
-                    v-model="bookFormTrip.ghi_chu"
-                    class="custom-input"
-                    placeholder="Ghi chú thêm..."
-                  />
+                  <input type="text" v-model="bookFormTrip.ghi_chu" class="custom-input"
+                    placeholder="Ghi chú thêm..." />
                 </div>
               </div>
 
               <div class="book-panel-actions">
-                <BaseButton
-                  variant="secondary"
-                  size="sm"
-                  @click="selectedSeats = []"
-                  >Bỏ chọn</BaseButton
-                >
-                <BaseButton
-                  variant="primary"
-                  :loading="bookLoading"
-                  @click="submitBookFromSeat"
-                >
+                <BaseButton variant="secondary" size="sm" @click="selectedSeats = []">Bỏ chọn</BaseButton>
+                <BaseButton variant="primary" :loading="bookLoading" @click="submitBookFromSeat">
                   🎫 Xác Nhận Đặt {{ selectedSeats.length }} Vé
                 </BaseButton>
               </div>
@@ -1297,30 +1065,19 @@ onMounted(() => {
       <div v-else class="empty-seat">Không có dữ liệu ghế.</div>
 
       <template #footer>
-        <BaseButton variant="secondary" @click="isSeatModal = false"
-          >Đóng</BaseButton
-        >
+        <BaseButton variant="secondary" @click="isSeatModal = false">Đóng</BaseButton>
       </template>
     </BaseModal>
 
     <!-- ===== MODAL XÁC NHẬN ===== -->
-    <BaseModal
-      v-model="confirmModal.show"
-      :title="confirmModal.title"
-      maxWidth="440px"
-    >
+    <BaseModal v-model="confirmModal.show" :title="confirmModal.title" maxWidth="440px">
       <div class="confirm-body">
         <p>{{ confirmModal.message }}</p>
       </div>
       <template #footer>
-        <BaseButton variant="secondary" @click="confirmModal.show = false"
-          >Hủy</BaseButton
-        >
-        <BaseButton
-          :variant="confirmModal.action === 'delete' ? 'danger' : 'primary'"
-          :loading="confirmModal.loading"
-          @click="executeConfirm"
-        >
+        <BaseButton variant="secondary" @click="confirmModal.show = false">Hủy</BaseButton>
+        <BaseButton :variant="confirmModal.action === 'delete' ? 'danger' : 'primary'" :loading="confirmModal.loading"
+          @click="executeConfirm">
           Xác Nhận
         </BaseButton>
       </template>
@@ -1382,7 +1139,7 @@ onMounted(() => {
   min-width: 280px;
 }
 
-.search-box > :first-child {
+.search-box> :first-child {
   flex: 1;
   margin-bottom: 0;
 }
@@ -1856,6 +1613,7 @@ onMounted(() => {
 
 /* Responsive */
 @media (max-width: 768px) {
+
   .form-grid-2,
   .book-form-grid {
     grid-template-columns: 1fr;

@@ -17,6 +17,11 @@ const handleLogin = async () => {
     router.push(redirect);
   }
 };
+
+const handleGoogleLogin = () => {
+  // Redirect trực tiếp tới route Backend xử lý OAuth
+  window.location.href = 'http://localhost:8000/auth/google';
+};
 </script>
 
 <template>
@@ -57,6 +62,15 @@ const handleLogin = async () => {
           <BaseButton type="submit" block :loading="clientStore.loading" class="client-btn">
             ĐĂNG NHẬP
           </BaseButton>
+
+          <div class="divider">
+            <span>Hoặc đăng nhập bằng</span>
+          </div>
+
+          <button type="button" @click="handleGoogleLogin" class="google-btn">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" />
+            Đăng nhập với Google
+          </button>
           
           <div class="register-prompt">
             Chưa có tài khoản? <router-link to="/auth/register">Đăng ký ngay</router-link>
@@ -237,6 +251,56 @@ const handleLogin = async () => {
   box-shadow: 0 12px 20px -3px rgba(0, 102, 255, 0.4) !important;
 }
 .client-btn:active {
+  transform: scale(0.98);
+}
+
+/* Divider styling */
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 1.5rem 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e2e8f0;
+}
+.divider:not(:empty)::before { margin-right: .75em; }
+.divider:not(:empty)::after { margin-left: .75em; }
+
+/* Google Button Premium Style */
+.google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  color: #334155;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.google-btn img {
+  width: 20px;
+  height: 20px;
+}
+.google-btn:hover {
+  background-color: #f8fafc;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.google-btn:active {
   transform: scale(0.98);
 }
 

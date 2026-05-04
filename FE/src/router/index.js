@@ -370,6 +370,11 @@ const router = createRouter({
           name: 'check-email',
           component: () => import('../views/auth/CheckEmailView.vue'),
         },
+        {
+          path: 'google/callback',
+          name: 'google-callback',
+          component: () => import('../views/auth/GoogleCallbackView.vue'),
+        },
       ],
     },
 

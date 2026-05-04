@@ -22,6 +22,9 @@ const authApi = {
   adminLogout: () => axiosClient.post('/v1/admin/logout'),
   adminRefresh: () => axiosClient.post('/v1/admin/refresh'),
   adminChangePassword: (data) => axiosClient.post('/v1/admin/doi-mat-khau', data),
+
+  // Profile
+  getClientProfile: () => axiosClient.get('/v1/profile'),
 };
 
 export default authApi;

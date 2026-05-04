@@ -12,6 +12,7 @@
         "intervention/image": "^3.11",
         "laravel/framework": "^11.0",
         "laravel/sanctum": "^4.3",
+        "laravel/socialite": "^5.27",
         "laravel/tinker": "^3.0",
         "maatwebsite/excel": "^3.1",
         "openspout/openspout": "^4.2",

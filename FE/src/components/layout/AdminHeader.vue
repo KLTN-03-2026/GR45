@@ -29,7 +29,7 @@ const toggleProfileMenu = () => {
 
 const handleLogout = () => {
   adminStore.logout()
-  router.push('/auth/login') // Điều hướng về login (tuỳ theo cấu hình route)
+  router.push('/auth/admin-login') // Điều hướng về trang đăng nhập Admin
 }
 
 // State dropdown thông báo & Dữ liệu mẫu
