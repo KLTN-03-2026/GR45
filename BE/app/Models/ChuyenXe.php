@@ -25,7 +25,7 @@ class ChuyenXe extends Model
     protected $casts = [
         'cac_ngay_trong_tuan' => 'array',
         'ngay_khoi_hanh' => 'date',
-        'gio_khoi_hanh' => 'datetime:H:i:s',
+        // Cột DB là time — không cast datetime (Laravel sẽ ghép ngày “hôm nay” → chuỗi Y-m-d H:i:s, phá concat ngày+giờ / ai:sync).
     ];
 
     public function tuyenDuong()
