@@ -3,19 +3,13 @@
 namespace App\Services;
 
 use App\Http\Resources\KhachHangResource;
-use App\Models\ChiTietVe;
-use App\Models\ChuyenXe;
-use App\Models\Ghe;
 use App\Models\KhachHang;
-use App\Models\TinhThanh;
-use App\Models\TramDung;
-use App\Models\Voucher;
 use App\Repositories\KhachHang\KhachHangRepositoryInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class KhachHangService
@@ -36,11 +30,11 @@ class KhachHangService
     public function login(array $data): array
     {
         $validator = Validator::make($data, [
-            'email' => 'required|email',
+            'email'    => 'required|email',
             'password' => 'required|string',
         ], [
-            'email.required' => 'Email không được để trống.',
-            'email.email' => 'Email không đúng định dạng.',
+            'email.required'    => 'Email không được để trống.',
+            'email.email'       => 'Email không đúng định dạng.',
             'password.required' => 'Mật khẩu không được để trống.',
         ]);
 
@@ -50,7 +44,7 @@ class KhachHangService
 
         $khachHang = $this->repo->findByEmail($data['email']);
 
-        if (! $khachHang || ! Hash::check($data['password'], $khachHang->password)) {
+        if (!$khachHang || !Hash::check($data['password'], $khachHang->password)) {
             throw ValidationException::withMessages([
                 'email' => 'Email hoặc mật khẩu không chính xác.',
             ]);
@@ -75,7 +69,7 @@ class KhachHangService
 
         return [
             'khach_hang' => new KhachHangResource($khachHang->load('diemThanhVien')),
-            'token' => $token,
+            'token'      => $token,
             'token_type' => 'Bearer',
         ];
     }
@@ -93,27 +87,27 @@ class KhachHangService
         $data['so_dien_thoai'] = trim((string) ($data['so_dien_thoai'] ?? ''));
 
         $validator = Validator::make($data, [
-            'ho_va_ten' => 'required|string|max:100',
-            'email' => 'nullable|email|unique:khach_hangs,email',
-            'password' => 'required|string|min:8|confirmed',
+            'ho_va_ten'     => 'required|string|max:100',
+            'email'         => 'nullable|email|unique:khach_hangs,email',
+            'password'      => 'required|string|min:8|confirmed',
             'so_dien_thoai' => [
                 'required',
                 'string',
                 'regex:/^(0|\\+84)[0-9]{9,10}$/',
                 'unique:khach_hangs,so_dien_thoai',
             ],
-            'dia_chi' => 'nullable|string|max:255',
-            'ngay_sinh' => 'nullable|date',
+            'dia_chi'       => 'nullable|string|max:255',
+            'ngay_sinh'     => 'nullable|date',
         ], [
             'ho_va_ten.required' => 'Họ và tên không được để trống.',
-            'email.email' => 'Email không đúng định dạng.',
-            'email.unique' => 'Email đã được sử dụng.',
-            'password.required' => 'Mật khẩu không được để trống.',
-            'password.min' => 'Mật khẩu phải có ít nhất 8 ký tự.',
+            'email.email'        => 'Email không đúng định dạng.',
+            'email.unique'       => 'Email đã được sử dụng.',
+            'password.required'  => 'Mật khẩu không được để trống.',
+            'password.min'       => 'Mật khẩu phải có ít nhất 8 ký tự.',
             'password.confirmed' => 'Xác nhận mật khẩu không khớp.',
             'so_dien_thoai.required' => 'Số điện thoại không được để trống.',
-            'so_dien_thoai.regex' => 'Số điện thoại không đúng định dạng.',
-            'so_dien_thoai.unique' => 'Số điện thoại đã tồn tại, vui lòng đăng nhập hoặc dùng số khác.',
+            'so_dien_thoai.regex'    => 'Số điện thoại không đúng định dạng.',
+            'so_dien_thoai.unique'   => 'Số điện thoại đã tồn tại, vui lòng đăng nhập hoặc dùng số khác.',
         ]);
 
         if ($validator->fails()) {
@@ -121,13 +115,13 @@ class KhachHangService
         }
 
         $khachHang = $this->repo->create([
-            'ho_va_ten' => $data['ho_va_ten'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
+            'ho_va_ten'     => $data['ho_va_ten'],
+            'email'         => $data['email'],
+            'password'      => Hash::make($data['password']),
             'so_dien_thoai' => $data['so_dien_thoai'],
-            'dia_chi' => $data['dia_chi'] ?? null,
-            'ngay_sinh' => $data['ngay_sinh'] ?? null,
-            'tinh_trang' => $data['email'] ? 'chua_xac_nhan' : 'hoat_dong',
+            'dia_chi'       => $data['dia_chi'] ?? null,
+            'ngay_sinh'     => $data['ngay_sinh'] ?? null,
+            'tinh_trang'    => $data['email'] ? 'chua_xac_nhan' : 'hoat_dong',
         ]);
 
         $token = null;
@@ -139,7 +133,7 @@ class KhachHangService
 
         return [
             'khach_hang' => new KhachHangResource($khachHang),
-            'token' => $token,
+            'token'      => $token,
             'token_type' => 'Bearer',
         ];
     }
@@ -162,7 +156,6 @@ class KhachHangService
         $khachHang->load(['diemThanhVien', 'ves' => function ($q) {
             $q->orderByDesc('created_at')->limit(5);
         }]);
-
         return new KhachHangResource($khachHang);
     }
 
@@ -174,11 +167,11 @@ class KhachHangService
     public function updateProfile(int $id, array $data): ?KhachHang
     {
         $validator = Validator::make($data, [
-            'ho_va_ten' => 'sometimes|string|max:100',
+            'ho_va_ten'     => 'sometimes|string|max:100',
             'so_dien_thoai' => 'sometimes|string|max:15',
-            'dia_chi' => 'sometimes|string|max:255',
-            'ngay_sinh' => 'sometimes|date',
-            'avatar' => 'sometimes|string',
+            'dia_chi'       => 'sometimes|string|max:255',
+            'ngay_sinh'     => 'sometimes|date',
+            'avatar'        => 'sometimes|string',
         ]);
 
         if ($validator->fails()) {
@@ -196,11 +189,11 @@ class KhachHangService
     public function doiMatKhau(KhachHang $khachHang, array $data): void
     {
         $validator = Validator::make($data, [
-            'mat_khau_cu' => 'required|string',
+            'mat_khau_cu'  => 'required|string',
             'mat_khau_moi' => 'required|string|min:6|confirmed',
         ], [
-            'mat_khau_cu.required' => 'Vui long nhap mat khau hien tai.',
-            'mat_khau_moi.min' => 'Mat khau moi phai co it nhat 6 ky tu.',
+            'mat_khau_cu.required'   => 'Vui long nhap mat khau hien tai.',
+            'mat_khau_moi.min'       => 'Mat khau moi phai co it nhat 6 ky tu.',
             'mat_khau_moi.confirmed' => 'Xac nhan mat khau moi khong khop.',
         ]);
 
@@ -208,7 +201,7 @@ class KhachHangService
             throw new ValidationException($validator);
         }
 
-        if (! Hash::check($data['mat_khau_cu'], $khachHang->password)) {
+        if (!Hash::check($data['mat_khau_cu'], $khachHang->password)) {
             throw ValidationException::withMessages([
                 'mat_khau_cu' => 'Mat khau hien tai khong chinh xac.',
             ]);
@@ -275,14 +268,14 @@ class KhachHangService
             ->whereNull('used_at')
             ->first();
 
-        if (! $record || now()->gt($record->expired_at)) {
+        if (!$record || now()->gt($record->expired_at)) {
             throw ValidationException::withMessages([
                 'token' => 'Liên kết kích hoạt không hợp lệ hoặc đã hết hạn.',
             ]);
         }
 
         $khachHang = $this->repo->findByEmail($normalizedEmail);
-        if (! $khachHang) {
+        if (!$khachHang) {
             throw ValidationException::withMessages([
                 'email' => 'Tài khoản không tồn tại.',
             ]);
@@ -305,7 +298,7 @@ class KhachHangService
      */
     public function getTinhThanhs()
     {
-        return TinhThanh::orderBy('ten_tinh_thanh', 'asc')->get();
+        return \App\Models\TinhThanh::orderBy('ten_tinh_thanh', 'asc')->get();
     }
 
     /**
@@ -313,71 +306,68 @@ class KhachHangService
      */
     public function searchChuyenXe(array $filters)
     {
-        $query = ChuyenXe::query()
+        $query = \App\Models\ChuyenXe::query()
             ->with(['tuyenDuong', 'xe', 'tuyenDuong.nhaXe'])
             ->whereIn('trang_thai', ['ChoChay', 'hoat_dong', '1']); // hoat_dong, ChoChay, 1 = sẵn sàng
 
-        if (! empty($filters['ngay_khoi_hanh'])) {
+        if (!empty($filters['ngay_khoi_hanh'])) {
             $query->whereDate('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
         }
 
-        if (! empty($filters['diem_di'])) {
+        if (!empty($filters['diem_di'])) {
             $diemDiPatterns = $this->buildLocationLikePatterns((string) $filters['diem_di']);
             $query->whereHas('tuyenDuong', function ($qTuyen) use ($diemDiPatterns) {
                 $qTuyen->where(function ($q) use ($diemDiPatterns) {
                     foreach ($diemDiPatterns as $pattern) {
-                        $q->orWhere('diem_bat_dau', 'LIKE', '%'.$pattern.'%');
+                        $q->orWhere('diem_bat_dau', 'LIKE', '%' . $pattern . '%');
                     }
                 })->orWhereHas('tramDons', function ($qTram) use ($diemDiPatterns) {
                     $qTram->where(function ($q) use ($diemDiPatterns) {
                         foreach ($diemDiPatterns as $pattern) {
-                            $q->orWhere('ten_tram', 'LIKE', '%'.$pattern.'%')
-                                ->orWhere('dia_chi', 'LIKE', '%'.$pattern.'%');
+                            $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
+                                ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
                         }
                     });
                 });
             });
         }
 
-        if (! empty($filters['diem_den'])) {
+        if (!empty($filters['diem_den'])) {
             $diemDenPatterns = $this->buildLocationLikePatterns((string) $filters['diem_den']);
             $query->whereHas('tuyenDuong', function ($qTuyen) use ($diemDenPatterns) {
                 $qTuyen->where(function ($q) use ($diemDenPatterns) {
                     foreach ($diemDenPatterns as $pattern) {
-                        $q->orWhere('diem_ket_thuc', 'LIKE', '%'.$pattern.'%');
+                        $q->orWhere('diem_ket_thuc', 'LIKE', '%' . $pattern . '%');
                     }
                 })->orWhereHas('tramTras', function ($qTram) use ($diemDenPatterns) {
                     $qTram->where(function ($q) use ($diemDenPatterns) {
                         foreach ($diemDenPatterns as $pattern) {
-                            $q->orWhere('ten_tram', 'LIKE', '%'.$pattern.'%')
-                                ->orWhere('dia_chi', 'LIKE', '%'.$pattern.'%');
+                            $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
+                                ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
                         }
                     });
                 });
             });
         }
 
-        if (! empty($filters['gia_ve_tu'])) {
+        if (!empty($filters['gia_ve_tu'])) {
             $query->whereHas('tuyenDuong', function ($qTuyen) use ($filters) {
                 $qTuyen->where('gia_ve_co_ban', '>=', $filters['gia_ve_tu']);
             });
         }
-        if (! empty($filters['gia_ve_den'])) {
+        if (!empty($filters['gia_ve_den'])) {
             $query->whereHas('tuyenDuong', function ($qTuyen) use ($filters) {
                 $qTuyen->where('gia_ve_co_ban', '<=', $filters['gia_ve_den']);
             });
         }
-        if (! empty($filters['gio_khoi_hanh_tu'])) {
+        if (!empty($filters['gio_khoi_hanh_tu'])) {
             $query->whereTime('gio_khoi_hanh', '>=', $filters['gio_khoi_hanh_tu']);
         }
-        if (! empty($filters['gio_khoi_hanh_den'])) {
+        if (!empty($filters['gio_khoi_hanh_den'])) {
             $query->whereTime('gio_khoi_hanh', '<=', $filters['gio_khoi_hanh_den']);
         }
 
-        $perPage = max(1, (int) ($filters['per_page'] ?? 15));
-        $page = max(1, (int) ($filters['page'] ?? 1));
-
-        return $query->orderBy('gio_khoi_hanh', 'asc')->paginate($perPage, ['*'], 'page', $page);
+        return $query->orderBy('gio_khoi_hanh', 'asc')->paginate($filters['per_page'] ?? 15);
     }
 
     /**
@@ -396,21 +386,6 @@ class KhachHangService
             str_replace(['D', 'd'], ['Đ', 'đ'], $base),
         ];
 
-        $lower = mb_strtolower($base, 'UTF-8');
-        if (preg_match('/sài gòn|sai gon|hcm\b|hồ chí minh|ho chi minh|tphcm|tp\.?\s*hcm|tp\.?\s*hồ chí minh/u', $lower)) {
-            $patterns[] = 'TP. Hồ Chí Minh';
-            $patterns[] = 'Hồ Chí Minh';
-            $patterns[] = 'Sài Gòn';
-        }
-        if (preg_match('/thừa\s*thiên\s*huế|thua\s*thien\s*hue|\bhuế\b|\bhue\b/u', $lower)) {
-            $patterns[] = 'Huế';
-            $patterns[] = 'Thừa Thiên Huế';
-        }
-        if (preg_match('/khánh\s*hòa|khanh\s*hoa|\bnha\s*trang\b|nhatrang/u', $lower)) {
-            $patterns[] = 'Nha Trang';
-            $patterns[] = 'Khánh Hòa';
-        }
-
         return array_values(array_unique(array_filter($patterns)));
     }
 
@@ -419,19 +394,19 @@ class KhachHangService
      */
     public function getGheChuyenXe(int $idChuyenXe)
     {
-        $chuyenXe = ChuyenXe::with(['tuyenDuong', 'xe'])->find($idChuyenXe);
-        if (! $chuyenXe) {
+        $chuyenXe = \App\Models\ChuyenXe::with(['tuyenDuong', 'xe.loaiXe', 'tuyenDuong.nhaXe'])->find($idChuyenXe);
+        if (!$chuyenXe) {
             throw new \Exception('Chuyến xe không tồn tại.');
         }
 
         $idXe = $chuyenXe->id_xe;
-        if (! $idXe) {
+        if (!$idXe) {
             throw new \Exception('Chuyến xe này chưa được phân công xe.');
         }
 
-        $danhSachGhe = Ghe::where('id_xe', $idXe)->get();
+        $danhSachGhe = \App\Models\Ghe::where('id_xe', $idXe)->get();
 
-        $gheDaDatIds = ChiTietVe::whereHas('ve', function ($query) use ($idChuyenXe) {
+        $gheDaDatIds = \App\Models\ChiTietVe::whereHas('ve', function ($query) use ($idChuyenXe) {
             $query->where('id_chuyen_xe', $idChuyenXe)
                 ->whereIn('tinh_trang', ['dang_cho', 'da_thanh_toan']);
         })->pluck('id_ghe')->toArray();
@@ -447,10 +422,10 @@ class KhachHangService
             }
 
             return [
-                'id_ghe' => $ghe->id,
-                'ma_ghe' => $ghe->ma_ghe,
-                'tang' => $ghe->tang,
-                'loai_ghe' => $ghe->id_loai_ghe,
+                'id_ghe'     => $ghe->id,
+                'ma_ghe'     => $ghe->ma_ghe,
+                'tang'       => $ghe->tang,
+                'loai_ghe'   => $ghe->id_loai_ghe,
                 'trang_thai' => $trangThai,
             ];
         });
@@ -466,24 +441,22 @@ class KhachHangService
      */
     public function getTramDungChuyenXe(int $idChuyenXe)
     {
-        $chuyenXe = ChuyenXe::with(['tuyenDuong'])->find($idChuyenXe);
-        if (! $chuyenXe) {
+        $chuyenXe = \App\Models\ChuyenXe::with(['tuyenDuong'])->find($idChuyenXe);
+        if (!$chuyenXe) {
             throw new \Exception('Chuyến xe không tồn tại.');
         }
 
-        $allStops = TramDung::where('id_tuyen_duong', $chuyenXe->id_tuyen_duong)
+        $allStops = \App\Models\TramDung::where('id_tuyen_duong', $chuyenXe->id_tuyen_duong)
             ->orderBy('thu_tu')
             ->get();
 
         $tramDons = $allStops->filter(function ($stop) {
             $type = strtolower(trim((string) $stop->loai_tram));
-
             return in_array($type, ['don', 'ca_hai'], true);
         })->values();
 
         $tramTras = $allStops->filter(function ($stop) {
             $type = strtolower(trim((string) $stop->loai_tram));
-
             return in_array($type, ['tra', 'ca_hai'], true);
         })->values();
 
@@ -508,15 +481,15 @@ class KhachHangService
      */
     public function getVoucherCongKhai(array $filters)
     {
-        $query = Voucher::where('trang_thai', 'hoat_dong')
+        $query = \App\Models\Voucher::where('trang_thai', 'hoat_dong')
             ->where('so_luong_con_lai', '>', 0)
             ->where(function ($q) {
                 $q->whereNull('ngay_ket_thuc')
-                    ->orWhere('ngay_ket_thuc', '>=', now()->startOfDay());
+                  ->orWhere('ngay_ket_thuc', '>=', now()->startOfDay());
             });
 
-        if (! empty($filters['ma_nha_xe'])) {
-            $query->whereHas('nhaXe', function ($q) use ($filters) {
+        if (!empty($filters['ma_nha_xe'])) {
+            $query->whereHas('nhaXe', function($q) use ($filters) {
                 $q->where('ma_nha_xe', $filters['ma_nha_xe']);
             });
         }
@@ -549,8 +522,8 @@ class KhachHangService
         ]);
 
         $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:5173'), '/');
-        $activationLink = $frontendUrl.'/auth/activate-account?token='.urlencode($token)
-            .'&email='.urlencode($email);
+        $activationLink = $frontendUrl . '/auth/activate-account?token=' . urlencode($token)
+            . '&email=' . urlencode($email);
 
         Mail::send(
             'emails.activate-account',
@@ -562,5 +535,33 @@ class KhachHangService
                 $message->to($email)->subject('GoBus — Kích hoạt tài khoản');
             }
         );
+    }
+
+    // ── DIEM THANH VIEN ──────────────────────────────────────────────
+    
+    /**
+     * Lay thong tin diem hien tai va hang thanh vien.
+     */
+    public function getDiemThanhVien(KhachHang $khachHang)
+    {
+        // Load or create if not exists
+        $diem = $khachHang->diemThanhVien ?: \App\Models\DiemThanhVien::create([
+            'id_khach_hang'      => $khachHang->id,
+            'diem_hien_tai'      => 0,
+            'tong_diem_tich_luy' => 0,
+            'hang_thanh_vien'    => 'dong',
+        ]);
+
+        return $diem;
+    }
+
+    /**
+     * Lay lich su bien dong diem.
+     */
+    public function getLichSuDiem(KhachHang $khachHang, array $params = [])
+    {
+        return \App\Models\LichSuDungDiem::where('id_khach_hang', $khachHang->id)
+            ->orderByDesc('created_at')
+            ->paginate($params['per_page'] ?? 10);
     }
 }
