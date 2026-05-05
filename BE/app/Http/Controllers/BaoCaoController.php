@@ -16,6 +16,7 @@ class BaoCaoController extends Controller
         return $request->user('nha_xe')?->ma_nha_xe;
     }
 
+    // kiểm tra quyền đăng nhập 
     protected function assertScope(Request $request): ?JsonResponse
     {
         if ($request->user('admin')) {
@@ -29,7 +30,7 @@ class BaoCaoController extends Controller
     }
 
     /**
-     * GET .../bao-cao/dashboard?tu_ngay=&den_ngay=
+     * GET .../bao-cao/dashboard?tu_ngay=&den_ngay= , lấy data tổng quan dashboard
      */
     public function dashboard(Request $request): JsonResponse
     {
@@ -47,7 +48,7 @@ class BaoCaoController extends Controller
     }
 
     /**
-     * GET .../bao-cao/theo-tuyen-duong?tu_ngay=&den_ngay=
+     * GET .../bao-cao/theo-tuyen-duong?tu_ngay=&den_ngay= , doanh thu theo tuyến đường
      */
     public function theoTuyenDuong(Request $request): JsonResponse
     {

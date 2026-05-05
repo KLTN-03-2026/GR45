@@ -24,7 +24,6 @@ ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, ArcElement, Title, Tooltip, Legend, Filler
 )
-
 // ─── Bộ lọc thời gian ───────────────────────────────────────────────
 const filterType = ref('year') // 'range' | 'month' | 'quarter' | 'year'
 const y0 = String(new Date().getFullYear())
@@ -188,10 +187,14 @@ const fetchBaoCaoAdmin = async (tuNgay, denNgay, gen) => {
         const arr = mapTuyenList(t.thap ?? t.tuyen_it_khach)
         if (arr.length) routeBottom.value = arr.slice(0, 8)
       }
-      if (!routeTop.value.length && Array.isArray(t.du_lieu)) {
-        const arr = mapTuyenList(t.du_lieu).filter(Boolean)
-        routeTop.value = [...arr].sort((a, b) => b.doanh_thu - a.doanh_thu).slice(0, 8)
-        routeBottom.value = [...arr].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+      if (!routeTop.value.length) {
+        // Nếu API trả về một mảng phẳng (không bọc trong du_lieu)
+        const rawArray = Array.isArray(t.du_lieu) ? t.du_lieu : (Array.isArray(t) ? t : [])
+        if (rawArray.length > 0) {
+          const arr = mapTuyenList(rawArray).filter(Boolean)
+          routeTop.value = [...arr].sort((a, b) => b.doanh_thu - a.doanh_thu).slice(0, 8)
+          routeBottom.value = [...arr].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+        }
       }
     }
 
@@ -234,8 +237,11 @@ const buildDateRange = () => {
 
 /** Lọc kiểm tra vé đã hủy chưa */
 const isHuyVe = (t) => ['huy', 'da_huy'].includes(String(t?.tinh_trang ?? '').toLowerCase())
-/** Lọc kiểm tra vé đã thanh toán thành công chưa */
-const isDaThanhToan = (t) => String(t?.tinh_trang ?? '').toLowerCase() === 'da_thanh_toan'
+/** Lọc kiểm tra vé đã thanh toán thành công/hoàn thành chưa */
+const isDaThanhToan = (t) => {
+  const st = String(t?.tinh_trang ?? '').toLowerCase()
+  return ['da_thanh_toan', 'hoan_thanh', 'da_hoan_thanh', 'confirmed', '1'].includes(st)
+}
 /** Lọc kiểm tra vé có thanh toán bằng tiền mặt không */
 const isTienMat = (t) => String(t?.phuong_thuc_thanh_toan ?? '').toLowerCase() === 'tien_mat'
 
@@ -281,9 +287,13 @@ const fetchTicketsAnalytics = async (tuNgay, denNgay, gen) => {
     return true
   })
 
-  // Vé đã bán: không tính vé hủy (dùng cho KPI số vé, không dùng để ghi đè doanh thu).
-  const soldTickets = inRangeTickets.filter((t) => !isHuyVe(t))
-  totalStats.value.tongVeDaBan = soldTickets.length
+  // Vé đã bán: chỉ tính vé đã thanh toán thành công hoặc hoàn thành (đồng bộ với biểu đồ chart)
+  const soldTickets = inRangeTickets.filter((t) => isDaThanhToan(t))
+
+  // Chỉ ghi đè nếu API Báo Cáo không trả về số liệu chuẩn
+  if (!baoCaoSetsPrimaryKpi.value) {
+    totalStats.value.tongVeDaBan = soldTickets.length
+  }
 
   // Không cập nhật `tongDoanhThu` ở đây nữa vì KPI này phải lấy theo bảng `thanh_toan`.
   // Phần vé chỉ dùng cho biểu đồ/tuyến/số lượng vé.
@@ -319,14 +329,20 @@ const fetchTicketsAnalytics = async (tuNgay, denNgay, gen) => {
     if (cid) {
       const cap0 = Number(cx.xe?.so_cho_ngoi ?? cx.phuong_tien?.so_cho_ngoi ?? cx.tong_so_ghe ?? 40) || 40
       if (!tripSeat[cid]) tripSeat[cid] = { sold: 0, cap: cap0 }
-      tripSeat[cid].sold += 1
+      // Tỉ lệ lấp đầy chỉ tính những vé đang giữ chỗ (không tính vé hủy)
+      if (!isHuyVe(t)) {
+        tripSeat[cid].sold += 1
+      }
       const cap = Number(cx.xe?.so_cho_ngoi ?? cx.phuong_tien?.so_cho_ngoi ?? cx.tong_so_ghe ?? tripSeat[cid].cap)
       if (cap > 0) tripSeat[cid].cap = cap
     }
   })
   const routes = Object.values(routeMap).sort((a, b) => b.doanh_thu - a.doanh_thu)
-  routeTop.value = routes.slice(0, 8)
-  routeBottom.value = [...routes].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+  // Chỉ ghi đè nếu API báo cáo không trả về Top tuyến
+  if (!baoCaoSetsPrimaryKpi.value) {
+    routeTop.value = routes.slice(0, 8)
+    routeBottom.value = [...routes].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
+  }
 
   const ratios = Object.values(tripSeat)
     .map((x) => (x.cap > 0 ? Math.min(100, (x.sold / x.cap) * 100) : 0))
@@ -369,176 +385,6 @@ const fetchNewClientsInRange = async (tuNgay, denNgay) => {
   }
 }
 
-/** 
- * Tầng 2: Lấy dữ liệu thống kê từ API bảng Thanh Toán.
- * Nếu endpoint này trả về dữ liệu (có tổng giao dịch > 0 hoặc tổng doanh thu > 0), nó sẽ cập nhật KPI.
- * Nếu trả về 0, nó sẽ tự động kích hoạt Tầng 3 (Fallback sang danh sách).
- * @param {string} tuNgay 
- * @param {string} denNgay 
- * @param {number} gen 
- */
-const statsLoading = ref(false)
-const fetchStats = async (tuNgay, denNgay, gen) => {
-  statsLoading.value = true
-  try {
-    const res = await adminApi.getPaymentStats({ tu_ngay: tuNgay, den_ngay: denNgay })
-    if (gen !== undefined && gen !== thongKeLoadGen.value) return
-    const pl = unwrapApi(res) ?? {}
-    console.log('[ThongKe] stats payload:', pl)
-
-    const tongDT = Number(
-      pl?.tong_doanh_thu ??
-      pl?.tong_thuc_thu ??
-      pl?.tong_tien ??
-      pl?.total_revenue ??
-      0
-    )
-    const tc = Number(pl?.trang_thai?.thanh_cong ?? pl?.so_thanh_cong ?? 0)
-    const tb = Number(pl?.trang_thai?.that_bai ?? pl?.so_that_bai ?? 0)
-    const cho = Number(pl?.trang_thai?.cho_xu_ly ?? pl?.so_cho_xu_ly ?? 0)
-    const tot = tc + tb + cho || Number(pl?.so_giao_dich ?? pl?.total_count ?? 0)
-
-    const preferBaoCao = baoCaoSetsPrimaryKpi.value
-
-    const vb = pl?.ve_phan_bo ?? pl?.phan_bo_ve
-    if (!preferBaoCao && vb && typeof vb === 'object') {
-      ticketVeSlice.value = {
-        daThanhToanNonCash: Number(vb.da_thanh_toan_khong_tien_mat ?? vb.non_cash ?? 0),
-        tienMat: Number(vb.tien_mat ?? vb.tien_mat_da_thanh_toan ?? 0),
-        daHuy: Number(vb.da_huy ?? vb.huy ?? 0),
-      }
-    }
-    if (!preferBaoCao && pl?.tong_ve_da_ban != null) totalStats.value.tongVeDaBan = Number(pl.tong_ve_da_ban)
-    if (!preferBaoCao && pl?.ty_le_lap_day_tb != null) totalStats.value.tyLeLapDay = Number(pl.ty_le_lap_day_tb)
-    if (!preferBaoCao && pl?.khach_hang_moi != null) totalStats.value.khachHangMoi = Number(pl.khach_hang_moi)
-
-    // Nếu endpoint trả về dữ liệu có nghĩa (tongVe > 0 hoặc tongDoanhThu > 0), dùng
-    if (tot > 0 || tongDT > 0) {
-      if (tongDT > 0) totalStats.value.tongDoanhThu = tongDT
-      if (!preferBaoCao) {
-        if (Array.isArray(pl?.theo_thang) && pl.theo_thang.length) {
-          const arrR = Array(12).fill(0), arrV = Array(12).fill(0)
-          pl.theo_thang.forEach(item => {
-            const m = typeof item.thang === 'string' ? parseInt(item.thang.split('-')[1]) - 1 : Number(item.thang) - 1
-            if (m >= 0 && m < 12) { arrR[m] = Number(item.doanh_thu ?? 0); arrV[m] = Number(item.so_ve ?? 0) }
-          })
-          monthlyRevenue.value = arrR; monthlyTickets.value = arrV
-        }
-        if (Array.isArray(pl?.theo_nha_xe) && pl.theo_nha_xe.length) {
-          const maxDT = Math.max(...pl.theo_nha_xe.map(x => Number(x.doanh_thu ?? 0)), 1)
-          revenueByBus.value = pl.theo_nha_xe.slice(0, 10).map(x => ({ name: x.ten_nha_xe ?? x.name ?? 'N/A', revenue: Number(x.doanh_thu ?? 0), tickets: Number(x.so_ve ?? 0), pct: Math.round((Number(x.doanh_thu ?? 0) / maxDT) * 100) }))
-        }
-        if (Array.isArray(pl?.theo_tuyen) && pl.theo_tuyen.length) {
-          const mapped = pl.theo_tuyen.map((x) => ({
-            label: x.ten_tuyen ?? x.tuyen ?? x.label ?? '—',
-            doanh_thu: Number(x.doanh_thu ?? x.revenue ?? 0),
-            so_ve: Number(x.so_ve ?? x.so_luong_ve ?? 0),
-          }))
-          routeTop.value = [...mapped].sort((a, b) => b.doanh_thu - a.doanh_thu).slice(0, 8)
-          routeBottom.value = [...mapped].sort((a, b) => a.so_ve - b.so_ve).slice(0, 5)
-        }
-      }
-      totalStats.value = {
-        ...totalStats.value,
-        tongVe: tot,
-        veHoanThanh: tc,
-        veHuy: tb,
-        veCho: cho,
-        tyLeHoanThanh: tot > 0 ? +((tc / tot) * 100).toFixed(1) : 0,
-        tyLeHuy: tot > 0 ? +((tb / tot) * 100).toFixed(1) : 0,
-        tyLeCho: tot > 0 ? +((cho / tot) * 100).toFixed(1) : 0,
-      }
-    } else {
-      // Endpoint trả về rỗng hoặc không match field → fallback sang danh sách
-      if (!preferBaoCao) {
-        console.warn('[ThongKe] thong-ke trả về tổng = 0, fallback sang list')
-        await fetchStatsFromList(tuNgay, denNgay, gen)
-      }
-    }
-  } catch (err) {
-    if (gen !== undefined && gen !== thongKeLoadGen.value) return
-    if (!baoCaoSetsPrimaryKpi.value) {
-      console.warn('[ThongKe] thong-ke lỗi, fallback:', err?.message)
-      await fetchStatsFromList(tuNgay, denNgay, gen)
-    }
-  } finally { statsLoading.value = false }
-}
-
-/**
- * Tầng 3 (Fallback toàn phần): Lấy danh sách giao dịch từ API `/thanh-toan` và tự tính toán Client-side.
- * Sử dụng khi API `thong-ke` chưa hỗ trợ hoặc bị lỗi.
- * @param {string} tuNgay 
- * @param {string} denNgay 
- * @param {number} gen 
- */
-const fetchStatsFromList = async (tuNgay, denNgay, gen) => {
-  if (baoCaoSetsPrimaryKpi.value) return
-  try {
-    // Lấy toàn bộ danh sách (BE có thể không filter theo ngày)
-    const res = await adminApi.getPayments({ per_page: 2000, page: 1 })
-    if (gen !== undefined && gen !== thongKeLoadGen.value) return
-    const list = extractPaginatedRows(res)
-    if (!list.length) return
-    console.log('[ThongKe-fallback] tong ban ghi BE:', list.length, '| sample:', JSON.stringify(list[0]))
-
-    // ── Helper lấy ngày thanh toán (ưu tiên thoi_gian_thanh_toan) ────────
-    const getDate = (pm) => new Date(
-      pm.thoi_gian_thanh_toan ?? pm.created_at ?? pm.ngay_tao ?? pm.thoi_gian ?? ''
-    )
-
-    // ── Lọc client-side theo khoảng ngày đang chọn ───────────────────────
-    const fromMs = tuNgay ? new Date(tuNgay).getTime() : null
-    const toMs = denNgay ? new Date(denNgay + 'T23:59:59').getTime() : null
-    const filteredList = list.filter(pm => {
-      const d = getDate(pm)
-      if (isNaN(d)) return false                         // bỏ record không có ngày
-      if (fromMs && d.getTime() < fromMs) return false
-      if (toMs && d.getTime() > toMs) return false
-      return true
-    })
-    console.log('[ThongKe-fallback] sau khi loc theo ngay:', filteredList.length, 'ban ghi (', tuNgay, '->', denNgay, ')')
-
-    if (!filteredList.length) {
-      // Không có dữ liệu trong khoảng thời gian → đặt về 0
-      monthlyRevenue.value = Array(12).fill(0)
-      monthlyTickets.value = Array(12).fill(0)
-      totalStats.value = { ...totalStats.value, tongDoanhThu: 0, tongVe: 0, veHoanThanh: 0, veHuy: 0, veCho: 0, tyLeHoanThanh: 0, tyLeHuy: 0, tyLeCho: 0 }
-      return
-    }
-
-    // ── Chỉ tính thanh toán thành công trong bảng `thanh_toan` ─────
-    const getST = pm => Number(pm.so_tien_thuc_thu ?? pm.so_tien ?? pm.tong_tien ?? pm.amount ?? pm.gia_tien ?? 0)
-    const isSuccess = pm => isPmThanhToanCong(pm)
-
-    const thanhCongList = filteredList.filter(isSuccess)
-    const thatBaiList = filteredList.filter(pm => !isSuccess(pm) && String(pm.trang_thai ?? pm.status ?? '').toLowerCase().trim() !== 'cho' && String(pm.trang_thai ?? pm.status ?? '').toLowerCase().trim() !== 'pending')
-    const choList = filteredList.filter(pm => !isSuccess(pm) && !thatBaiList.includes(pm))
-
-    const tot = filteredList.length
-    const tongDoanhThu = thanhCongList.reduce((s, pm) => s + getST(pm), 0)
-
-    totalStats.value = {
-      ...totalStats.value,
-      tongDoanhThu,
-      tongVe: tot,
-      veHoanThanh: thanhCongList.length,
-      veHuy: thatBaiList.length,
-      veCho: choList.length,
-      tyLeHoanThanh: tot > 0 ? +((thanhCongList.length / tot) * 100).toFixed(1) : 0,
-      tyLeHuy: tot > 0 ? +((thatBaiList.length / tot) * 100).toFixed(1) : 0,
-      tyLeCho: tot > 0 ? +((choList.length / tot) * 100).toFixed(1) : 0,
-    }
-
-    // ── Chart: doanh thu + số vé theo tháng ──────────────────────────────
-    const arrR = Array(12).fill(0), arrV = Array(12).fill(0)
-    filteredList.forEach(pm => {
-      const d = getDate(pm)
-      if (!isNaN(d)) { arrR[d.getMonth()] += getST(pm); arrV[d.getMonth()] += 1 }
-    })
-    monthlyRevenue.value = arrR
-    monthlyTickets.value = arrV
-  } catch (err) { console.error('[ThongKe-fallback] error:', err) }
-}
 
 
 // ─── Fetch KPI riêng lẻ ─────────────────────────────────────────────
@@ -629,67 +475,7 @@ const pmPageNumbers = computed(() => {
   return range
 })
 
-/** Số tiền một bản ghi thanh toán (khớp cột bảng + fallback list). */
-const getPmSoTienForTotal = (pm) =>
-  Number(pm.so_tien_thuc_thu ?? pm.so_tien ?? pm.tong_tien ?? pm.amount ?? pm.gia_tien ?? 0)
 
-/**
- * Giao dịch được tính vào doanh thu: thành công / hoàn tất; loại thất bại, hoàn tiền, chờ.
- * Bản ghi không có trạng thái (tiền mặt…) vẫn cộng nếu không thuộc nhóm loại trừ.
- */
-const isPmThanhToanCong = (pm) => {
-  const raw = pm?.trang_thai ?? pm?.status
-  if (raw === null || raw === undefined || raw === '') return true
-  if (raw === 1 || raw === true) return true
-  const tt = String(raw).toLowerCase().trim()
-  if (tt === 'thanh_cong' || tt === 'success' || tt === 'completed' || tt === 'da_thanh_toan') return true
-  if (raw === 0 || tt === '0' || tt === 'that_bai' || tt === 'failed' || tt === 'failure') return false
-  if (raw === 2 || tt === '2' || tt === 'hoan_tien' || tt === 'refund' || tt === 'refunded') return false
-  if (tt === 'huy' || tt === 'da_huy' || tt === 'cancelled' || tt === 'cancel') return false
-  if (tt === 'cho' || tt === 'pending' || tt === 'cho_xu_ly' || tt === 'processing' || tt === 'dang_cho') return false
-  return true
-}
-
-/** 
- * Quét toàn bộ danh sách thanh toán trong kỳ (phân trang) để cộng dồn TỔNG DOANH THU chính xác.
- * Doanh thu này dựa trên các giao dịch thanh toán thành công (không tính tiền mặt chưa nộp).
- * @param {string} tuNgay 
- * @param {string} denNgay 
- * @param {number} gen 
- */
-const applyPaymentRevenueTotal = async (tuNgay, denNgay, gen) => {
-  if (!tuNgay || !denNgay) return
-  let sum = 0
-  try {
-    let page = 1
-    const perPage = 200
-    let lastPage = 1
-    for (; ;) {
-      const res = await adminApi.getPayments({
-        tu_ngay: tuNgay,
-        den_ngay: denNgay,
-        page,
-        per_page: perPage,
-      })
-      if (gen !== undefined && gen !== thongKeLoadGen.value) return
-      const rows = extractPaginatedRows(res)
-      const meta = extractPaginatedMeta(res)
-      lastPage = Math.max(1, Number(meta?.last_page ?? 1) || 1)
-      for (const pm of rows) {
-        sum += getPmSoTienForTotal(pm)
-      }
-      if (page >= lastPage || rows.length < perPage) break
-      page += 1
-      if (page > 200) break
-    }
-    if (gen !== undefined && gen !== thongKeLoadGen.value) return
-    if (sum > 0) {
-      totalStats.value.tongDoanhThu = sum
-    }
-  } catch (e) {
-    console.warn('[ThongKe] tổng doanh thu (thanh-toan):', e?.message ?? e)
-  }
-}
 
 // ─── Nút "Áp dụng" chính ─────────────────────────────────────────────
 const handleApplyFilter = async () => {
@@ -698,10 +484,6 @@ const handleApplyFilter = async () => {
   const { tuNgay, denNgay } = buildDateRange()
   pmFilter.value.tu_ngay = tuNgay; pmFilter.value.den_ngay = denNgay; pmFilter.value.page = 1
   await fetchBaoCaoAdmin(tuNgay, denNgay, myGen)
-  if (myGen !== thongKeLoadGen.value) return
-  await fetchStats(tuNgay, denNgay, myGen)
-  if (myGen !== thongKeLoadGen.value) return
-  await applyPaymentRevenueTotal(tuNgay, denNgay, myGen)
   if (myGen !== thongKeLoadGen.value) return
   const tasks = [fetchPayments(), fetchTicketsAnalytics(tuNgay, denNgay, myGen)]
   if (!totalStats.value.khachHangMoi) tasks.push(fetchNewClientsInRange(tuNgay, denNgay))
@@ -734,10 +516,6 @@ onMounted(async () => {
   const { tuNgay, denNgay } = buildDateRange()
   pmFilter.value.tu_ngay = tuNgay; pmFilter.value.den_ngay = denNgay
   await fetchBaoCaoAdmin(tuNgay, denNgay, myGen)
-  if (myGen !== thongKeLoadGen.value) return
-  await fetchStats(tuNgay, denNgay, myGen)
-  if (myGen !== thongKeLoadGen.value) return
-  await applyPaymentRevenueTotal(tuNgay, denNgay, myGen)
   if (myGen !== thongKeLoadGen.value) return
   const tasks = [fetchPayments(), fetchKhachHang(), fetchNhaXe(), fetchChuyenXe(), fetchTicketsAnalytics(tuNgay, denNgay, myGen)]
   if (!totalStats.value.khachHangMoi) tasks.push(fetchNewClientsInRange(tuNgay, denNgay))
@@ -2618,6 +2396,8 @@ const handleExportExcel = async () => {
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  background: #dcfce7;
+  color: #d97706;
 }
 
 .badge-green {

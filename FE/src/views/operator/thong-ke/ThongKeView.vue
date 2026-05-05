@@ -132,7 +132,7 @@ const fetchStats = async () => {
     showToast('Tải dữ liệu thành công', 'success')
   } catch (e) {
     console.error('[ThongKe Operator] lỗi:', e)
-    showToast('Mất kết nối với db', 'error')
+    showToast('Mất kết nối với Database', 'error')
   } finally {
     isLoading.value = false
   }
