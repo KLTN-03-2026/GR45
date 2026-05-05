@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 class BaoCaoThongKeService
 {
+    // hàm xử lý thời gian
     protected function parseRange(?string $maNhaXe, ?string $tuNgay, ?string $denNgay): array
     {
         $den = $denNgay ? Carbon::parse($denNgay)->endOfDay() : now()->endOfDay();
@@ -25,8 +26,10 @@ class BaoCaoThongKeService
         return [$tu, $den];
     }
 
+    // tạo truy vấn gốc chứa các điều kiện cơ bản (thời gian, nhà xe)
     protected function baseTicketQuery(?string $maNhaXe, ?string $tuNgay, ?string $denNgay)
     {
+        // lọc thời gian theo tham số đầu vào
         [$tu, $den] = $this->parseRange($maNhaXe, $tuNgay, $denNgay);
 
         return Ve::query()
@@ -34,6 +37,7 @@ class BaoCaoThongKeService
                 'khachHang:id,ho_va_ten,so_dien_thoai',
                 'chuyenXe:id,id_tuyen_duong,id_xe,ngay_khoi_hanh,gio_khoi_hanh',
                 'chuyenXe.tuyenDuong:id,ma_nha_xe,ten_tuyen_duong,diem_bat_dau,diem_ket_thuc',
+                'chuyenXe.tuyenDuong.nhaXe:ma_nha_xe,ten_nha_xe',
             ])
             ->whereBetween('thoi_gian_dat', [$tu, $den])
             ->when($maNhaXe, function ($q) use ($maNhaXe) {
@@ -41,10 +45,10 @@ class BaoCaoThongKeService
             });
     }
 
+    // hàm lấy tổng quan dashboard
     public function getDashboardKpis(?string $maNhaXe = null, ?string $tuNgay = null, ?string $denNgay = null): array
     {
         $allTickets = $this->baseTicketQuery($maNhaXe, $tuNgay, $denNgay)->get();
-        
         // Chỉ tính cho các vé đã thanh toán / hoàn thành
         $tickets = $allTickets->filter(fn($ve) => in_array(strtolower($ve->tinh_trang), ['da_thanh_toan', 'hoan_thanh', 'confirmed', '1'], true));
 
@@ -124,6 +128,24 @@ class BaoCaoThongKeService
             ->take(5)
             ->values();
 
+        $theoNhaXe = $tickets
+            ->groupBy(function ($ve) {
+                return $ve->chuyenXe?->tuyenDuong?->ma_nha_xe;
+            })
+            ->filter(fn($group, $key) => !empty($key))
+            ->map(function (Collection $group) {
+                $nhaXe = $group->first()->chuyenXe?->tuyenDuong?->nhaXe;
+                return [
+                    'ma_nha_xe' => $nhaXe?->ma_nha_xe,
+                    'ten_nha_xe' => $nhaXe?->ten_nha_xe ?? 'Không xác định',
+                    'so_ve' => $group->count(),
+                    'doanh_thu' => (float) $group->sum(fn($ve) => (float) ($ve->tong_tien ?? 0)),
+                ];
+            })
+            ->values()
+            ->sortByDesc('doanh_thu')
+            ->values();
+
         return [
             'tong_doanh_thu' => $tongDoanhThu,
             'tong_ve_ban' => $tongVe,
@@ -131,6 +153,7 @@ class BaoCaoThongKeService
             'tong_khach_hang' => $tongKhachHang,
             'theo_thoi_gian' => $theoThoiGian,
             'doanh_thu_theo_tuyen' => $doanhThuTheoTuyen,
+            'theo_nha_xe' => $theoNhaXe,
             'top_chuyen_xe' => $topChuyenXe,
             'top_khach_hang' => $topKhachHang,
         ];
@@ -168,8 +191,8 @@ class BaoCaoThongKeService
     {
         $tickets = $this->baseTicketQuery($maNhaXe, $tuNgay, $denNgay)->get();
 
-        $completed = $tickets->filter(fn($ve) => in_array($ve->tinh_trang, ['hoan_thanh', 'confirmed', 1, '1'], true))->count();
-        $cancelled = $tickets->filter(fn($ve) => in_array($ve->tinh_trang, ['da_huy', 'cancelled', 0, '0'], true))->count();
+        $completed = $tickets->filter(fn($ve) => in_array(strtolower($ve->tinh_trang), ['da_thanh_toan', 'hoan_thanh', 'da_hoan_thanh', 'confirmed', '1'], true))->count();
+        $cancelled = $tickets->filter(fn($ve) => in_array(strtolower($ve->tinh_trang), ['huy', 'da_huy', 'cancelled', '0'], true))->count();
         $pending = max($tickets->count() - $completed - $cancelled, 0);
 
         return [

@@ -33,6 +33,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use App\Models\Ve;
+use App\Models\ThanhToan;
+use App\Observers\VeObserver;
+use App\Observers\ThanhToanObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -75,6 +79,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Đăng ký Observers cho đồng bộ giao dịch
+        Ve::observe(VeObserver::class);
+        ThanhToan::observe(ThanhToanObserver::class);
+
         $appUrl = config('app.url');
         if (is_string($appUrl) && str_starts_with($appUrl, 'https://')) {
             URL::forceScheme('https');
