@@ -1,52 +1,84 @@
-# Welcome to your Expo app 👋
+# 📱 SmartBus Mobile App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> **Ứng dụng di động dành cho Khách hàng và Tài xế trong hệ sinh thái SmartBus — Xây dựng bằng React Native & Expo (v54).**
 
-## Get started
+---
 
-1. Install dependencies
+## 🛠️ 1. Hướng dẫn cài đặt nhanh (Setup)
 
+### Yêu cầu tiên quyết
+* **Node.js:** Phiên bản `>= 20.19.0` hoặc `>= 22.12.0`.
+* **Thiết bị chạy thử:**
+  * **iOS Simulator** (đã cài Xcode trên macOS) hoặc **Android Emulator** (đã cài Android Studio).
+  * **Thiết bị thật:** Cài đặt ứng dụng **Expo Go** từ App Store hoặc Google Play Store.
+
+### Các bước khởi chạy lần đầu
+1. **Cài đặt các thư viện (Dependencies):**
    ```bash
+   cd Mobile
    npm install
    ```
+2. **Cấu hình biến môi trường (`.env`):**
+   * Dự án đã có sẵn file `.env` mẫu.
+   * **Mặc định:** Ứng dụng sẽ tự kết nối tới API Production đã deploy: `https://api.bussafe.io.vn/api`.
+   * **Khi muốn chạy local:** Hãy mở file `.env` và bỏ dấu comment `#` ở dòng tương ứng với môi trường phát triển của bạn (`localhost` hoặc IP cục bộ của máy Mac).
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## 🚀 2. Tổng hợp các lệnh khởi chạy (Scripts)
 
-In the output, you'll find options to open the app in a
+Hãy sử dụng các lệnh sau trong Terminal (tại thư mục `Mobile`) để vận hành ứng dụng:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Lệnh chạy | Ý nghĩa |
+| :--- | :--- |
+| `npm run start` | Khởi động máy chủ Metro Bundler (giao diện điều khiển chính). |
+| `npm run ios:local` | **(Khuyên dùng)** Mở trực tiếp trên iOS Simulator qua dải `localhost` (không lo lỗi kết nối mạng Wi-Fi). |
+| `npm run ios` | Mở trực tiếp trên iOS Simulator (sử dụng dải IP nội bộ LAN). |
+| `npm run android` | Mở trực tiếp trên Android Emulator / Thiết bị Android đang kết nối. |
+| `npm run web` | Chạy phiên bản web thử nghiệm trên trình duyệt. |
+| `npx expo start -c` | Khởi động Metro Bundler và **xóa sạch cache** (dùng khi cập nhật `.env` hoặc gặp lỗi import lạ). |
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## ⌨️ 3. Phím tắt tương tác trong Terminal (Metro Bundler Shortcuts)
 
-When you're ready, run:
+Khi bạn đã chạy server Metro Bundler (`npm run start` hoặc các lệnh khởi chạy trên), bạn có thể nhấn trực tiếp các phím sau trên bàn phím Terminal để điều khiển:
 
-```bash
-npm run reset-project
-```
+| Phím bấm | Thao tác thực hiện |
+| :---: | :--- |
+| **`i`** | Mở ứng dụng trên **iOS Simulator** (nếu simulator đang chạy). |
+| **`a`** | Mở ứng dụng trên **Android Emulator** hoặc thiết bị Android thực đang cắm cáp USB. |
+| **`w`** | Mở ứng dụng trên trình duyệt **Web**. |
+| **`r`** | **Reload ứng dụng** (tải lại toàn bộ gói JS tức thì mà không cần cài lại app). |
+| **`d`** | Mở **Developer Menu** (Menu gỡ lỗi) trong ứng dụng để debug. |
+| **`c`** | Xóa bộ nhớ đệm (Clear cache) và khởi động lại Metro Bundler. |
+| **`o`** | Mở nhanh thư mục dự án trên trình soạn thảo mã nguồn (VS Code/Cursor). |
+| **`shift + d`** | Bật/tắt tự động mở công cụ gỡ lỗi (React Native DevTools). |
+| **`Ctrl + C`** | **Dừng hoàn toàn** máy chủ phát triển Metro Bundler. |
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## 📲 4. Phím tắt điều khiển gỡ lỗi trong ứng dụng (In-App Debug Shortcuts)
 
-To learn more about developing your project with Expo, look at the following resources:
+Khi ứng dụng đang chạy trên Emulator / Simulator hoặc Thiết bị thật, bạn có thể mở **Developer Menu** (Menu gỡ lỗi của React Native để kích hoạt Fast Refresh, Debug JS, Inspect Elements) bằng các phím tắt sau:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Trực tiếp trên thiết bị gỡ lỗi
+* **iOS Simulator:** Nhấn cụm phím `Cmd ⌘ + D`.
+* **Android Emulator:** 
+  * Trên macOS: Nhấn cụm phím `Cmd ⌘ + M`.
+  * Trên Windows / Linux: Nhấn cụm phím `Ctrl + M`.
+* **Thiết bị thật (Expo Go):** Cầm điện thoại lên và **lắc mạnh (Shake)** thiết bị.
 
-## Join the community
+### Các tùy chọn hữu ích trong Developer Menu
+* **Reload:** Tải lại giao diện nhanh.
+* **Toggle Element Inspector:** Bật thanh công cụ kiểm tra giao diện (giống F12 trên Web) để xem kích thước, padding, margin của các thẻ Text, View.
+* **Show Keep Awake:** Giữ màn hình điện thoại luôn sáng khi đang code.
 
-Join our community of developers creating universal apps.
+---
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-
-## Đây là dự án mobile cho khoá luận
+## 📂 5. Quy tắc tổ chức cấu trúc code
+* Thư mục `app/` chỉ quản lý các đường dẫn điều hướng (**Route Layer**) thông qua Expo Router.
+* Thư mục `src/` quản lý toàn bộ logic nghiệp vụ thực tế:
+  * `src/components/`: Chứa các component UI dùng chung và độc lập.
+  * `src/services/`: Quản lý các lệnh gọi API thông qua `client-api.ts` (đã tích hợp tự động đọc cấu hình `.env`).
+  * `src/constants/`: Quản lý các hằng số, bảng màu và theme của app.

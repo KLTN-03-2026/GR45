@@ -5,7 +5,7 @@ import axios from 'axios';
  * Nếu `VITE_API_URL` kết thúc bằng `/api/v1` (file .env.exemple), bỏ `/v1` để không thành `/api/v1/v1/...`.
  */
 function resolveAxiosBaseUrl() {
-  let u = String(import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/').trim();
+  let u = String(import.meta.env.VITE_API_URL || 'https://api.bussafe.io.vn/api/').trim();
   u = u.replace(/\/+$/, '');
   if (/\/v1$/i.test(u)) {
     u = u.replace(/\/v1$/i, '');

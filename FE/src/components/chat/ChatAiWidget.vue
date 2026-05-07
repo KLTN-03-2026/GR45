@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted } from "vue";
-import { callChatAiMessage, parseAssistantUiPayload } from "@/api/chatAiApi.js";
+import { callChatAiMessage, parseAssistantUiPayload, getChatAiHistory } from "@/api/chatAiApi.js";
 
 const open = ref(false);
 const input = ref("");
@@ -63,13 +63,59 @@ function normalizeQuickReplies(items) {
   return out;
 }
 
-onMounted(() => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    chatAiSessionId.value = crypto.randomUUID();
-  } else {
-    chatAiSessionId.value = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+onMounted(async () => {
+  let storedKey = localStorage.getItem("chat_session_key");
+  if (!storedKey) {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      storedKey = crypto.randomUUID();
+    } else {
+      storedKey = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+    localStorage.setItem("chat_session_key", storedKey);
+  }
+  chatAiSessionId.value = storedKey;
+
+  try {
+    const res = await getChatAiHistory({ session_key: storedKey });
+    if (res && res.success && Array.isArray(res.data)) {
+      messages.value = res.data.map(msg => {
+        let text = msg.content;
+        try {
+          const payload = parseAssistantJsonPayload(msg.content);
+          if (payload && payload.answer) {
+            text = payload.answer;
+          }
+        } catch {
+          // keep original
+        }
+        return {
+          role: msg.role,
+          text: text,
+          metadata: msg.meta || {}
+        };
+      });
+    }
+  } catch (err) {
+    console.error("Lỗi tải lịch sử chat AI:", err);
   }
 });
+
+function startNewChatSession() {
+  if (streaming.value) return;
+  
+  let newKey;
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    newKey = crypto.randomUUID();
+  } else {
+    newKey = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+  
+  localStorage.setItem("chat_session_key", newKey);
+  chatAiSessionId.value = newKey;
+  messages.value = [];
+  quickReplies.value = [];
+  input.value = "";
+}
 
 function refreshGeoOnce() {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -395,14 +441,26 @@ watch([quickReplies, streaming], () => {
             <strong>Trợ lý ảo</strong>
             <div class="rag-chat__geo">{{ geoLabel }}</div>
           </div>
-          <button
-            type="button"
-            class="rag-chat__icon"
-            aria-label="Đóng"
-            @click="open = false"
-          >
-            <span class="material-symbols-outlined">close</span>
-          </button>
+          <div class="rag-chat__head-actions">
+            <button
+              type="button"
+              class="rag-chat__icon"
+              title="Tạo đoạn hội thoại mới"
+              aria-label="Hội thoại mới"
+              :disabled="streaming"
+              @click="startNewChatSession"
+            >
+              <span class="material-symbols-outlined">add_comment</span>
+            </button>
+            <button
+              type="button"
+              class="rag-chat__icon"
+              aria-label="Đóng"
+              @click="open = false"
+            >
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
         </header>
 
         <div ref="scrollRef" class="rag-chat__body">
@@ -552,6 +610,11 @@ watch([quickReplies, streaming], () => {
   margin-top: 0.1rem;
   font-size: 0.72rem;
   color: #64748b;
+}
+.rag-chat__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 .rag-chat__icon {
   border: none;
