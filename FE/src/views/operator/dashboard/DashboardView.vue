@@ -116,7 +116,7 @@ const initWs = () => {
     const key = import.meta.env.VITE_PUSHER_APP_KEY, cluster = import.meta.env.VITE_PUSHER_APP_CLUSTER
     if (!key||!cluster) return
     window.Pusher = Pusher
-    let url = import.meta.env.VITE_API_URL||'http://127.0.0.1:8000/api/'
+    let url = import.meta.env.VITE_API_URL||'https://api.bussafe.io.vn/api/'
     if (!url.endsWith('/')) url+='/'
     echoInst = new Echo({ broadcaster:'pusher', key, cluster, forceTLS:true, authEndpoint:`${url}v1/nha-xe/broadcasting/auth`, auth:{ headers:{ Authorization:`Bearer ${store.token}`, Accept:'application/json', 'ngrok-skip-browser-warning':'true' } } })
     const maNhaXe = store.user?.nhaXe?.ma_nha_xe || store.user?.ma_nha_xe || 'global'

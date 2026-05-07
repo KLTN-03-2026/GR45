@@ -86,6 +86,7 @@ Route::prefix('v1')->group(function () {
 
     // Chat AI — widget khách; Bearer tùy chọn để gắn session khách.
     Route::post('chat/ai/message', [ChatAiController::class, 'message']);
+    Route::get('chat/ai/history', [ChatAiController::class, 'history']);
 
     // quản lý tài xế (DRIVER APP)
     Route::prefix('tai-xe')->group(function () {

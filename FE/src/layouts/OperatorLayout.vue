@@ -53,7 +53,7 @@ onMounted(() => {
     // Lấy config từ môi trường (hoặc fallback mặc định)
     const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
     const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
-    let apiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api/";
+    let apiUrl = import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/";
     if (!apiUrl.endsWith("/")) apiUrl += "/";
 
     echoInstance = new Echo({

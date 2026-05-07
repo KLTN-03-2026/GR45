@@ -1,0 +1,89 @@
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+
+import { HeroSection } from "@/src/components/home/hero-section";
+import { PopularRouteCard } from "@/src/components/home/popular-route-card";
+import { QuickActionGrid } from "@/src/components/home/quick-action-grid";
+import { SafetyBanner } from "@/src/components/home/safety-banner";
+import { SearchTripCard } from "@/src/components/home/search-trip-card";
+import { popularRoutes, quickActions } from "@/src/constants/home-data";
+
+
+export function HomeScreen() {
+  return (
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <HeroSection />
+
+        <SearchTripCard
+          from="Sài Gòn"
+          to="Đà Lạt"
+          date="Thứ 7, 24 Tháng 8, 2024"
+          onPressSearch={() => Alert.alert("Demo", "Search trip action")}
+        />
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Vigilant AI Ecosystem</Text>
+          <Text style={styles.linkText}>Xem tất cả</Text>
+        </View>
+        <QuickActionGrid actions={quickActions} />
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Tuyến Đường Phổ Biến</Text>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.carousel}
+        >
+          {popularRoutes.map((route) => (
+            <PopularRouteCard key={route.id} route={route} />
+          ))}
+        </ScrollView>
+
+        <View style={styles.sectionBottom}>
+          <SafetyBanner />
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
+  },
+  content: {
+    paddingBottom: 40,
+    backgroundColor: "#f8fafc",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginTop: 32,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  linkText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0052cc",
+  },
+  carousel: {
+    paddingLeft: 20,
+  },
+  sectionBottom: {
+    marginTop: 10,
+    marginBottom: 20,
+  },
+});

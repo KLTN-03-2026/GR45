@@ -13,7 +13,7 @@ function chatAiMessageTimeoutMs() {
 }
 
 function apiV1Base() {
-  let raw = String(import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1').trim();
+  let raw = String(import.meta.env.VITE_API_URL || 'https://api.bussafe.io.vn/api/v1').trim();
   raw = raw.replace(/\/+$/, '');
   if (/\/api$/i.test(raw)) {
     raw += '/v1';
@@ -135,7 +135,7 @@ export function parseAssistantUiPayload(rawText) {
 function httpErrorMessage(status, bodyText, contentType) {
   const ct = (contentType || '').toLowerCase();
   if (status === 404 && (ct.includes('text/html') || /^\s*</.test(bodyText))) {
-    return `HTTP ${status} — Không tìm thấy API. Kiểm tra VITE_API_URL (ví dụ http://127.0.0.1:8000/api/v1), backend đang chạy, và route POST /api/v1/chat/ai/message.`;
+    return `HTTP ${status} — Không tìm thấy API. Kiểm tra VITE_API_URL (ví dụ https://api.bussafe.io.vn/api/v1), backend đang chạy, và route POST /api/v1/chat/ai/message.`;
   }
   if (bodyText && bodyText.length < 400 && !ct.includes('text/html')) {
     return bodyText;
@@ -233,5 +233,43 @@ export async function callChatAiMessage(message, signal, opts = null) {
   }
   return body;
 }
+
+/**
+ * Lấy lịch sử chat dựa vào session_key hoặc chat_session_id.
+ *
+ * @param {{ session_key?: string, chat_session_id?: string }} params
+ * @returns {Promise<{ success: boolean, data: { role: string, content: string, meta?: any }[] }>}
+ */
+export async function getChatAiHistory(params) {
+  const query = new URLSearchParams();
+  if (params.session_key) query.append('session_key', params.session_key);
+  if (params.chat_session_id) query.append('chat_session_id', params.chat_session_id);
+
+  const url = `${apiV1Base()}/chat/ai/history?${query.toString()}`;
+
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...chatAiAuthHeaders(),
+    },
+  });
+
+  const text = await res.text().catch(() => '');
+  let body;
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = {};
+  }
+
+  if (!res.ok) {
+    const msg = (body && body.message) || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return body;
+}
+
 
 

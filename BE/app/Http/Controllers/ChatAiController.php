@@ -52,6 +52,56 @@ final class ChatAiController extends Controller
         ]);
     }
 
+    public function history(Request $request): JsonResponse
+    {
+        $sessionKey = $request->query('session_key');
+        $chatSessionId = $request->query('chat_session_id');
+        $khId = $this->optionalKhachHangId($request);
+
+        $session = null;
+
+        if ($chatSessionId) {
+            $session = \App\Models\ChatSession::query()
+                ->where('id', $chatSessionId)
+                ->with(['messages'])
+                ->first();
+        } elseif ($sessionKey) {
+            $session = \App\Models\ChatSession::query()
+                ->where('session_key', $sessionKey)
+                ->with(['messages'])
+                ->first();
+        } elseif ($khId) {
+            // Nếu không truyền session_key/id nhưng khách hàng đang đăng nhập, lấy session gần nhất của họ
+            $session = \App\Models\ChatSession::query()
+                ->where('id_khach_hang', $khId)
+                ->with(['messages'])
+                ->latest()
+                ->first();
+        }
+
+        if (!$session) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        // Tự động liên kết session vãng lai với tài khoản nếu khách vừa đăng nhập
+        if ($khId && $session->id_khach_hang === null) {
+            $session->id_khach_hang = $khId;
+            $session->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $session->messages->map(fn($msg) => [
+                'role' => $msg->role,
+                'content' => $msg->content,
+                'meta' => $msg->meta,
+            ]),
+        ]);
+    }
+
     /**
      * @return array{message: string, history: array<int, array<string, mixed>>, session_id: ?string}
      */
