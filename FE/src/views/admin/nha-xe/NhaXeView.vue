@@ -94,6 +94,7 @@ const previewAnhLogo = ref('')
 const previewAnhTruSo = ref('')
 const previewGiayPhep = ref('')   // tên file PDF hiện tại
 const previewCccd = ref('')       // URL ảnh CCCD hiện tại
+const pdfViewUrl = ref('')        // URL thực để mở xem PDF (objectURL hoặc Cloudinary URL)
 
 const onFileChange = (field, event) => {
   const file = event.target.files[0]
@@ -107,6 +108,7 @@ const onFileChange = (field, event) => {
   } else if (field === 'file_giay_phep_kinh_doanh') {
     fileGiayPhep.value = file
     previewGiayPhep.value = file.name
+    pdfViewUrl.value = URL.createObjectURL(file)
   } else if (field === 'file_cccd_dai_dien') {
     fileCccd.value = file
     previewCccd.value = URL.createObjectURL(file)
@@ -241,6 +243,7 @@ const resetForm = () => {
   previewAnhTruSo.value = ''
   previewGiayPhep.value = ''
   previewCccd.value = ''
+  pdfViewUrl.value = ''
   formError.value = ''
 }
 
@@ -262,9 +265,9 @@ const openEditModal = async (item) => {
   previewAnhLogo.value = item.ho_so?.anh_logo || item.anh_logo || ''
   previewAnhTruSo.value = item.ho_so?.anh_tru_so || item.anh_tru_so || ''
   // Điền tên file giấy tờ hiện tại
-  previewGiayPhep.value = item.ho_so?.file_giay_phep_kinh_doanh
-    ? item.ho_so.file_giay_phep_kinh_doanh.split('/').pop()
-    : ''
+  const gpkdUrl = item.ho_so?.file_giay_phep_kinh_doanh || ''
+  previewGiayPhep.value = gpkdUrl ? gpkdUrl.split('/').pop() : ''
+  pdfViewUrl.value = gpkdUrl
   previewCccd.value = item.ho_so?.file_cccd_dai_dien || ''
   await nextTick()
   formModalInstance?.show()
@@ -383,6 +386,9 @@ const executeConfirm = async () => {
 /** Áp dụng bộ lọc và tải lại từ trang 1 */
 const submitFilter = () => fetchOperators(1)
 
+/** Mở file PDF ở tab mới */
+const openPdf = (url) => { if (url) window.open(url, '_blank') }
+
 /** Khởi tạo Bootstrap Modal instances và tải dữ liệu nhà xe lần đầu */
 onMounted(async () => {
   await nextTick()
@@ -408,8 +414,8 @@ onMounted(async () => {
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-refresh" :class="{ spinning: loading }" @click="fetchOperators(filters.page)">
-          <RefreshCw size="18" />
+        <button class="btn btn-refresh" @click="fetchOperators(filters.page)">
+          <RefreshCw size="18" :class="{ 'spin-icon': loading }" />
         </button>
         <button class="btn btn-primary" @click="openAddModal">
           <Plus size="16" />
@@ -682,8 +688,12 @@ onMounted(async () => {
                         <input type="file" accept="application/pdf" class="hidden-input" @change="onFileChange('file_giay_phep_kinh_doanh', $event)" />
                       </label>
                       <div v-if="previewGiayPhep" class="pdf-info-wrap">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
                         <span class="pdf-name">{{ previewGiayPhep }}</span>
+                        <button v-if="pdfViewUrl" type="button" class="btn-view-pdf" @click="openPdf(pdfViewUrl)">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          Xem PDF
+                        </button>
                       </div>
                       <span v-else class="img-placeholder">Chưa có file PDF</span>
                     </div>
@@ -1367,16 +1377,50 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .pdf-name {
   font-size: 0.78rem;
   color: #334155;
   font-weight: 600;
-  max-width: 200px;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.btn-view-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid #fca5a5;
+  background: #fff5f5;
+  color: #dc2626;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.12s;
+  white-space: nowrap;
+}
+
+.btn-view-pdf:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+  transform: translateY(-1px);
+}
+
+/* Spin chỉ icon, không xoay cả nút */
+.spin-icon {
+  animation: icon-spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 /* 2×2 upload grid */
