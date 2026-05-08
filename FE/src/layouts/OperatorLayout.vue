@@ -53,7 +53,8 @@ onMounted(() => {
     // Lấy config từ môi trường (hoặc fallback mặc định)
     const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
     const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
-    let apiUrl = import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/";
+    let apiUrl =
+      import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/v1/";
     if (!apiUrl.endsWith("/")) apiUrl += "/";
 
     echoInstance = new Echo({
@@ -61,7 +62,7 @@ onMounted(() => {
       key: pusherKey,
       cluster: pusherCluster,
       forceTLS: true,
-      authEndpoint: `${apiUrl}v1/nha-xe/broadcasting/auth`, // Router API để verify Channel
+      authEndpoint: `${apiUrl}nha-xe/broadcasting/auth`, // Router API để verify Channel
       auth: {
         headers: {
           Authorization: `Bearer ${operatorStore.token}`,
@@ -78,68 +79,78 @@ onMounted(() => {
       .private(channelName)
       .listen(".ve.moi_dat", (eventVeMoi) => {
         console.log("Nhan event moi_dat:", eventVeMoi);
-        const msg = eventVeMoi.message || `Bạn có 1 vé mới (${eventVeMoi.ma_ve})!`;
+        const msg =
+          eventVeMoi.message || `Bạn có 1 vé mới (${eventVeMoi.ma_ve})!`;
         showToast(msg, "success");
         operatorStore.addNotification({
-          type: 'ticket',
-          title: 'Vé mới được đặt',
+          type: "ticket",
+          title: "Vé mới được đặt",
           message: msg,
-          icon: 'info'
+          icon: "info",
         });
       })
       .listen(".ve.da_thanh_toan", (eventTiendo) => {
         console.log("Nhan event da_thanh_toan:", eventTiendo);
-        const msg = eventTiendo.message || `Vé ${eventTiendo.ma_ve} mới được thanh toán.`;
+        const msg =
+          eventTiendo.message || `Vé ${eventTiendo.ma_ve} mới được thanh toán.`;
         showToast(msg, "success");
         operatorStore.addNotification({
-          type: 'success',
-          title: 'Thanh toán thành công',
+          type: "success",
+          title: "Thanh toán thành công",
           message: msg,
-          icon: 'success'
+          icon: "success",
         });
       })
       .listen(".ve.huy_tu_dong", (eventHuy) => {
         console.log("Nhan event huy_tu_dong:", eventHuy);
-        const msg = eventHuy.message || `Vé ${eventHuy.ma_ve} vừa bị huỷ do hết thời gian thanh toán`;
+        const msg =
+          eventHuy.message ||
+          `Vé ${eventHuy.ma_ve} vừa bị huỷ do hết thời gian thanh toán`;
         showToast(msg, "error");
         operatorStore.addNotification({
-          type: 'alert',
-          title: 'Vé bị hủy tự động',
+          type: "alert",
+          title: "Vé bị hủy tự động",
           message: msg,
-          icon: 'alert'
+          icon: "alert",
         });
       })
       .listen(".bao-dong.vi-pham", (event) => {
         console.log("🚨 Nhận cảnh báo vi phạm:", event);
-        const msg = event.message || `⚠️ Phát hiện tài xế vi phạm trên chuyến #${event.id_chuyen_xe}`;
+        const msg =
+          event.message ||
+          `⚠️ Phát hiện tài xế vi phạm trên chuyến #${event.id_chuyen_xe}`;
         showToast(msg, "error");
         operatorStore.addNotification({
-          type: 'alert',
-          title: 'Cảnh báo vi phạm',
+          type: "alert",
+          title: "Cảnh báo vi phạm",
           message: msg,
-          icon: 'alert'
+          icon: "alert",
         });
       })
       .listen(".yeu_cau_rut_tien.approved", (event) => {
         console.log("💰 Nhận thông báo duyệt rút tiền:", event);
-        const msg = event.message || `Yêu cầu rút tiền ${event.transaction_code} đã được duyệt.`;
+        const msg =
+          event.message ||
+          `Yêu cầu rút tiền ${event.transaction_code} đã được duyệt.`;
         showToast(msg, "success");
         operatorStore.addNotification({
-          type: 'wallet',
-          title: 'Rút tiền thành công',
+          type: "wallet",
+          title: "Rút tiền thành công",
           message: msg,
-          icon: 'success'
+          icon: "success",
         });
       })
       .listen(".yeu_cau_rut_tien.rejected", (event) => {
         console.log("❌ Nhận thông báo từ chối rút tiền:", event);
-        const msg = event.message || `Yêu cầu rút tiền ${event.transaction_code} đã bị từ chối.`;
+        const msg =
+          event.message ||
+          `Yêu cầu rút tiền ${event.transaction_code} đã bị từ chối.`;
         showToast(msg, "error");
         operatorStore.addNotification({
-          type: 'wallet',
-          title: 'Rút tiền bị từ chối',
+          type: "wallet",
+          title: "Rút tiền bị từ chối",
           message: msg,
-          icon: 'alert'
+          icon: "alert",
         });
       })
       .listen(".nha_xe.topup_success", (event) => {
@@ -147,10 +158,10 @@ onMounted(() => {
         const msg = event.message || `Nạp tiền thành công ${event.amount} VNĐ.`;
         showToast(msg, "success");
         operatorStore.addNotification({
-          type: 'wallet',
-          title: 'Nạp tiền thành công',
+          type: "wallet",
+          title: "Nạp tiền thành công",
           message: msg,
-          icon: 'success'
+          icon: "success",
         });
       });
   }

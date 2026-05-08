@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\NhaXeResource;
+use App\Models\ChucNang;
 use App\Services\NhaXeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,6 +50,63 @@ class NhaXeController extends Controller
             return response()->json(['success' => true, 'message' => 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.']);
         } catch (ValidationException $e) {
             return response()->json(['success' => false, 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $e->errors()], 422);
+        }
+    }
+
+    // ── PHÂN QUYỀN NHÀ XE ────────────────────────────────────────────────
+
+    /**
+     * GET /api/v1/nha-xe/phan-quyen
+     * Trả về chức vụ và danh sách chức năng được phép của nhà xe đang đăng nhập.
+     */
+    public function getPhanQuyen(Request $request): JsonResponse
+    {
+        try {
+            $nhaXe = $request->user('nha_xe') ?? auth('nha_xe')->user();
+
+            if (!$nhaXe) {
+                return response()->json(['success' => false, 'message' => 'Chưa xác thực.'], 401);
+            }
+
+            // Load chucVu và các chucNangs liên quan
+            $nhaXe->load(['chucVu.chucNangs']);
+
+            $chucVu = $nhaXe->chucVu;
+
+            // Nếu không có chức vụ hoặc chức vụ bị khoá -> trả về rỗng
+            if (!$chucVu || $chucVu->tinh_trang === 'khoa') {
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'chuc_vu' => null,
+                        'permissions' => [],
+                        'chuc_nangs' => [],
+                    ]
+                ]);
+            }
+
+            // Lấy các chức năng đang hoạt động theo chức vụ
+            $chucNangs = $chucVu->chucNangs
+                ->where('tinh_trang', 'hoat_dong')
+                ->values();
+
+            $permissions = $chucNangs->pluck('slug')->toArray();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'chuc_vu' => [
+                        'id' => $chucVu->id,
+                        'ten_chuc_vu' => $chucVu->ten_chuc_vu,
+                        'slug' => $chucVu->slug,
+                        'tinh_trang' => $chucVu->tinh_trang,
+                    ],
+                    'permissions' => $permissions,
+                    'chuc_nangs' => $chucNangs,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
 

@@ -267,6 +267,11 @@ const router = createRouter({
           component: () => import('../views/operator/thong-ke/ThongKeView.vue'),
         },
         {
+          path: 'nhan-vien',
+          name: 'operator-nhan-vien',
+          component: () => import('../views/operator/nhan-vien/NhanVienView.vue'),
+        },
+        {
           path: 'phan-quyen',
           name: 'operator-phan-quyen',
           component: () => import('../views/operator/phan-quyen/PhanQuyenView.vue'),

@@ -102,10 +102,11 @@ const menuList = [
     name: "Nhân sự",
     icon: Users,
     children: [
+      { name: "Nhân viên nhà xe", path: "/nha-xe/nhan-vien", icon: Users },
       { name: "Tài xế", path: "/nha-xe/tai-xe", icon: Car },
       { name: "Xe & Phương tiện", path: "/nha-xe/phuong-tien", icon: Bus },
     ],
-    paths: ["/nha-xe/tai-xe", "/nha-xe/phuong-tien"],
+    paths: ["/nha-xe/nhan-vien", "/nha-xe/tai-xe", "/nha-xe/phuong-tien"],
   },
 
   // --- Giám sát ---

@@ -11,11 +11,24 @@ class ChucNang extends Model
     protected $fillable = [
         'ten_chuc_nang',
         'slug',
-        'tinh_trang'
+        'loai',
+        'tinh_trang',
     ];
 
     public function chucVus()
     {
         return $this->belongsToMany(ChucVu::class, 'phan_quyens', 'id_chuc_nang', 'id_chuc_vu');
+    }
+
+    // ── Scopes ───────────────────────────────────────────────────────────────
+
+    public function scopeHeThong($query)
+    {
+        return $query->where('loai', 'he_thong');
+    }
+
+    public function scopeNhaXe($query)
+    {
+        return $query->where('loai', 'nha_xe');
     }
 }

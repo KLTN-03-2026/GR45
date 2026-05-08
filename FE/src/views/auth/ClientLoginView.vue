@@ -1,26 +1,33 @@
 <script setup>
-import { reactive } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useClientStore } from '@/stores/clientStore.js';
-import BaseInput from '@/components/common/BaseInput.vue';
-import BaseButton from '@/components/common/BaseButton.vue';
+import { reactive } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { useClientStore } from "@/stores/clientStore.js";
+import BaseInput from "@/components/common/BaseInput.vue";
+import BaseButton from "@/components/common/BaseButton.vue";
 
-const router      = useRouter();
-const route       = useRoute();
+const router = useRouter();
+const route = useRoute();
 const clientStore = useClientStore();
-const form        = reactive({ email: '', password: '' });
+const form = reactive({ email: "", password: "" });
 
 const handleLogin = async () => {
   const success = await clientStore.login(form);
   if (success) {
-    const redirect = route.query.redirect || '/';
+    const redirect = route.query.redirect || "/";
     router.push(redirect);
   }
 };
 
 const handleGoogleLogin = () => {
-  // Redirect trực tiếp tới route Backend xử lý OAuth
-  window.location.href = 'http://localhost:8000/auth/google';
+  // // Redirect trực tiếp tới route Backend xử lý OAuth
+  // window.location.href = "http://localhost:8000/auth/google";
+  // Lấy API URL từ env hoặc fallback sang production
+  let apiUrl =
+    import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/v1";
+  // Strip '/api/v1' hoặc '/api' để lấy domain chính của backend
+  let baseUrl = apiUrl.replace(/\/api\/v1\/?$/, "").replace(/\/api\/?$/, "");
+  baseUrl = baseUrl.replace(/\/+$/, "");
+  window.location.href = `${baseUrl}/auth/google`;
 };
 </script>
 
@@ -29,7 +36,10 @@ const handleGoogleLogin = () => {
     <div class="illustration-side">
       <div class="overlay-glass">
         <h1>Khám Phá Hành Trình Tuyệt Vời</h1>
-        <p>Đặt vé nhanh chóng, thanh toán tiện lợi và trải nghiệm chuyến đi an toàn với hệ thống giám sát AI thông minh.</p>
+        <p>
+          Đặt vé nhanh chóng, thanh toán tiện lợi và trải nghiệm chuyến đi an
+          toàn với hệ thống giám sát AI thông minh.
+        </p>
         <!-- <div class="features">
           <span class="badge">Mạng lưới toàn quốc</span>
           <span class="badge">Trí tuệ nhân tạo AI</span>
@@ -37,29 +47,48 @@ const handleGoogleLogin = () => {
         </div> -->
       </div>
     </div>
-    
+
     <div class="form-side">
       <div class="form-wrapper">
         <div class="auth-header">
-          <div class="mobile-logo">DATN Bus</div>
+          <div class="mobile-logo">BusSafe</div>
           <h2>Xin chào!</h2>
           <p>Mừng bạn quay trở lại hệ thống</p>
         </div>
-        
+
         <form @submit.prevent="handleLogin" class="login-form">
-          <BaseInput v-model="form.email" type="email" label="Email / Số điện thoại" placeholder="Nhập định danh..." />
-          <BaseInput v-model="form.password" type="password" label="Mật khẩu" placeholder="••••••••" />
-          
+          <BaseInput
+            v-model="form.email"
+            type="email"
+            label="Email / Số điện thoại"
+            placeholder="Nhập định danh..."
+          />
+          <BaseInput
+            v-model="form.password"
+            type="password"
+            label="Mật khẩu"
+            placeholder="••••••••"
+          />
+
           <div class="flex-between">
             <label class="remember-me">
               <input type="checkbox" /> Ghi nhớ
             </label>
-            <router-link :to="{ name: 'forgot-password' }" class="forgot-link">Quên mật khẩu?</router-link>
+            <router-link :to="{ name: 'forgot-password' }" class="forgot-link"
+              >Quên mật khẩu?</router-link
+            >
           </div>
-          
-          <div v-if="clientStore.error" class="error-msg">{{ clientStore.error }}</div>
-          
-          <BaseButton type="submit" block :loading="clientStore.loading" class="client-btn">
+
+          <div v-if="clientStore.error" class="error-msg">
+            {{ clientStore.error }}
+          </div>
+
+          <BaseButton
+            type="submit"
+            block
+            :loading="clientStore.loading"
+            class="client-btn"
+          >
             ĐĂNG NHẬP
           </BaseButton>
 
@@ -68,12 +97,16 @@ const handleGoogleLogin = () => {
           </div>
 
           <button type="button" @click="handleGoogleLogin" class="google-btn">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" />
+            <img
+              src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg"
+              alt="Google"
+            />
             Đăng nhập với Google
           </button>
-          
+
           <div class="register-prompt">
-            Chưa có tài khoản? <router-link to="/auth/register">Đăng ký ngay</router-link>
+            Chưa có tài khoản?
+            <router-link to="/auth/register">Đăng ký ngay</router-link>
           </div>
         </form>
       </div>
@@ -91,7 +124,8 @@ const handleGoogleLogin = () => {
 /* Bên trái: Poster minh hoạ (Ẩn trên Mobile) */
 .illustration-side {
   flex: 1.25;
-  background: url('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80') center/cover no-repeat;
+  background: url("https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80")
+    center/cover no-repeat;
   display: none;
   position: relative;
 }
@@ -175,9 +209,13 @@ const handleGoogleLogin = () => {
     background: white;
     padding: 2.5rem 2rem;
     border-radius: 24px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    box-shadow:
+      0 20px 25px -5px rgba(0, 0, 0, 0.05),
+      0 8px 10px -6px rgba(0, 0, 0, 0.01);
   }
-  .mobile-logo { display: block; }
+  .mobile-logo {
+    display: block;
+  }
 }
 
 .auth-header {
@@ -234,7 +272,9 @@ const handleGoogleLogin = () => {
   font-weight: 600;
   text-decoration: none;
 }
-.forgot-link:hover { text-decoration: underline; }
+.forgot-link:hover {
+  text-decoration: underline;
+}
 
 .client-btn {
   background: linear-gradient(135deg, #0066ff 0%, #0052cc 100%) !important;
@@ -265,12 +305,16 @@ const handleGoogleLogin = () => {
 }
 .divider::before,
 .divider::after {
-  content: '';
+  content: "";
   flex: 1;
   border-bottom: 1px solid #e2e8f0;
 }
-.divider:not(:empty)::before { margin-right: .75em; }
-.divider:not(:empty)::after { margin-left: .75em; }
+.divider:not(:empty)::before {
+  margin-right: 0.75em;
+}
+.divider:not(:empty)::after {
+  margin-left: 0.75em;
+}
 
 /* Google Button Premium Style */
 .google-btn {

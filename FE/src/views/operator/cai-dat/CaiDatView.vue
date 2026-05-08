@@ -1,62 +1,63 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import operatorApi from '@/api/operatorApi.js'
-import { useOperatorStore } from '@/stores/operatorStore'
-import BaseToast from '@/components/common/BaseToast.vue'
+import { onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import operatorApi from "@/api/operatorApi.js";
+import { useOperatorStore } from "@/stores/operatorStore";
+import BaseToast from "@/components/common/BaseToast.vue";
+import { formatCurrency } from "@/utils/format.js";
 
 const profile = ref({
-  ten_nha_xe: 'Nhà xe',
-  email: '---',
-  so_dien_thoai: '---',
-  ma_nha_xe: '---',
-  ten_cong_ty: '---',
-  ma_so_thue: '---',
-  nguoi_dai_dien: '---',
-  so_du_vi: '---',
-})
-const router = useRouter()
-const operatorStore = useOperatorStore()
-const isLoading = ref(false)
-const isChangingPassword = ref(false)
-const passwordErrors = ref({})
+  ten_nha_xe: "Nhà xe",
+  email: "---",
+  so_dien_thoai: "---",
+  ma_nha_xe: "---",
+  ten_cong_ty: "---",
+  ma_so_thue: "---",
+  nguoi_dai_dien: "---",
+  so_du_vi: "---",
+});
+const router = useRouter();
+const operatorStore = useOperatorStore();
+const isLoading = ref(false);
+const isChangingPassword = ref(false);
+const passwordErrors = ref({});
 const passwordForm = ref({
-  mat_khau_cu: '',
-  mat_khau_moi: '',
-  mat_khau_moi_confirmation: '',
-})
-const showPwCu = ref(false)
-const showPwMoi = ref(false)
-const showPwConf = ref(false)
+  mat_khau_cu: "",
+  mat_khau_moi: "",
+  mat_khau_moi_confirmation: "",
+});
+const showPwCu = ref(false);
+const showPwMoi = ref(false);
+const showPwConf = ref(false);
 
-const toastVisible = ref(false)
-const toastMessage = ref('')
-const toastType = ref('success')
-let toastTimer = null
+const toastVisible = ref(false);
+const toastMessage = ref("");
+const toastType = ref("success");
+let toastTimer = null;
 
-const showToast = (message, type = 'success') => {
-  toastMessage.value = message
-  toastType.value = type
-  toastVisible.value = true
-  clearTimeout(toastTimer)
+const showToast = (message, type = "success") => {
+  toastMessage.value = message;
+  toastType.value = type;
+  toastVisible.value = true;
+  clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
-    toastVisible.value = false
-  }, 3000)
-}
+    toastVisible.value = false;
+  }, 3000);
+};
 
 const resetPasswordForm = () => {
   passwordForm.value = {
-    mat_khau_cu: '',
-    mat_khau_moi: '',
-    mat_khau_moi_confirmation: '',
-  }
-  passwordErrors.value = {}
-}
+    mat_khau_cu: "",
+    mat_khau_moi: "",
+    mat_khau_moi_confirmation: "",
+  };
+  passwordErrors.value = {};
+};
 
 const fetchProfile = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
-    const res = await operatorApi.getProfile()
+    const res = await operatorApi.getProfile();
     // axiosClient đã unwrap response => res thường là { success, data }
     // nhưng vẫn fallback các dạng cũ để tương thích.
     const payload =
@@ -66,71 +67,84 @@ const fetchProfile = async () => {
       res?.data?.data?.nha_xe ||
       res?.data?.data ||
       res?.data?.nha_xe ||
-      {}
-    const hoSo = payload.ho_so || {}
-    const viTopup = payload.vi_top_up || {}
+      {};
+    const hoSo = payload.ho_so || {};
+    const viTopup = payload.vi_top_up || {};
     profile.value = {
-      ten_nha_xe: payload.ten_nha_xe || payload.ten || payload.name || 'Nhà xe',
-      email: payload.email || '---',
-      so_dien_thoai: payload.so_dien_thoai || payload.phone || '---',
-      ma_nha_xe: payload.ma_nha_xe || '---',
-      ten_cong_ty: hoSo.ten_cong_ty || '---',
-      ma_so_thue: hoSo.ma_so_thue || '---',
-      nguoi_dai_dien: hoSo.nguoi_dai_dien || '---',
-      so_du_vi: viTopup.so_du || '---',
-    }
+      ten_nha_xe: payload.ten_nha_xe || payload.ten || payload.name || "Nhà xe",
+      email: payload.email || "---",
+      so_dien_thoai: payload.so_dien_thoai || payload.phone || "---",
+      ma_nha_xe: payload.ma_nha_xe || "---",
+      ten_cong_ty: hoSo.ten_cong_ty || "---",
+      ma_so_thue: hoSo.ma_so_thue || "---",
+      nguoi_dai_dien: hoSo.nguoi_dai_dien || "---",
+      so_du_vi: viTopup.so_du || "---",
+    };
   } catch (error) {
-    const fallback = operatorStore.user || {}
+    const fallback = operatorStore.user || {};
     profile.value = {
-      ten_nha_xe: fallback.ten_nha_xe || 'Nhà xe',
-      email: fallback.email || '---',
-      so_dien_thoai: fallback.so_dien_thoai || '---',
-      ma_nha_xe: fallback.ma_nha_xe || '---',
-      ten_cong_ty: '---',
-      ma_so_thue: '---',
-      nguoi_dai_dien: '---',
-      so_du_vi: '---',
-    }
-    showToast(error?.response?.data?.message || 'Không tải được thông tin nhà xe.', 'error')
+      ten_nha_xe: fallback.ten_nha_xe || "Nhà xe",
+      email: fallback.email || "---",
+      so_dien_thoai: fallback.so_dien_thoai || "---",
+      ma_nha_xe: fallback.ma_nha_xe || "---",
+      ten_cong_ty: "---",
+      ma_so_thue: "---",
+      nguoi_dai_dien: "---",
+      so_du_vi: "---",
+    };
+    showToast(
+      error?.response?.data?.message || "Không tải được thông tin nhà xe.",
+      "error",
+    );
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const handleChangePassword = async () => {
-  isChangingPassword.value = true
-  passwordErrors.value = {}
+  isChangingPassword.value = true;
+  passwordErrors.value = {};
   try {
     const payload = {
       mat_khau_cu: passwordForm.value.mat_khau_cu,
       mat_khau_moi: passwordForm.value.mat_khau_moi,
       mat_khau_moi_confirmation: passwordForm.value.mat_khau_moi_confirmation,
-    }
-    const res = await operatorApi.changePassword(payload)
-    showToast(res?.data?.message || 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.', 'success')
-    resetPasswordForm()
+    };
+    const res = await operatorApi.changePassword(payload);
+    showToast(
+      res?.data?.message || "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.",
+      "success",
+    );
+    resetPasswordForm();
     setTimeout(() => {
-      operatorStore.logout()
-      router.replace({ name: 'operator-login' })
-    }, 700)
+      operatorStore.logout();
+      router.replace({ name: "operator-login" });
+    }, 700);
   } catch (error) {
-    passwordErrors.value = error?.response?.data?.errors || {}
-    showToast(error?.response?.data?.message || 'Đổi mật khẩu thất bại.', 'error')
+    passwordErrors.value = error?.response?.data?.errors || {};
+    showToast(
+      error?.response?.data?.message || "Đổi mật khẩu thất bại.",
+      "error",
+    );
   } finally {
-    isChangingPassword.value = false
+    isChangingPassword.value = false;
   }
-}
+};
 
-onMounted(fetchProfile)
+onMounted(fetchProfile);
 </script>
 
 <template>
   <section class="operator-page">
-    <BaseToast :visible="toastVisible" :message="toastMessage" :type="toastType" />
+    <BaseToast
+      :visible="toastVisible"
+      :message="toastMessage"
+      :type="toastType"
+    />
     <h1 class="page-title">Cài đặt tài khoản nhà xe</h1>
 
     <article class="card">
-      <h2>Thông tin tài khoản</h2>
+      <h2 class="fw-bold">Thông tin tài khoản</h2>
       <p v-if="isLoading" class="muted">Đang tải thông tin...</p>
       <div v-else class="profile-grid">
         <div class="profile-item">
@@ -163,13 +177,13 @@ onMounted(fetchProfile)
         </div>
         <div class="profile-item">
           <span>Số dư ví</span>
-          <strong>{{ profile.so_du_vi }}</strong>
+          <strong>{{ formatCurrency(profile.so_du_vi) }}</strong>
         </div>
       </div>
     </article>
 
     <article class="card">
-      <h2>Đổi mật khẩu</h2>
+      <h2 class="fw-bold">Đổi mật khẩu</h2>
       <div class="field">
         <label>Mật khẩu hiện tại</label>
         <div class="pw-field">
@@ -179,11 +193,20 @@ onMounted(fetchProfile)
             placeholder="Nhập mật khẩu hiện tại"
             autocomplete="current-password"
           />
-          <button type="button" class="pw-toggle" :aria-label="showPwCu ? 'Ẩn' : 'Hiện'" @click="showPwCu = !showPwCu">
-            <span class="material-symbols-outlined">{{ showPwCu ? 'visibility_off' : 'visibility' }}</span>
+          <button
+            type="button"
+            class="pw-toggle"
+            :aria-label="showPwCu ? 'Ẩn' : 'Hiện'"
+            @click="showPwCu = !showPwCu"
+          >
+            <span class="material-symbols-outlined">{{
+              showPwCu ? "visibility_off" : "visibility"
+            }}</span>
           </button>
         </div>
-        <small v-if="passwordErrors.mat_khau_cu" class="error-text">{{ passwordErrors.mat_khau_cu[0] }}</small>
+        <small v-if="passwordErrors.mat_khau_cu" class="error-text">{{
+          passwordErrors.mat_khau_cu[0]
+        }}</small>
       </div>
 
       <div class="field">
@@ -195,11 +218,20 @@ onMounted(fetchProfile)
             placeholder="Ít nhất 6 ký tự"
             autocomplete="new-password"
           />
-          <button type="button" class="pw-toggle" :aria-label="showPwMoi ? 'Ẩn' : 'Hiện'" @click="showPwMoi = !showPwMoi">
-            <span class="material-symbols-outlined">{{ showPwMoi ? 'visibility_off' : 'visibility' }}</span>
+          <button
+            type="button"
+            class="pw-toggle"
+            :aria-label="showPwMoi ? 'Ẩn' : 'Hiện'"
+            @click="showPwMoi = !showPwMoi"
+          >
+            <span class="material-symbols-outlined">{{
+              showPwMoi ? "visibility_off" : "visibility"
+            }}</span>
           </button>
         </div>
-        <small v-if="passwordErrors.mat_khau_moi" class="error-text">{{ passwordErrors.mat_khau_moi[0] }}</small>
+        <small v-if="passwordErrors.mat_khau_moi" class="error-text">{{
+          passwordErrors.mat_khau_moi[0]
+        }}</small>
       </div>
 
       <div class="field">
@@ -211,14 +243,25 @@ onMounted(fetchProfile)
             placeholder="Nhập lại mật khẩu mới"
             autocomplete="new-password"
           />
-          <button type="button" class="pw-toggle" :aria-label="showPwConf ? 'Ẩn' : 'Hiện'" @click="showPwConf = !showPwConf">
-            <span class="material-symbols-outlined">{{ showPwConf ? 'visibility_off' : 'visibility' }}</span>
+          <button
+            type="button"
+            class="pw-toggle"
+            :aria-label="showPwConf ? 'Ẩn' : 'Hiện'"
+            @click="showPwConf = !showPwConf"
+          >
+            <span class="material-symbols-outlined">{{
+              showPwConf ? "visibility_off" : "visibility"
+            }}</span>
           </button>
         </div>
       </div>
 
-      <button class="btn-save" :disabled="isChangingPassword" @click="handleChangePassword">
-        {{ isChangingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu' }}
+      <button
+        class="btn-save"
+        :disabled="isChangingPassword"
+        @click="handleChangePassword"
+      >
+        {{ isChangingPassword ? "Đang cập nhật..." : "Cập nhật mật khẩu" }}
       </button>
     </article>
   </section>

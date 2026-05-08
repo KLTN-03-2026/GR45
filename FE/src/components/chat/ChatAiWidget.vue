@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted } from "vue";
 import { callChatAiMessage, parseAssistantUiPayload, getChatAiHistory } from "@/api/chatAiApi.js";
+// Force Vite HMR reload
 
 const open = ref(false);
 const input = ref("");
