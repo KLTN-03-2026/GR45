@@ -118,9 +118,9 @@ class VeService
             // Xử lý Voucher (nếu có)
             $voucher = null;
             if (!empty($data['id_voucher']) && $role === 'khach_hang') {
-                $voucher = Voucher::whereHas('targetedKhachHangs', function($q) use ($user) {
+                $voucher = Voucher::whereHas('targetedKhachHangs', function ($q) use ($user) {
                     $q->where('khach_hang_id', $user->id)
-                      ->where('trang_thai', 'chua_dung');
+                        ->where('trang_thai', 'chua_dung');
                 })->find($data['id_voucher']);
 
                 if (!$voucher) {
@@ -287,6 +287,25 @@ class VeService
             $nhaXe = auth('nha_xe')->user();
             $query->whereHas('chuyenXe.tuyenDuong', function ($q) use ($nhaXe) {
                 $q->where('ma_nha_xe', $nhaXe->ma_nha_xe);
+            });
+        }
+
+        // Logic tìm kiếm (chỉ áp dụng cho vai trò Khách hàng)
+        if ($role === 'khach_hang' && !empty($filters['search'])) {
+            $searchTerm = '%' . strtolower($filters['search']) . '%';
+            $query->where(function ($q) use ($searchTerm) {
+                $q->whereRaw('LOWER(ma_ve) LIKE ?', [$searchTerm])
+                    ->orWhereHas('chuyenXe.tuyenDuong.nhaXe', function ($query) use ($searchTerm) {
+                        $query->whereRaw('LOWER(ten_nha_xe) LIKE ?', [$searchTerm]);
+                    })
+                    ->orWhereHas('chuyenXe.tuyenDuong', function ($query) use ($searchTerm) {
+                        $query->whereRaw('LOWER(ten_tuyen) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(diem_bat_dau) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(diem_ket_thuc) LIKE ?', [$searchTerm]);
+                    })
+                    ->orWhereHas('chuyenXe.taiXe', function ($query) use ($searchTerm) {
+                        $query->whereRaw('LOWER(ho_ten_tai_xe) LIKE ?', [$searchTerm]);
+                    });
             });
         }
 

@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ChatAiController;
 use App\Http\Controllers\ChucNangController;
 use App\Http\Controllers\ChucVuController;
+use App\Http\Controllers\NhanVienNhaXeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\KhachHangController;
@@ -126,6 +127,21 @@ Route::prefix('v1')->group(function () {
             Route::post('dang-xuat',    [NhaXeController::class, 'logout']);
             Route::get('profile',       [NhaXeController::class, 'profile']);
             Route::post('doi-mat-khau', [NhaXeController::class, 'doiMatKhau']);
+            Route::get('phan-quyen',    [NhaXeController::class, 'getPhanQuyen']);
+
+            // ── Quản lý nhân viên nhà xe ─────────────────────────────────────────
+            Route::get('nhan-vien',                          [NhanVienNhaXeController::class, 'index']);
+            Route::get('nhan-vien/{id}',                     [NhanVienNhaXeController::class, 'show']);
+            Route::post('nhan-vien',                         [NhanVienNhaXeController::class, 'store']);
+            Route::put('nhan-vien/{id}',                     [NhanVienNhaXeController::class, 'update']);
+            Route::delete('nhan-vien/{id}',                  [NhanVienNhaXeController::class, 'destroy']);
+            Route::patch('nhan-vien/{id}/trang-thai',        [NhanVienNhaXeController::class, 'toggleStatus']);
+
+            // ── Phân quyền chức vụ nhà xe ────────────────────────────────────────
+            Route::get('chuc-vus',                           [NhanVienNhaXeController::class, 'getChucVus']);
+            Route::get('chuc-nangs',                         [NhanVienNhaXeController::class, 'getChucNangs']);
+            Route::get('chuc-vus/{id}/phan-quyen',           [NhanVienNhaXeController::class, 'getPhanQuyenChucVu']);
+            Route::post('chuc-vus/{id}/phan-quyen',          [NhanVienNhaXeController::class, 'syncPhanQuyenChucVu']);
 
             Route::post('broadcasting/auth', function (\Illuminate\Http\Request $request) {
                 return \Illuminate\Support\Facades\Broadcast::auth($request);

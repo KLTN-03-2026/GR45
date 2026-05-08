@@ -54,6 +54,7 @@ const pagination = reactive({
 const searchQuery = ref("");
 const filterStatus = ref("");
 const filterTripId = ref("");
+const filterTripDate = ref("");
 
 const tableColumns = [
   { key: "ma_ve", label: "Mã Vé" },
@@ -72,8 +73,7 @@ const extractPaginated = (res) => {
   const d = res?.data;
   if (!d) return { list: [], info: {} };
   if (Array.isArray(d)) return { list: d, info: {} };
-  if (Array.isArray(d.data))
-    return { list: d.data, info: d };
+  if (Array.isArray(d.data)) return { list: d.data, info: d };
   return { list: [], info: {} };
 };
 
@@ -85,6 +85,7 @@ const fetchTickets = async (page = 1) => {
       search: searchQuery.value?.trim() || undefined,
       tinh_trang: filterStatus.value || undefined,
       id_chuyen_xe: filterTripId.value || undefined,
+      ngay_khoi_hanh: filterTripDate.value || undefined,
       page,
     });
     const { list, info } = extractPaginated(res);
@@ -487,6 +488,16 @@ onMounted(() => fetchTickets());
         </div>
 
         <div class="filter-group">
+          <label class="filter-label">Ngày khởi hành</label>
+          <input
+            type="date"
+            v-model="filterTripDate"
+            @change="fetchTickets(1)"
+            class="custom-select"
+          />
+        </div>
+
+        <div class="filter-group">
           <label class="filter-label">Trạng thái</label>
           <select
             v-model="filterStatus"
@@ -517,6 +528,7 @@ onMounted(() => fetchTickets());
             searchQuery = '';
             filterStatus = '';
             filterTripId = '';
+            filterTripDate = '';
             fetchTickets(1);
           "
           variant="outline"

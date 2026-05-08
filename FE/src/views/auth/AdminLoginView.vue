@@ -1,18 +1,18 @@
 <script setup>
-import { reactive } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAdminStore } from '@/stores/adminStore.js';
-import BaseInput from '@/components/common/BaseInput.vue';
-import BaseButton from '@/components/common/BaseButton.vue';
-import BaseCard from '@/components/common/BaseCard.vue';
+import { reactive } from "vue";
+import { useRouter } from "vue-router";
+import { useAdminStore } from "@/stores/adminStore.js";
+import BaseInput from "@/components/common/BaseInput.vue";
+import BaseButton from "@/components/common/BaseButton.vue";
+import BaseCard from "@/components/common/BaseCard.vue";
 
-const router    = useRouter();
+const router = useRouter();
 const adminStore = useAdminStore();
-const form      = reactive({ email: '', password: '' });
+const form = reactive({ email: "", password: "" });
 
 const handleLogin = async () => {
   const success = await adminStore.login(form);
-  if (success) router.push('/admin');
+  if (success) router.push("/admin");
 };
 </script>
 
@@ -23,22 +23,42 @@ const handleLogin = async () => {
       <div class="card-title text-center mb-8">
         <div class="logo-circle">🛡️</div>
         <h2>Hệ Thống Quản Trị</h2>
-        <p>Trung tâm điều hành DATN</p>
+        <p>Trung tâm điều hành</p>
       </div>
       <BaseCard class="admin-card">
         <form @submit.prevent="handleLogin" class="login-form">
-          <BaseInput v-model="form.email" type="email" label="Email quản trị" placeholder="admin@example.com" />
-          <BaseInput v-model="form.password" type="password" label="Mật khẩu" placeholder="••••••••" />
+          <BaseInput
+            v-model="form.email"
+            type="email"
+            label="Email quản trị"
+            placeholder="admin@example.com"
+          />
+          <BaseInput
+            v-model="form.password"
+            type="password"
+            label="Mật khẩu"
+            placeholder="••••••••"
+          />
 
           <div class="forgot-link">
-            <router-link :to="{ name: 'forgot-password', query: { role: 'admin' } }">
+            <router-link
+              :to="{ name: 'forgot-password', query: { role: 'admin' } }"
+            >
               Quên mật khẩu?
             </router-link>
           </div>
-          
-          <div v-if="adminStore.error" class="error-msg">{{ adminStore.error }}</div>
-          
-          <BaseButton type="submit" variant="primary" block :loading="adminStore.loading" class="mt-6 submit-btn">
+
+          <div v-if="adminStore.error" class="error-msg">
+            {{ adminStore.error }}
+          </div>
+
+          <BaseButton
+            type="submit"
+            variant="primary"
+            block
+            :loading="adminStore.loading"
+            class="mt-6 submit-btn"
+          >
             Đăng nhập hệ thống
           </BaseButton>
         </form>
@@ -64,7 +84,11 @@ const handleLogin = async () => {
   width: 100%;
   max-width: 800px;
   height: 800px;
-  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(15,23,42,0) 60%);
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.15) 0%,
+    rgba(15, 23, 42, 0) 60%
+  );
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -77,9 +101,15 @@ const handleLogin = async () => {
   z-index: 10;
 }
 
-.text-center { text-align: center; }
-.mb-8 { margin-bottom: 2rem; }
-.mt-6 { margin-top: 1.75rem; }
+.text-center {
+  text-align: center;
+}
+.mb-8 {
+  margin-bottom: 2rem;
+}
+.mt-6 {
+  margin-top: 1.75rem;
+}
 
 .logo-circle {
   width: 72px;
@@ -121,7 +151,10 @@ const handleLogin = async () => {
   padding: 1.5rem 0.5rem;
 }
 
-.login-form { display: flex; flex-direction: column; }
+.login-form {
+  display: flex;
+  flex-direction: column;
+}
 
 .forgot-link {
   text-align: right;

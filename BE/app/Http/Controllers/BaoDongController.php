@@ -37,7 +37,7 @@ class BaoDongController extends Controller
     {
         $request->validate([
             'id_chuyen_xe'   => 'required|integer|exists:chuyen_xes,id',
-            'loai_bao_dong'  => 'required|string|in:ngu_gat,qua_toc_do,phanh_gap,lac_lan,roi_khoi_hanh_trinh,khong_phan_hoi,thiet_bi_loi,phat_hien_dao,hut_thuoc,vi_pham_khac',
+            'loai_bao_dong'  => 'required|string|in:ngu_gat,qua_toc_do,phanh_gap,lac_lan,roi_khoi_hanh_trinh,khong_phan_hoi,thiet_bi_loi,phat_hien_dao,su_dung_dien_thoai,hut_thuoc,mang_vu_khi,khong_quan_sat,bao_dong_khan_cap,vi_pham_khac',
             'muc_do'         => 'required|string|in:thong_tin,canh_bao,nguy_hiem,khan_cap',
             'anh_vi_pham'    => 'nullable|string', // base64 encoded image
             'vi_do_luc_bao'  => 'nullable|numeric',
@@ -55,12 +55,17 @@ class BaoDongController extends Controller
         // Build du_lieu_phat_hien JSON
         $duLieu = $request->input('du_lieu_phat_hien', []);
 
+        $loaiBaoDong = $request->input('loai_bao_dong');
+        if ($loaiBaoDong === 'phat_hien_dao') {
+            $loaiBaoDong = 'mang_vu_khi';
+        }
+
         // Lưu NhatKyBaoDong ngay lập tức (chưa có ảnh URL)
         $baoDong = NhatKyBaoDong::create([
             'id_chuyen_xe'       => $request->input('id_chuyen_xe'),
             'id_tai_xe'          => $taiXe->id,
             'id_xe'              => $idXe,
-            'loai_bao_dong'      => $request->input('loai_bao_dong'),
+            'loai_bao_dong'      => $loaiBaoDong,
             'muc_do'             => $request->input('muc_do'),
             'trang_thai'         => 'moi',
             'du_lieu_phat_hien'  => $duLieu,

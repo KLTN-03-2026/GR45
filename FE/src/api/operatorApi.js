@@ -5,6 +5,23 @@ const operatorApi = {
   getProfile: () => axiosClient.get('/v1/nha-xe/profile'),
   changePassword: (data) => axiosClient.post('/v1/nha-xe/doi-mat-khau', data),
 
+  // --- PHÂN QUYỀN NHÀ XE ---
+  getPhanQuyen: () => axiosClient.get('/v1/nha-xe/phan-quyen'),
+
+  // --- NHÂN VIÊN NHÀ XE ---
+  getStaffs: (params) => axiosClient.get('/v1/nha-xe/nhan-vien', { params }),
+  getStaffDetail: (id) => axiosClient.get(`/v1/nha-xe/nhan-vien/${id}`),
+  createStaff: (data) => axiosClient.post('/v1/nha-xe/nhan-vien', data),
+  updateStaff: (id, data) => axiosClient.put(`/v1/nha-xe/nhan-vien/${id}`, data),
+  deleteStaff: (id) => axiosClient.delete(`/v1/nha-xe/nhan-vien/${id}`),
+  toggleStaffStatus: (id) => axiosClient.patch(`/v1/nha-xe/nhan-vien/${id}/trang-thai`),
+
+  // --- PHÂN QUYỀN CHỨC VỤ NHÀ XE ---
+  getChucVusNhaXe: () => axiosClient.get('/v1/nha-xe/chuc-vus'),
+  getChucNangsNhaXe: () => axiosClient.get('/v1/nha-xe/chuc-nangs'),
+  getChucVuPhanQuyen: (id) => axiosClient.get(`/v1/nha-xe/chuc-vus/${id}/phan-quyen`),
+  syncChucVuPhanQuyen: (id, data) => axiosClient.post(`/v1/nha-xe/chuc-vus/${id}/phan-quyen`, data),
+
   // --- THỐNG KÊ NHÀ XE ---
   getDashboardKpis: () => axiosClient.get('/v1/nha-xe/dashboard-kpis'),
   getStatistics: (params) => axiosClient.get('/v1/nha-xe/thong-ke', { params }),

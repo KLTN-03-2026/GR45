@@ -99,3 +99,5 @@ Get-Content -Path "c:\xampp\htdocs\DATN1\DoAnPrivate\public\models\yolo-violatio
 curl.exe -L -o "c:\xampp\htdocs\DATN1\DoAnPrivate\public\models\yolo-violations.onnx" "https://github.com/Hyuto/yolov8-onnxruntime-web/raw/master/public/model/yolov8n.onnx"
 
 new update
+
+npm run dev -- --force

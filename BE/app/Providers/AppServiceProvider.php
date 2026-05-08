@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Repositories\Admin\AdminRepository;
 use App\Repositories\Admin\AdminRepositoryInterface;
+use App\Repositories\BaoDong\BaoDongRepository;
+use App\Repositories\BaoDong\BaoDongRepositoryInterface;
 use App\Repositories\ChuyenXe\ChuyenXeRepository;
 use App\Repositories\ChuyenXe\ChuyenXeRepositoryInterface;
 use App\Repositories\KhachHang\KhachHangRepository;
@@ -54,6 +56,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(VoucherRepositoryInterface::class, VoucherRepository::class);
         $this->app->bind(ThanhToanRepositoryInterface::class, ThanhToanRepository::class);
         $this->app->bind(XeRepositoryInterface::class, XeRepository::class);
+        $this->app->bind(BaoDongRepositoryInterface::class, BaoDongRepository::class);
         $this->app->bind(VectorStore::class, MysqlVectorStore::class);
 
         $this->app->singleton(ToolRegistry::class, function ($app) {
