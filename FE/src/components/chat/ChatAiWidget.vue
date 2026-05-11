@@ -322,6 +322,16 @@ async function submitMessage(text) {
     }
 
     waitingFirstToken.value = false;
+
+    if (body.is_paused) {
+      // Bỏ qua hiển thị AI (xóa bong bóng assistant vừa tạo)
+      const last = messages.value[messages.value.length - 1];
+      if (last && last.role === "assistant") {
+        messages.value.pop();
+      }
+      return;
+    }
+
     const last = messages.value[messages.value.length - 1];
     if (last && last.role === "assistant") {
       const rawForUi = String(body.assistant ?? "").trim();
