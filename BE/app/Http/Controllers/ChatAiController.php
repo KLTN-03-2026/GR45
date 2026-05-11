@@ -48,8 +48,10 @@ final class ChatAiController extends Controller
         return response()->json([
             'success' => true,
             'assistant' => $text,
+            'session_id' => $result['session_id'] ?? null,
             'metadata' => $result['metadata'] ?? [],
         ]);
+
     }
 
     public function history(Request $request): JsonResponse
@@ -94,12 +96,14 @@ final class ChatAiController extends Controller
 
         return response()->json([
             'success' => true,
+            'session_id' => $session->id,
             'data' => $session->messages->map(fn($msg) => [
                 'role' => $msg->role,
                 'content' => $msg->content,
                 'meta' => $msg->meta,
             ]),
         ]);
+
     }
 
     /**

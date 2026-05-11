@@ -397,7 +397,7 @@ const getStatusInfo = (status) => {
 const ensureClientAuthContext = () => {
   const clientToken = localStorage.getItem(CLIENT_TOKEN_KEY);
   if (clientToken) {
-    localStorage.setItem("auth.active_role", "client");
+    //
   }
 };
 

@@ -25,7 +25,6 @@ export async function checkOperatorLogin(to, from) {
 
   // Đánh dấu đã xác thực, cho phép truy cập
   operatorStore.isTokenVerified = true;
-  localStorage.setItem('auth.active_role', 'operator');
 
   return true;
 }

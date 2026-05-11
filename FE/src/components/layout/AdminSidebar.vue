@@ -1,14 +1,14 @@
 <script setup>
-import { inject, ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { useAdminStore } from '@/stores/adminStore.js'
-import { 
-  LayoutDashboard, 
-  Users, 
-  ShieldCheck, 
-  Map, 
-  Ticket, 
-  LifeBuoy, 
+import { inject, ref, computed } from "vue";
+import { useRoute } from "vue-router";
+import { useAdminStore } from "@/stores/adminStore.js";
+import {
+  LayoutDashboard,
+  Users,
+  ShieldCheck,
+  Map,
+  Ticket,
+  LifeBuoy,
   TrendingUp,
   ChevronDown,
   Bus,
@@ -21,227 +21,257 @@ import {
   Star,
   Sparkles,
   Wallet,
-} from 'lucide-vue-next'
+} from "lucide-vue-next";
 
 // Inject từ AdminLayout
-const isSidebarOpen = inject('isSidebarOpen')
-const closeSidebar = inject('closeSidebar')
-const route = useRoute()
-const adminStore = useAdminStore()
+const isSidebarOpen = inject("isSidebarOpen");
+const closeSidebar = inject("closeSidebar");
+const route = useRoute();
+const adminStore = useAdminStore();
 
 // Lịch sử state mở menu (chỉ mở 1 cái 1 lúc)
-const activeDropdown = ref(null)
+const activeDropdown = ref(null);
 
 const toggleDropdown = (menuName) => {
   if (activeDropdown.value === menuName) {
-    activeDropdown.value = null
+    activeDropdown.value = null;
   } else {
-    activeDropdown.value = menuName
+    activeDropdown.value = menuName;
   }
-}
+};
 
 // Kiểm tra route hien tai co nam trong menu cha dropdown hay ko
 const isChildActive = (paths) => {
-  return paths.some(p => route.path.includes(p))
-}
+  return paths.some((p) => route.path.includes(p));
+};
 
 const hasMenuPermission = (item) => {
-  if (adminStore.isMaster === 1) return true
+  if (adminStore.isMaster === 1) return true;
 
   if (Array.isArray(item.permissionSlugs) && item.permissionSlugs.length > 0) {
-    return adminStore.hasAnyPermission(item.permissionSlugs)
+    return adminStore.hasAnyPermission(item.permissionSlugs);
   }
 
   if (Array.isArray(item.permissionHints) && item.permissionHints.length > 0) {
     return item.permissionHints.some((hint) =>
-      adminStore.permissions.some((slug) => slug.includes(hint))
-    )
+      adminStore.permissions.some((slug) => slug.includes(hint)),
+    );
   }
 
-  return true
-}
+  return true;
+};
 
 const closeSidebarSafely = () => {
-  if (typeof closeSidebar === 'function') {
-    closeSidebar()
+  if (typeof closeSidebar === "function") {
+    closeSidebar();
   }
-}
+};
 
 const menuList = [
-  { id: 'dashboard', name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
   {
-    id: 'chat-ai-tri-thuc',
-    name: 'Tri thức Chat AI',
-    path: '/admin/chat-ai-tri-thuc',
+    id: "dashboard",
+    name: "Dashboard",
+    path: "/admin/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    id: "chat-ai-tri-thuc",
+    name: "Tri thức Chat AI",
+    path: "/admin/chat-ai-tri-thuc",
     icon: Sparkles,
   },
   {
-    id: 'tuyen-duong',
-    name: 'Quản lý tuyến đường',
-    path: '/admin/tuyen-duong',
+    id: "tuyen-duong",
+    name: "Quản lý tuyến đường",
+    path: "/admin/tuyen-duong",
     icon: Map,
-    permissionSlugs: ['xem-tuyen-duong'],
-    permissionHints: ['tuyen-duong'],
+    permissionSlugs: ["xem-tuyen-duong"],
+    permissionHints: ["tuyen-duong"],
   },
   {
-    id: 'chuyen-xe',
-    name: 'Quản lý chuyến xe',
-    path: '/admin/chuyen-xe',
+    id: "chuyen-xe",
+    name: "Quản lý chuyến xe",
+    path: "/admin/chuyen-xe",
     icon: BusFront,
-    permissionSlugs: ['xem-chuyen-xe'],
-    permissionHints: ['chuyen-xe'],
+    permissionSlugs: ["xem-chuyen-xe"],
+    permissionHints: ["chuyen-xe"],
   },
   {
-    id: 'tracking',
-    name: 'Giám sát xe',
+    id: "tracking",
+    name: "Giám sát xe",
     icon: Map,
-    permissionSlugs: ['xem-tracking-chuyen-xe', 'xem-chuyen-xe'],
-    permissionHints: ['tracking'],
+    permissionSlugs: ["xem-tracking-chuyen-xe", "xem-chuyen-xe"],
+    permissionHints: ["tracking"],
     children: [
-      { name: '📡 Live Tracking', path: '/admin/live-tracking', icon: Map },
-      { name: '📋 Lịch sử hành trình', path: '/admin/lich-su-hanh-trinh', icon: Map },
+      { name: "📡 Live Tracking", path: "/admin/live-tracking", icon: Map },
+      {
+        name: "📋 Lịch sử hành trình",
+        path: "/admin/lich-su-hanh-trinh",
+        icon: Map,
+      },
     ],
-    paths: ['/admin/live-tracking', '/admin/lich-su-hanh-trinh'],
+    paths: ["/admin/live-tracking", "/admin/lich-su-hanh-trinh"],
   },
   {
-    id: 've',
-    name: 'Quản lý vé',
-    path: '/admin/ve',
+    id: "ve",
+    name: "Quản lý vé",
+    path: "/admin/ve",
     icon: Ticket,
-    permissionSlugs: ['xem-ve'],
-    permissionHints: ['ve'],
+    permissionSlugs: ["xem-ve"],
+    permissionHints: ["ve"],
   },
   {
-    id: 'voucher',
-    name: 'Quản lý voucher',
-    path: '/admin/voucher',
+    id: "voucher",
+    name: "Quản lý voucher",
+    path: "/admin/voucher",
     icon: Gift,
-    permissionSlugs: ['xem-voucher'],
-    permissionHints: ['voucher'],
+    permissionSlugs: ["xem-voucher"],
+    permissionHints: ["voucher"],
   },
   {
-    id: 'danh-gia',
-    name: 'Đánh giá chuyến xe',
-    path: '/admin/danh-gia',
+    id: "danh-gia",
+    name: "Đánh giá chuyến xe",
+    path: "/admin/danh-gia",
     icon: Star,
   },
-  
+
   // Dropdown quản lý user
-  { 
-    id: 'quan-ly', 
-    name: 'Quản lý', 
+  {
+    id: "quan-ly",
+    name: "Quản lý",
     icon: Users,
     children: [
       {
-        name: 'Nhân viên',
-        path: '/admin/nhan-vien',
+        name: "Nhân viên",
+        path: "/admin/nhan-vien",
         icon: UserCog,
-        permissionSlugs: ['xem-nhan-vien'],
-        permissionHints: ['nhan-vien'],
+        permissionSlugs: ["xem-nhan-vien"],
+        permissionHints: ["nhan-vien"],
       },
       {
-        name: 'Nhà xe',
-        path: '/admin/nha-xe',
+        name: "Nhà xe",
+        path: "/admin/nha-xe",
         icon: Bus,
-        permissionSlugs: ['xem-nha-xe'],
-        permissionHints: ['nha-xe'],
+        permissionSlugs: ["xem-nha-xe"],
+        permissionHints: ["nha-xe"],
       },
       {
-        name: 'Tài xế',
-        path: '/admin/tai-xe',
+        name: "Tài xế",
+        path: "/admin/tai-xe",
         icon: User,
-        permissionSlugs: ['xem-tai-xe'],
-        permissionHints: ['tai-xe'],
+        permissionSlugs: ["xem-tai-xe"],
+        permissionHints: ["tai-xe"],
       },
       {
-        name: 'Phương tiện',
-        path: '/admin/phuong-tien',
+        name: "Phương tiện",
+        path: "/admin/phuong-tien",
         icon: BusFront,
-        permissionSlugs: ['xem-xe'],
-        permissionHints: ['xe', 'phuong-tien'],
+        permissionSlugs: ["xem-xe"],
+        permissionHints: ["xe", "phuong-tien"],
       },
       {
-        name: 'Khách hàng',
-        path: '/admin/khach-hang',
+        name: "Khách hàng",
+        path: "/admin/khach-hang",
         icon: Users,
-        permissionSlugs: ['xem-khach-hang'],
-        permissionHints: ['khach-hang'],
+        permissionSlugs: ["xem-khach-hang"],
+        permissionHints: ["khach-hang"],
       },
     ],
-    paths: ['/admin/nhan-vien', '/admin/nha-xe', '/admin/tai-xe', '/admin/phuong-tien', '/admin/khach-hang']
+    paths: [
+      "/admin/nhan-vien",
+      "/admin/nha-xe",
+      "/admin/tai-xe",
+      "/admin/phuong-tien",
+      "/admin/khach-hang",
+    ],
   },
 
   // Dropdown Hệ thống
-  { 
-    id: 'he-thong', 
-    name: 'Hệ thống', 
+  {
+    id: "he-thong",
+    name: "Hệ thống",
     icon: Settings,
     children: [
       {
-        name: 'Phân quyền',
-        path: '/admin/phan-quyen',
+        name: "Phân quyền",
+        path: "/admin/phan-quyen",
         icon: ShieldCheck,
-        permissionSlugs: ['xem-phan-quyen'],
-        permissionHints: ['phan-quyen', 'chuc-nang'],
+        permissionSlugs: ["xem-phan-quyen"],
+        permissionHints: ["phan-quyen", "chuc-nang"],
       },
       {
-        name: 'Cấu hình chung',
-        path: '/admin/cau-hinh',
+        name: "Cấu hình chung",
+        path: "/admin/cau-hinh",
         icon: Database,
-        permissionSlugs: ['xem-cau-hinh'],
-        permissionHints: ['cau-hinh'],
+        permissionSlugs: ["xem-cau-hinh"],
+        permissionHints: ["cau-hinh"],
       },
     ],
-    paths: ['/admin/phan-quyen', '/admin/cau-hinh']
+    paths: ["/admin/phan-quyen", "/admin/cau-hinh"],
   },
 
   {
-    id: 'ho-tro',
-    name: 'Quản lý hỗ trợ',
-    path: '/admin/ho-tro',
+    id: "ho-tro",
+    name: "Quản lý hỗ trợ",
     icon: LifeBuoy,
-    permissionSlugs: ['xem-ho-tro'],
-    permissionHints: ['ho-tro'],
+    children: [
+      {
+        name: "Hỗ trợ khách hàng",
+        path: "/admin/ho-tro-khach-hang",
+        icon: User,
+        // permissionSlugs: ["xem-ho-tro-khach-hang"],
+        // permissionHints: ["ho-tro-khach-hang"],
+      },
+      {
+        name: "Hỗ trợ nhà xe",
+        path: "/admin/ho-tro-nha-xe",
+        icon: Bus,
+        // permissionSlugs: ["xem-ho-tro-nha-xe"],
+        // permissionHints: ["ho-tro-nha-xe"],
+      },
+    ],
+    paths: ["/admin/ho-tro-khach-hang", "/admin/ho-tro-nha-xe"],
   },
   {
-    id: 'thong-ke',
-    name: 'Báo cáo doanh thu',
-    path: '/admin/thong-ke',
+    id: "thong-ke",
+    name: "Báo cáo doanh thu",
+    path: "/admin/thong-ke",
     icon: TrendingUp,
-    permissionSlugs: ['xem-thong-ke'],
-    permissionHints: ['thong-ke', 'doanh-thu'],
+    permissionSlugs: ["xem-thong-ke"],
+    permissionHints: ["thong-ke", "doanh-thu"],
   },
   {
-    id: 'vi-nha-xe',
-    name: 'Quản lý ví nhà xe',
-    path: '/admin/vi-nha-xe',
+    id: "vi-nha-xe",
+    name: "Quản lý ví nhà xe",
+    path: "/admin/vi-nha-xe",
     icon: Wallet,
   },
-]
+];
 
 const visibleMenuList = computed(() => {
   return menuList
     .map((item) => {
       if (!item.children) {
-        return hasMenuPermission(item) ? item : null
+        return hasMenuPermission(item) ? item : null;
       }
 
-      const children = item.children.filter((child) => hasMenuPermission(child))
-      if (children.length === 0) return null
+      const children = item.children.filter((child) =>
+        hasMenuPermission(child),
+      );
+      if (children.length === 0) return null;
 
       return {
         ...item,
         children,
         paths: children.map((child) => child.path),
-      }
+      };
     })
-    .filter(Boolean)
-})
-
+    .filter(Boolean);
+});
 </script>
 
 <template>
-  <aside 
+  <aside
     class="sidebar scrollable-custom"
     :class="{ 'mobile-open': isSidebarOpen }"
   >
@@ -252,7 +282,11 @@ const visibleMenuList = computed(() => {
         <div class="brand-copy">
           <span class="brand-text">Admin Panel</span>
           <span class="brand-role">
-            {{ adminStore.isMaster === 1 ? 'Super Admin' : (adminStore.chucVu || 'Nhân viên') }}
+            {{
+              adminStore.isMaster === 1
+                ? "Super Admin"
+                : adminStore.chucVu || "Nhân viên"
+            }}
           </span>
         </div>
       </div>
@@ -262,9 +296,9 @@ const visibleMenuList = computed(() => {
     <nav class="sidebar-menu">
       <template v-for="item in visibleMenuList" :key="item.id">
         <!-- Nếu là link bình thường -->
-        <RouterLink 
-          v-if="!item.children" 
-          :to="item.path" 
+        <RouterLink
+          v-if="!item.children"
+          :to="item.path"
           class="menu-item"
           active-class="active"
           @click="closeSidebarSafely"
@@ -275,23 +309,29 @@ const visibleMenuList = computed(() => {
 
         <!-- Nếu là Dropdown -->
         <div v-else class="menu-dropdown">
-          <button 
-            class="menu-item" 
-            :class="{ 'dropdown-active': activeDropdown === item.id || isChildActive(item.paths) }"
+          <button
+            class="menu-item"
+            :class="{
+              'dropdown-active':
+                activeDropdown === item.id || isChildActive(item.paths),
+            }"
             @click="toggleDropdown(item.id)"
           >
             <component :is="item.icon" class="menu-icon" />
             <span class="menu-text">{{ item.name }}</span>
-            <ChevronDown 
-              class="arrow-icon" 
-              :class="{ 'rotate-180': activeDropdown === item.id }" 
+            <ChevronDown
+              class="arrow-icon"
+              :class="{ 'rotate-180': activeDropdown === item.id }"
             />
           </button>
-          
+
           <!-- Lưới dropdown (transition scale y smoothly) -->
-          <div class="submenu" :class="{ 'submenu-open': activeDropdown === item.id }">
-            <RouterLink 
-              v-for="sub in item.children" 
+          <div
+            class="submenu"
+            :class="{ 'submenu-open': activeDropdown === item.id }"
+          >
+            <RouterLink
+              v-for="sub in item.children"
               :key="sub.path"
               :to="sub.path"
               class="submenu-item"
@@ -310,16 +350,20 @@ const visibleMenuList = computed(() => {
       </p>
 
       <div class="divider"></div>
-      
+
       <!-- Khác -->
       <div class="menu-title">KHÁC</div>
-      <RouterLink to="/admin/cai-dat" class="menu-item" active-class="active" @click="closeSidebarSafely">
+      <RouterLink
+        to="/admin/cai-dat"
+        class="menu-item"
+        active-class="active"
+        @click="closeSidebarSafely"
+      >
         <Settings class="menu-icon" />
         <span class="menu-text">Cài đặt cá nhân</span>
       </RouterLink>
-
     </nav>
-    
+
     <!-- Upgrade block (Aesthetic touch) -->
     <div class="sidebar-footer">
       <div class="upgrade-card gradient-glass">
@@ -392,12 +436,12 @@ const visibleMenuList = computed(() => {
 .brand-text {
   font-size: 20px;
   font-weight: 700;
-  color: #0F172A;
+  color: #0f172a;
   letter-spacing: -0.5px;
 }
 .brand-role {
   font-size: 12px;
-  color: #64748B;
+  color: #64748b;
   font-weight: 600;
 }
 
@@ -412,7 +456,7 @@ const visibleMenuList = computed(() => {
 .menu-title {
   font-size: 12px;
   font-weight: 700;
-  color: #64748B;
+  color: #64748b;
   text-transform: uppercase;
   letter-spacing: 1px;
   margin: 16px 0 8px 16px;
@@ -420,7 +464,7 @@ const visibleMenuList = computed(() => {
 .empty-menu-text {
   padding: 12px 16px;
   font-size: 13px;
-  color: #64748B;
+  color: #64748b;
   border: 1px dashed #cbd5e1;
   border-radius: 10px;
   background: #f8fafc;
@@ -450,14 +494,15 @@ const visibleMenuList = computed(() => {
   border-left: 4px solid transparent;
 }
 .menu-item:hover {
-  background-color: #F8FAFC;
-  color: #4F46E5;
+  background-color: #f8fafc;
+  color: #4f46e5;
 }
-.menu-item.active, .menu-item.dropdown-active {
-  background-color: #EEF2FF;
-  color: #4338CA;
+.menu-item.active,
+.menu-item.dropdown-active {
+  background-color: #eef2ff;
+  color: #4338ca;
   font-weight: 700;
-  border-left: 4px solid #4F46E5;
+  border-left: 4px solid #4f46e5;
   border-radius: 0 12px 12px 0;
 }
 .menu-icon {
@@ -480,7 +525,9 @@ const visibleMenuList = computed(() => {
 .submenu {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.4s ease-in-out, opacity 0.3s ease;
+  transition:
+    max-height 0.4s ease-in-out,
+    opacity 0.3s ease;
   opacity: 0;
   display: flex;
   flex-direction: column;
@@ -498,7 +545,7 @@ const visibleMenuList = computed(() => {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  color: #64748B;
+  color: #64748b;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s;
@@ -511,13 +558,13 @@ const visibleMenuList = computed(() => {
   opacity: 0.5;
 }
 .submenu-item:hover {
-  color: #4F46E5;
-  background-color: #F8FAFC;
+  color: #4f46e5;
+  background-color: #f8fafc;
 }
 .submenu-item.sub-active {
-  color: #4338CA;
+  color: #4338ca;
   font-weight: 700;
-  background-color: #EEF2FF;
+  background-color: #eef2ff;
 }
 .submenu-item.sub-active .submenu-dot {
   opacity: 1;
@@ -537,7 +584,7 @@ const visibleMenuList = computed(() => {
   overflow: hidden;
 }
 .gradient-glass {
-  background: linear-gradient(135deg, #4F46E5 0%, #818cf8 100%);
+  background: linear-gradient(135deg, #4f46e5 0%, #818cf8 100%);
   box-shadow: 0 10px 20px rgba(79, 70, 229, 0.25);
 }
 .upgrade-icon {

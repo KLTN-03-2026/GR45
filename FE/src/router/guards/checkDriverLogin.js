@@ -25,7 +25,6 @@ export async function checkDriverLogin(to, from) {
 
   // Đánh dấu đã xác thực, cho phép truy cập
   driverStore.isTokenVerified = true;
-  localStorage.setItem('auth.active_role', 'driver');
 
   return true;
 }

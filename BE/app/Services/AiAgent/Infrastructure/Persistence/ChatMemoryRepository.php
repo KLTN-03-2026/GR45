@@ -18,9 +18,9 @@ final class ChatMemoryRepository
         string $userText,
         string $assistantText,
         array $meta,
-    ): void {
+    ): ?int {
         if (! $sessionKey || ! Schema::hasTable('chat_sessions') || ! Schema::hasTable('chat_messages')) {
-            return;
+            return null;
         }
 
         $key = Str::limit($sessionKey, 64, '');
@@ -34,20 +34,29 @@ final class ChatMemoryRepository
                 $session->save();
             }
 
-            ChatMessage::query()->create([
+            $userMsg = ChatMessage::query()->create([
                 'chat_session_id' => $session->id,
                 'role' => 'user',
                 'content' => $userText,
                 'meta' => null,
             ]);
-            ChatMessage::query()->create([
+            broadcast(new \App\Events\ChatMessageSentEvent($userMsg));
+
+            $aiMsg = ChatMessage::query()->create([
                 'chat_session_id' => $session->id,
                 'role' => 'assistant',
                 'content' => $assistantText,
                 'meta' => array_merge($meta, ['provider' => 'modules_chat']),
             ]);
+            broadcast(new \App\Events\ChatMessageSentEvent($aiMsg));
+
+            // Cập nhật thời gian của session để giao diện admin hiển thị mới nhất
+            $session->touch();
+
+            return $session->id;
         } catch (\Throwable) {
             // Không chặn chat nếu log DB lỗi
+            return null;
         }
     }
 }

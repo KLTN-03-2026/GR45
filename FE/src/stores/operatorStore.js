@@ -50,7 +50,6 @@ export const useOperatorStore = defineStore('operator', () => {
       isTokenVerified.value = true;
       localStorage.setItem(TOKEN_KEY, t);
       localStorage.setItem(USER_KEY, JSON.stringify(u));
-      localStorage.setItem('auth.active_role', 'operator');
       return true;
     } catch (err) {
       error.value = err.response?.data?.errors

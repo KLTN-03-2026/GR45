@@ -11,6 +11,9 @@ class ChatSession extends Model
     protected $fillable = [
         'session_key',
         'id_khach_hang',
+        'id_nha_xe',
+        'loai_ho_tro',
+        'tieu_de',
         'structured_context',
     ];
 
@@ -24,6 +27,11 @@ class ChatSession extends Model
     public function khachHang(): BelongsTo
     {
         return $this->belongsTo(KhachHang::class, 'id_khach_hang');
+    }
+
+    public function nhaXe(): BelongsTo
+    {
+        return $this->belongsTo(NhaXe::class, 'id_nha_xe');
     }
 
     public function messages(): HasMany

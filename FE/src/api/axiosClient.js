@@ -51,11 +51,10 @@ const axiosClient = axios.create({
 });
 
 // --- REQUEST INTERCEPTOR ---
-// Tự động đính Bearer: ưu tiên auth.active_role; không có thì suy ra từ URL (hành vi cũ, hợp ngrok).
+// Tự động đính Bearer: suy ra role từ URL.
 axiosClient.interceptors.request.use(
   (config) => {
-    const storedRole = localStorage.getItem('auth.active_role');
-    const activeRole = storedRole || getRoleFromUrl(config.url);
+    const activeRole = getRoleFromUrl(config.url);
     const tokenKey = ROLE_TOKEN_MAP[activeRole];
     const token = tokenKey ? localStorage.getItem(tokenKey) : null;
 
@@ -80,12 +79,9 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    // Nếu 401 → xóa token của đúng role gọi API (bản cũ không xóa auth.active_role)
+    // Nếu 401 → xóa token của đúng role gọi API
     if (error.response?.status === 401) {
-      const activeRole =
-        error.config?._role ||
-        localStorage.getItem('auth.active_role') ||
-        getRoleFromUrl(error.config?.url);
+      const activeRole = error.config?._role || getRoleFromUrl(error.config?.url);
       const tokenKey = ROLE_TOKEN_MAP[activeRole];
       if (tokenKey) {
         localStorage.removeItem(tokenKey);
