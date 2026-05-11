@@ -25,7 +25,6 @@ export async function checkClientLogin(to, from) {
 
   // Đánh dấu đã xác thực, cho phép truy cập
   clientStore.isTokenVerified = true;
-  localStorage.setItem('auth.active_role', 'client');
 
   return true;
 }

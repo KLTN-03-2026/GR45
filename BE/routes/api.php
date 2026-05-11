@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminChatAiKnowledgeController;
+use App\Http\Controllers\AdminChatSupportController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\ChatAiController;
 use App\Http\Controllers\ChucNangController;
@@ -224,6 +225,14 @@ Route::prefix('v1')->group(function () {
             Route::post('vi-nha-xe/withdraw', [\App\Http\Controllers\ViNhaXeController::class, 'requestWithdraw']);
             Route::post('vi-nha-xe/topup', [\App\Http\Controllers\ViNhaXeController::class, 'requestTopup']);
             Route::get('vi-nha-xe/giao-dich/{id}', [\App\Http\Controllers\ViNhaXeController::class, 'getTransactionDetail']);
+            
+            // Hỗ trợ chat nhà xe
+            Route::prefix('ho-tro')->group(function () {
+                Route::get('sessions', [\App\Http\Controllers\OperatorChatSupportController::class, 'index']);
+                Route::get('sessions/{id}', [\App\Http\Controllers\OperatorChatSupportController::class, 'show']);
+                Route::post('sessions', [\App\Http\Controllers\OperatorChatSupportController::class, 'store']);
+                Route::post('sessions/{id}/reply', [\App\Http\Controllers\OperatorChatSupportController::class, 'reply']);
+            });
         });
     });
 
@@ -344,6 +353,23 @@ Route::prefix('v1')->group(function () {
                 Route::get('ingest-logs', [AdminChatAiKnowledgeController::class, 'ingestLogs']);
                 Route::delete('ingest-logs/{id}', [AdminChatAiKnowledgeController::class, 'destroyIngestLog']);
                 Route::post('upload-pdf-sync', [AdminChatAiKnowledgeController::class, 'uploadPdfSync']);
+            });
+
+            // Kênh hỗ trợ admin (chat realtime với khách hàng & nhà xe)
+            Route::prefix('ho-tro')->group(function () {
+                // Hỗ trợ khách hàng
+                Route::prefix('khach-hang')->group(function () {
+                    Route::get('sessions', [AdminChatSupportController::class, 'sessionsKhachHang']);
+                    Route::get('sessions/{id}', [AdminChatSupportController::class, 'showSession']);
+                    Route::post('sessions/{id}/reply', [AdminChatSupportController::class, 'reply']);
+                });
+                // Hỗ trợ nhà xe
+                Route::prefix('nha-xe')->group(function () {
+                    Route::get('sessions', [AdminChatSupportController::class, 'sessionsNhaXe']);
+                    Route::get('sessions/{id}', [AdminChatSupportController::class, 'showSession']);
+                    Route::post('sessions/{id}/reply', [AdminChatSupportController::class, 'reply']);
+                    Route::post('sessions', [AdminChatSupportController::class, 'createNhaXeSession']);
+                });
             });
 
             // Thanh toán và thống kê

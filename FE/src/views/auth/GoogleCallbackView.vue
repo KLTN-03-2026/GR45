@@ -15,7 +15,6 @@ onMounted(async () => {
     const TOKEN_KEY = 'auth.client.token';
     clientStore.token = token;
     localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem('auth.active_role', 'client');
     
     // Fetch profile để đồng bộ dữ liệu user
     const success = await clientStore.fetchProfile();

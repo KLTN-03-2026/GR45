@@ -20,8 +20,36 @@ final class ChatAiController extends Controller
     {
         $data = $this->validatedPayload($request);
         $khId = $this->optionalKhachHangId($request);
+        $sessionKey = $data['session_id'];
+
+        // Kiểm tra xem admin có vừa tham gia trả lời không (trong vòng 30 phút)
+        if ($sessionKey) {
+            $chatSession = \App\Models\ChatSession::where('session_key', $sessionKey)->first();
+            if ($chatSession) {
+                $lastAdminMsg = $chatSession->messages()->where('role', 'admin')->latest('id')->first();
+                if ($lastAdminMsg && $lastAdminMsg->created_at->diffInMinutes(now()) < 30) {
+                    // Lưu tin nhắn của user
+                    $userMsg = \App\Models\ChatMessage::create([
+                        'chat_session_id' => $chatSession->id,
+                        'role' => 'user',
+                        'content' => trim($data['message']),
+                    ]);
+                    $chatSession->touch();
+                    broadcast(new \App\Events\ChatMessageSentEvent($userMsg));
+
+                    // Đánh dấu là đang tạm ngưng AI (để frontend ẩn bong bóng AI đi)
+                    return response()->json([
+                        'success' => true,
+                        'is_paused' => true,
+                        'session_id' => $chatSession->id,
+                        'metadata' => [],
+                    ]);
+                }
+            }
+        }
 
         try {
+
             $result = $this->chatService->run(
                 message: $data['message'],
                 history: $data['history'],
@@ -48,8 +76,10 @@ final class ChatAiController extends Controller
         return response()->json([
             'success' => true,
             'assistant' => $text,
+            'session_id' => $result['session_id'] ?? null,
             'metadata' => $result['metadata'] ?? [],
         ]);
+
     }
 
     public function history(Request $request): JsonResponse
@@ -94,12 +124,14 @@ final class ChatAiController extends Controller
 
         return response()->json([
             'success' => true,
+            'session_id' => $session->id,
             'data' => $session->messages->map(fn($msg) => [
                 'role' => $msg->role,
                 'content' => $msg->content,
                 'meta' => $msg->meta,
             ]),
         ]);
+
     }
 
     /**

@@ -169,9 +169,14 @@ const router = createRouter({
           component: () => import('../views/admin/cau-hinh/CauHinhView.vue'),
         },
         {
-          path: 'ho-tro',
-          name: 'admin-ho-tro',
-          component: () => import('../views/admin/ho-tro/HoTroView.vue'),
+          path: 'ho-tro-khach-hang',
+          name: 'admin-ho-tro-khach-hang',
+          component: () => import('../views/admin/ho-tro/HoTroKhachHangView.vue'),
+        },
+        {
+          path: 'ho-tro-nha-xe',
+          name: 'admin-ho-tro-nha-xe',
+          component: () => import('../views/admin/ho-tro/HoTroNhaXeView.vue'),
         },
         {
           path: 'thong-ke',

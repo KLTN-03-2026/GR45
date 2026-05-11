@@ -120,7 +120,6 @@ export const useAdminStore = defineStore('admin', () => {
       isTokenVerified.value = true;
       localStorage.setItem(TOKEN_KEY, t);
       localStorage.setItem(USER_KEY, JSON.stringify(u));
-      localStorage.setItem('auth.active_role', 'admin');
       await fetchPermissions({ silent: true });
       return true;
     } catch (err) {

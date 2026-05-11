@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, nextTick, watch, onMounted } from "vue";
 import { callChatAiMessage, parseAssistantUiPayload, getChatAiHistory } from "@/api/chatAiApi.js";
+import { useChatSupportChannel } from "@/composables/useChatSupportChannel";
 // Force Vite HMR reload
 
 const open = ref(false);
@@ -21,6 +22,23 @@ const chatAiSessionId = ref("");
 /** Tránh scroll layout mỗi token — gộp theo frame. */
 let scrollRaf = null;
 const loginPath = String(import.meta.env.VITE_CHAT_LOGIN_PATH || "/auth/login").trim() || "/auth/login";
+
+const { subscribe, unsubscribeAll, isSubscribed } = useChatSupportChannel();
+
+function subscribeToSession(sessionId) {
+  if (!sessionId || isSubscribed(sessionId)) return;
+  subscribe(sessionId, (message) => {
+    // Chỉ thêm tin nhắn của admin, tin nhắn của user/assistant đã được handle qua flow chuẩn
+    if (message.role === "admin") {
+      messages.value.push({
+        role: message.role,
+        text: message.content,
+        metadata: message.meta || {},
+      });
+      scrollToEnd();
+    }
+  });
+}
 
 /** Link từ tool (tickets_url — tìm chuyến dùng chip suggestions open_search). */
 function toolPayloadLinks(m) {
@@ -79,6 +97,9 @@ onMounted(async () => {
   try {
     const res = await getChatAiHistory({ session_key: storedKey });
     if (res && res.success && Array.isArray(res.data)) {
+      if (res.session_id) {
+        subscribeToSession(res.session_id);
+      }
       messages.value = res.data.map(msg => {
         let text = msg.content;
         try {
@@ -296,7 +317,21 @@ async function submitMessage(text) {
   try {
     const body = await callChatAiMessage(displayText, undefined, opts);
 
+    if (body.session_id) {
+      subscribeToSession(body.session_id);
+    }
+
     waitingFirstToken.value = false;
+
+    if (body.is_paused) {
+      // Bỏ qua hiển thị AI (xóa bong bóng assistant vừa tạo)
+      const last = messages.value[messages.value.length - 1];
+      if (last && last.role === "assistant") {
+        messages.value.pop();
+      }
+      return;
+    }
+
     const last = messages.value[messages.value.length - 1];
     if (last && last.role === "assistant") {
       const rawForUi = String(body.assistant ?? "").trim();

@@ -26,7 +26,6 @@ export async function checkAdminLogin(to, from) {
   // Đánh dấu đã xác thực an toàn, cho phép truy cập luôn 
   // (tránh tình trạng gọi check-token bị lỗi khiến admin bị logout oan)
   adminStore.isTokenVerified = true;
-  localStorage.setItem('auth.active_role', 'admin');
   await adminStore.fetchPermissions({ silent: true });
 
   return true;

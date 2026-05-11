@@ -38,7 +38,7 @@ final class ChatService
 
     /**
      * @param  array<int, array<string, mixed>>  $history
-     * @return array{assistant: string, metadata: array<string, mixed>}
+     * @return array{assistant: string, metadata: array<string, mixed>, session_id?: int}
      */
     public function run(
         string $message,
@@ -88,7 +88,7 @@ final class ChatService
 
     /**
      * @param  array<string, mixed>  $pipeline
-     * @return array{assistant: string, metadata: array<string, mixed>}
+     * @return array{assistant: string, metadata: array<string, mixed>, session_id?: int}
      */
     private function runToolPath(
         ChatContext $ctx,
@@ -120,11 +120,12 @@ final class ChatService
             if ($toolName === 'list_my_tickets' && in_array('đăng_nhập_tài_khoản', $validation->missingFields, true)) {
                 $metaClarify['login_required'] = true;
             }
-            $this->memory->saveTurn($sessionId, $khachHangId, $originalMessage, $assistant, $metaClarify);
+            $realSessionId = $this->memory->saveTurn($sessionId, $khachHangId, $originalMessage, $assistant, $metaClarify);
 
             return [
                 'assistant' => $assistant,
                 'metadata' => $metaClarify,
+                'session_id' => $realSessionId,
             ];
         }
 
@@ -138,17 +139,18 @@ final class ChatService
         if (! $run->ok && ! empty($run->payload['login_required'])) {
             $meta['login_required'] = true;
         }
-        $this->memory->saveTurn($sessionId, $khachHangId, $originalMessage, $assistant, $meta);
+        $realSessionId = $this->memory->saveTurn($sessionId, $khachHangId, $originalMessage, $assistant, $meta);
 
         return [
             'assistant' => $assistant,
             'metadata' => $meta,
+            'session_id' => $realSessionId,
         ];
     }
 
     /**
      * @param  array<string, mixed>  $pipeline
-     * @return array{assistant: string, metadata: array<string, mixed>}
+     * @return array{assistant: string, metadata: array<string, mixed>, session_id?: int}
      */
     private function runKnowledgePath(
         ChatContext $ctx,
@@ -167,7 +169,7 @@ final class ChatService
         $assistant = $this->responseWriter->formatFinal($ctx, $draft);
 
         $pipeline['steps'][] = 'memory_service';
-        $this->memory->saveTurn($sessionId, $khachHangId, $originalMessage, $assistant, [
+        $realSessionId = $this->memory->saveTurn($sessionId, $khachHangId, $originalMessage, $assistant, [
             'ai' => $metaAi,
             'pipeline' => $pipeline,
             'rag' => [
@@ -179,6 +181,7 @@ final class ChatService
         return [
             'assistant' => $assistant,
             'metadata' => ['ai' => $metaAi, 'pipeline' => $pipeline],
+            'session_id' => $realSessionId,
         ];
     }
 }

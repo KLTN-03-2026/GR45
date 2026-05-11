@@ -49,7 +49,6 @@ const popupTrip = computed(() =>
 const isClientLoggedIn = () => {
   const token = localStorage.getItem("auth.client.token");
   if (!token) return false;
-  localStorage.setItem("auth.active_role", "client");
   return true;
 };
 

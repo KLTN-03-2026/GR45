@@ -53,7 +53,6 @@ export const useClientStore = defineStore('client', () => {
       isTokenVerified.value = true;
       localStorage.setItem(TOKEN_KEY, t);
       localStorage.setItem(USER_KEY, JSON.stringify(u));
-      localStorage.setItem('auth.active_role', 'client');
       return true;
     } catch (err) {
       error.value = err.response?.data?.errors
