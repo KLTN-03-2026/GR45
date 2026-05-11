@@ -71,6 +71,9 @@ class DatabaseSeeder extends Seeder
                 // --- Tang 10: Thanh toan (phu thuoc Ve + KhachHang) ---
             ThanhToanSeeder::class,
             LichSuThanhToanNhaXe::class,
+            
+                // --- Tang 11: Danh gia (phu thuoc Ve) ---
+            DanhGiaSeeder::class,
 
         ]);
     }

@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('bien_so')->unique();
             $table->string('ten_xe')->nullable();
+            $table->string('hinh_anh')->nullable();
             $table->string('ma_nha_xe');
             $table->unsignedBigInteger('id_loai_xe'); //
             $table->unsignedBigInteger('id_nhan_vien_quan_ly')->nullable();

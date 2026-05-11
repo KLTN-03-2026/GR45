@@ -13,6 +13,9 @@ return new class extends Migration
                 $table->id();
                 $table->string('session_key', 64)->unique();
                 $table->unsignedBigInteger('id_khach_hang')->nullable()->index();
+                $table->unsignedBigInteger('id_nha_xe')->nullable()->index();
+                $table->string('loai_ho_tro', 32)->default('khach_hang');
+                $table->string('tieu_de')->nullable();
                 $table->json('structured_context')->nullable();
                 $table->timestamps();
             });
@@ -22,6 +25,7 @@ return new class extends Migration
             Schema::create('chat_messages', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('chat_session_id')->constrained('chat_sessions')->cascadeOnDelete();
+                $table->unsignedBigInteger('id_admin')->nullable()->index();
                 $table->string('role', 32);
                 $table->longText('content');
                 $table->json('meta')->nullable();
@@ -59,6 +63,33 @@ return new class extends Migration
             });
         }
 
+        // Thêm block check an toàn cho migration nếu các bảng đã tồn tại từ trước mà chưa có cột mới
+        if (Schema::hasTable('chat_sessions')) {
+            if (! Schema::hasColumn('chat_sessions', 'id_nha_xe')) {
+                Schema::table('chat_sessions', function (Blueprint $table) {
+                    $table->unsignedBigInteger('id_nha_xe')->nullable()->index()->after('id_khach_hang');
+                });
+            }
+            if (! Schema::hasColumn('chat_sessions', 'loai_ho_tro')) {
+                Schema::table('chat_sessions', function (Blueprint $table) {
+                    $table->string('loai_ho_tro', 32)->default('khach_hang')->after('id_nha_xe');
+                });
+            }
+            if (! Schema::hasColumn('chat_sessions', 'tieu_de')) {
+                Schema::table('chat_sessions', function (Blueprint $table) {
+                    $table->string('tieu_de')->nullable()->after('loai_ho_tro');
+                });
+            }
+        }
+
+        if (Schema::hasTable('chat_messages')) {
+            if (! Schema::hasColumn('chat_messages', 'id_admin')) {
+                Schema::table('chat_messages', function (Blueprint $table) {
+                    $table->unsignedBigInteger('id_admin')->nullable()->index()->after('chat_session_id');
+                });
+            }
+        }
+
         if (Schema::hasTable('ai_documents') && ! Schema::hasColumn('ai_documents', 'type')) {
             Schema::table('ai_documents', function (Blueprint $table) {
                 $table->string('type', 32)->nullable()->after('status');
@@ -75,7 +106,6 @@ return new class extends Migration
                 $table->index(['chunk_hash', 'embedding_model'], 'ai_chunks_hash_model_idx');
             });
         }
-
     }
 
     public function down(): void

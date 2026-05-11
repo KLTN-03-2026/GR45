@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('ma_nha_xe')->unique();  // Mã nhà xe dùng làm khóa nghiệp vụ
             $table->string('ten_nha_xe');
+            $table->string('hinh_anh')->nullable();
             $table->string('email')->unique();
             $table->string('password');
             $table->string('so_dien_thoai')->nullable();

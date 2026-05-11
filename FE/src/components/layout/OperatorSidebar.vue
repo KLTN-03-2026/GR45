@@ -120,7 +120,7 @@ const menuList = [
   // --- Dịch vụ ---
   {
     id: "ho-tro",
-    name: "Hỗ trợ khách hàng",
+    name: "Yêu cầu hỗ trợ",
     path: "/nha-xe/ho-tro",
     icon: LifeBuoy,
   },
