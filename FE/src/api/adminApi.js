@@ -157,6 +157,8 @@ const adminApi = {
 
   // --- BÁO ĐỘNG ---
   getAlerts: (params) => axiosClient.get('/v1/admin/bao-dong', { params }),
+  getAlertDetail: (id) => axiosClient.get(`/v1/admin/bao-dong/${id}`),
+  toggleAlertStatus: (id, data) => axiosClient.patch(`/v1/admin/bao-dong/${id}/trang-thai`, data),
 
   // --- QUẢN LÝ VÍ NHÀ XE ---
   getOperatorWallets: (params) => axiosClient.get('/v1/admin/vi-nha-xe', { params }),

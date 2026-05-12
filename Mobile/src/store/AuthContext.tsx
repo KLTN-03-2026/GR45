@@ -54,11 +54,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const response = await clientApi.login(loginData);
       console.log("Kết quả Login API:", response.data);
 
-      if (response.data.success || response.data.token) {
-        const token = response.data.token || response.data.access_token; // Tuỳ cách backend trả về
+      if (response.data.success) {
+        const responseData = response.data.data;
+        const token = responseData?.token || responseData?.access_token || response.data.token || response.data.access_token; 
         if (token) {
            await SecureStore.setItemAsync('userToken', token);
-           setUser(response.data.data || response.data.user); 
+           setUser(responseData?.khach_hang || responseData?.user || responseData || response.data.user); 
            console.log("✅ Đã lưu Token thành công.");
         } else {
            console.log("⚠️ Backend báo thành công nhưng không trả về token trong key 'token' / 'access_token'!");

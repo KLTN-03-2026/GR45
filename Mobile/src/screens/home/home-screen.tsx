@@ -8,7 +8,22 @@ import { SearchTripCard } from "@/src/components/home/search-trip-card";
 import { popularRoutes, quickActions } from "@/src/constants/home-data";
 
 
+import { useRouter } from "expo-router";
+
 export function HomeScreen() {
+  const router = useRouter();
+  
+  const handleSearch = (params: any) => {
+    router.push({
+      pathname: "/search/results",
+      params: {
+        from: params.from,
+        to: params.to,
+        date: params.date,
+      }
+    });
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -19,10 +34,9 @@ export function HomeScreen() {
         <HeroSection />
 
         <SearchTripCard
-          from="Sài Gòn"
-          to="Đà Lạt"
-          date="Thứ 7, 24 Tháng 8, 2024"
-          onPressSearch={() => Alert.alert("Demo", "Search trip action")}
+          from="Thành phố Hà Nội"
+          to="Hải Phòng"
+          onPressSearch={handleSearch}
         />
 
         <View style={styles.sectionHeader}>

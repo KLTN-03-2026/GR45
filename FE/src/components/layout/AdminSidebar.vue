@@ -21,6 +21,7 @@ import {
   Star,
   Sparkles,
   Wallet,
+  AlertTriangle,
 } from "lucide-vue-next";
 
 // Inject từ AdminLayout
@@ -109,8 +110,14 @@ const menuList = [
         path: "/admin/lich-su-hanh-trinh",
         icon: Map,
       },
+      {
+        name: "⚠️ Cảnh báo vi phạm",
+        path: "/admin/canh-bao",
+        icon: AlertTriangle,
+        permissionSlugs: ["xem-bao-dong"],
+      },
     ],
-    paths: ["/admin/live-tracking", "/admin/lich-su-hanh-trinh"],
+    paths: ["/admin/live-tracking", "/admin/lich-su-hanh-trinh", "/admin/canh-bao"],
   },
   {
     id: "ve",
