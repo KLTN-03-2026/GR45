@@ -342,6 +342,8 @@ Route::prefix('v1')->group(function () {
 
             // Báo động
             Route::get('bao-dong', [BaoDongController::class, 'indexAdmin'])->middleware('permission:xem-bao-dong');
+            Route::get('bao-dong/{id}', [BaoDongController::class, 'showAdmin'])->middleware('permission:xem-bao-dong');
+            Route::patch('bao-dong/{id}/trang-thai', [BaoDongController::class, 'toggleStatusAdmin'])->middleware('permission:xem-bao-dong');
 
             // Đánh giá
             Route::get('ratings', [RatingController::class, 'getAdminRatings']);

@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('chuc_nangs', function (Blueprint $table) {
             $table->id();
             $table->string('ten_chuc_nang')->unique(); // Tên chức năng
+            $table->enum('loai', ['he_thong', 'nha_xe'])->default('he_thong')->comment('he_thong = chức năng admin | nha_xe = chức năng nhân viên nhà xe');
             $table->string('slug')->unique(); // Slug định danh kiểm tra quyền
             $table->enum('tinh_trang', ['khoa', 'hoat_dong'])->default('hoat_dong');
             $table->timestamps();

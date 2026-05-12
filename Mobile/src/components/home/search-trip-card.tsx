@@ -13,6 +13,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import { Platform } from 'react-native';
+
 export type Province = {
   id: number;
   ma_tinh_thanh: string;
@@ -25,14 +30,14 @@ export type Province = {
 type SearchTripCardProps = {
   from?: string;
   to?: string;
-  date?: string;
-  onPressSearch?: () => void;
+  date?: Date;
+  onPressSearch?: (params: { from: string, to: string, date: string }) => void;
 };
 
 export function SearchTripCard({
   from = "Thành phố Hà Nội",
   to = "Hải Phòng",
-  date = "Thứ 7, 24 Tháng 8, 2024",
+  date = new Date(),
   onPressSearch,
 }: SearchTripCardProps) {
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -40,6 +45,8 @@ export function SearchTripCard({
 
   const [fromCity, setFromCity] = useState<string>(from);
   const [toCity, setToCity] = useState<string>(to);
+  const [searchDate, setSearchDate] = useState<Date>(date);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectingType, setSelectingType] = useState<"from" | "to" | null>(
@@ -67,7 +74,7 @@ export function SearchTripCard({
         {
           id: 1,
           ma_tinh_thanh: "01",
-          ten_tinh_thanh: "Thành phố Hà Nội",
+          ten_tinh_thanh: "Hà Nội",
           created_at: null,
           updated_at: null,
           ma_tinh_thanh_2: "HN",
@@ -113,6 +120,23 @@ export function SearchTripCard({
     const temp = fromCity;
     setFromCity(toCity);
     setToCity(temp);
+  };
+
+  const handleDateChange = (event: any, selected?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios'); // iOS stays open, android closes automatically
+    if (selected) {
+      setSearchDate(selected);
+    }
+  };
+
+  const onSubmit = () => {
+    if (onPressSearch) {
+      onPressSearch({
+         from: fromCity,
+         to: toCity,
+         date: format(searchDate, 'yyyy-MM-dd')
+      });
+    }
   };
 
   const renderLocationModal = () => (
@@ -194,13 +218,23 @@ export function SearchTripCard({
 
       <View style={styles.dateContainer}>
         <Text style={styles.label}>NGÀY KHỞI HÀNH</Text>
-        <View style={styles.inputBoxDate}>
+        <Pressable style={styles.inputBoxDate} onPress={() => setShowDatePicker(true)}>
           <MaterialIcons name="calendar-today" size={20} color="#0052cc" />
-          <Text style={styles.inputText}>{date}</Text>
-        </View>
+          <Text style={styles.inputText}>{format(searchDate, 'EEEE, dd/MM/yyyy', { locale: vi })}</Text>
+        </Pressable>
       </View>
 
-      <Pressable style={styles.submitButton} onPress={onPressSearch}>
+      {showDatePicker && (
+        <DateTimePicker
+          value={searchDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          minimumDate={new Date()}
+          onChange={handleDateChange}
+        />
+      )}
+
+      <Pressable style={styles.submitButton} onPress={onSubmit}>
         <Text style={styles.submitText}>Tìm Chuyến Ngay</Text>
       </Pressable>
 

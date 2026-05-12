@@ -134,6 +134,11 @@ const router = createRouter({
           component: () => import('../views/admin/ratings/RatingsView.vue'),
         },
         {
+          path: 'canh-bao',
+          name: 'admin-canh-bao',
+          component: () => import('../views/admin/canh-bao/CanhBaoView.vue'),
+        },
+        {
           path: 'nhan-vien',
           name: 'admin-nhan-vien',
           component: () => import('../views/admin/nhan-vien/NhanVienView.vue'),

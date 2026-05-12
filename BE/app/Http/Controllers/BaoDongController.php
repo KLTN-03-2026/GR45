@@ -192,6 +192,52 @@ class BaoDongController extends Controller
         ]);
     }
 
+    public function showAdmin($id): JsonResponse
+    {
+        $baoDong = NhatKyBaoDong::with(['chuyenXe', 'taiXe', 'xe', 'nhaXeXuLy', 'adminXuLy'])->find($id);
+
+        if (!$baoDong) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy báo động.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lấy chi tiết báo động thành công.',
+            'data'    => $baoDong,
+        ]);
+    }
+
+    public function toggleStatusAdmin(Request $request, $id): JsonResponse
+    {
+        $admin = auth()->user();
+        if (!$admin) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        // Có thể update cụ thể trang thai từ request nếu có
+        $baoDong = NhatKyBaoDong::find($id);
+        if (!$baoDong) {
+             return response()->json(['success' => false, 'message' => 'Không tìm thấy báo động.'], 404);
+        }
+
+        if ($request->has('trang_thai')) {
+             $baoDong->update([
+                 'trang_thai' => $request->input('trang_thai'),
+                 'admin_id' => $admin->id,
+                 'thoi_gian_xu_ly' => now()
+             ]);
+        } else {
+             $this->baoDongRepo->toggleStatusAdmin($id, $admin->id);
+             $baoDong->refresh();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Đã thay đổi trạng thái báo động.',
+            'data'    => $baoDong,
+        ]);
+    }
+
     public function toggleStatusNhaXe(Request $request, $id): JsonResponse
     {
         $nhaXe = Auth::guard('nha_xe')->user();
