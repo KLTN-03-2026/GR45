@@ -2,17 +2,7 @@
  * Chat AI API helpers.
  */
 
-/** Timeout (ms) cho POST chat AI JSON — mặc định 10 phút (ReAct + LLM có thể rất lâu). */
-function chatAiMessageTimeoutMs() {
-  const raw = String(import.meta.env.VITE_CHAT_AI_TIMEOUT_MS || '').trim();
-  const n = Number.parseInt(raw, 10);
-  if (Number.isFinite(n) && n >= 120000) {
-    return n;
-  }
-  return 600000;
-}
-
-function apiV1Base() {
+export function apiV1Base() {
   let raw = String(import.meta.env.VITE_API_URL || 'https://api.bussafe.io.vn/api/v1').trim();
   raw = raw.replace(/\/+$/, '');
   if (/\/api$/i.test(raw)) {
@@ -21,14 +11,40 @@ function apiV1Base() {
   return raw;
 }
 
-/** Gửi Bearer nếu khách đã đăng nhập (cùng key với axios client) — để tool "vé của tôi" hoạt động. */
-function chatAiAuthHeaders() {
+export function agentVectorHttpBaseUrl() {
+  const explicit = String(import.meta.env.VITE_AGENT_VECTOR_BASE_URL || '').trim().replace(/\/+$/, '');
+  return explicit || `${apiV1Base()}/agent`;
+}
+
+export function chatAiAuthHeaders() {
   if (typeof localStorage === 'undefined') return {};
-  const t = localStorage.getItem('auth.client.token');
-  if (t && String(t).trim().length > 0) {
-    return { Authorization: `Bearer ${String(t).trim()}` };
+  const token = String(localStorage.getItem('auth.client.token') ?? '').trim();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/**
+ * Mặc định Chat AI chạy trong trình duyệt (`@fe-agent/gr45-fe-chat-runtime` + Ollama).
+ * Chỉ dùng `POST /chat/ai/message` Laravel khi đặt rõ `VITE_CHAT_AI_RUNTIME=laravel` (hoặc `server`|`backend`|`api`).
+ */
+export function isFeChatAgentRuntime() {
+  const v = String(import.meta.env.VITE_CHAT_AI_RUNTIME || '').trim().toLowerCase();
+  if (['laravel', 'server', 'backend', 'api'].includes(v)) {
+    return false;
   }
-  return {};
+  if (['false', '0', 'off', 'no'].includes(v)) {
+    return false;
+  }
+  return true;
+}
+
+/** Timeout (ms) cho POST chat AI JSON — mặc định 10 phút (ReAct + LLM có thể rất lâu). */
+function chatAiMessageTimeoutMs() {
+  const raw = String(import.meta.env.VITE_CHAT_AI_TIMEOUT_MS || '').trim();
+  const n = Number.parseInt(raw, 10);
+  if (Number.isFinite(n) && n >= 120000) {
+    return n;
+  }
+  return 600000;
 }
 
 /** JSON object cân ngoặc từ vị trí `{` (UTF-16 index). */
@@ -132,15 +148,115 @@ export function parseAssistantUiPayload(rawText) {
   return { answer, suggestions };
 }
 
+/**
+ * Chuẩn hoá assistant: FE runtime trả `{ answer, suggestions }`, Laravel có thể trả JSON string hoặc prose + `{"answer":...}`.
+ * @returns {{ answer: string, suggestions: unknown[] } | null}
+ */
+export function coerceAssistantStructured(assistant) {
+  if (assistant == null || assistant === "") return null;
+  if (typeof assistant === "object" && !Array.isArray(assistant)) {
+    const answerRaw =
+      typeof assistant.answer === "string"
+        ? assistant.answer
+        : String(assistant.answer ?? "").trim();
+    const suggestions = Array.isArray(assistant.suggestions)
+      ? assistant.suggestions
+      : [];
+    return { answer: answerRaw.trim(), suggestions };
+  }
+  const s = String(assistant ?? "").trim();
+  if (!s || s === "[object Object]") return null;
+  return parseAssistantUiPayload(s);
+}
+
+/** Chuỗi JSON lưu message-log (`answer` + `suggestions`) — không stringify object bằng `String(...)`. */
+function assistantPayloadJsonForPersist(assistant) {
+  const coerced = coerceAssistantStructured(assistant);
+  if (!coerced) {
+    const amRaw =
+      typeof assistant === "string" ? assistant.trim() : String(assistant ?? "").trim();
+    if (!amRaw || amRaw === "[object Object]") return "";
+    return amRaw;
+  }
+  try {
+    const answer =
+      coerced.answer && coerced.answer.length > 0
+        ? coerced.answer
+        : "(Không có nội dung phản hồi)";
+    const suggestions = Array.isArray(coerced.suggestions)
+      ? coerced.suggestions
+      : [];
+    return JSON.stringify({ answer, suggestions });
+  } catch {
+    return "";
+  }
+}
+
 function httpErrorMessage(status, bodyText, contentType) {
   const ct = (contentType || '').toLowerCase();
   if (status === 404 && (ct.includes('text/html') || /^\s*</.test(bodyText))) {
-    return `HTTP ${status} — Không tìm thấy API. Kiểm tra VITE_API_URL (ví dụ https://api.bussafe.io.vn/api/v1), backend đang chạy, và route POST /api/v1/chat/ai/message.`;
+    return `HTTP ${status} — Không tìm thấy API Laravel chat (/chat/ai/message). Repo này mặc định xài agent-runtime trên FE: không đặt VITE_CHAT_AI_RUNTIME=laravel cho tới khi BE có route, hoặc kiểm tra VITE_API_URL.`;
   }
   if (bodyText && bodyText.length < 400 && !ct.includes('text/html')) {
     return bodyText;
   }
   return `HTTP ${status}`;
+}
+
+/** Gửi log lượt chat (FE agent-runtime → Laravel DB cho admin audit). */
+async function persistFeChatAiMessageLog({
+  session_id,
+  user_message,
+  assistant_message,
+  metadata,
+}) {
+  const sid = String(session_id || "").trim().slice(0, 96);
+  if (!sid || typeof fetch === "undefined") return;
+
+  /** Laravel `required|string` rejects empty string — luôn gửi placeholder tối thiểu. */
+  const umRaw = String(user_message ?? "").trim();
+  const um = (umRaw.length > 0 ? umRaw : " ").slice(0, 48000);
+
+  const persisted = assistantPayloadJsonForPersist(assistant_message).trim();
+  const am = (
+    persisted.length > 0
+      ? persisted
+      : '{"answer":"(Không có nội dung phản hồi)","suggestions":[]}'
+  ).slice(0, 96000);
+
+  try {
+    const res = await fetch(`${apiV1Base()}/chat/ai/message-log`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...chatAiAuthHeaders(),
+      },
+      credentials: "omit",
+      body: JSON.stringify({
+        session_id: sid.slice(0, 64),
+        user_message: um,
+        assistant_message: am,
+        metadata:
+          metadata && typeof metadata === "object" ? metadata : {},
+      }),
+      keepalive: true,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      if (import.meta.env.DEV) {
+        console.warn(
+          "[chat/ai/message-log]",
+          res.status,
+          errText.slice(0, 500),
+        );
+      }
+    }
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      console.warn("[chat/ai/message-log] fetch failed", e);
+    }
+  }
 }
 
 /**
@@ -152,6 +268,27 @@ function httpErrorMessage(status, bodyText, contentType) {
  * @returns {Promise<{ success: boolean, assistant?: string, metadata?: { ai?: Record<string, unknown> }, message?: string }>}
  */
 export async function callChatAiMessage(message, signal, opts = null) {
+  if (isFeChatAgentRuntime()) {
+    const { invokeFeChatAgent } = await import('@fe-agent/gr45-fe-chat-runtime');
+    const out = await invokeFeChatAgent(message, opts, signal);
+    const sid =
+      (opts && typeof opts.session_id === 'string' && opts.session_id.trim()) ||
+      (out && typeof out.session_id === 'string' && out.session_id.trim()) ||
+      '';
+    if (sid && out && out.success !== false) {
+      void persistFeChatAiMessageLog({
+        session_id: sid,
+        user_message: message,
+        assistant_message: out?.assistant ?? "",
+        metadata:
+          out.metadata && typeof out.metadata === 'object'
+            ? out.metadata
+            : {},
+      });
+    }
+    return out;
+  }
+
   const url = `${apiV1Base()}/chat/ai/message`;
   const payload = { message };
   const geo = opts && typeof opts === 'object' ? opts : null;
@@ -235,44 +372,62 @@ export async function callChatAiMessage(message, signal, opts = null) {
 }
 
 /**
- * Lấy lịch sử chat dựa vào session_key hoặc chat_session_id.
- *
- * @param {{ session_key?: string, chat_session_id?: string }} params
- * @returns {Promise<{ success: boolean, data: { role: string, content: string, meta?: any }[] }>}
+ * Gửi khi khách reload / đóng tab để backend đặt user_closed_at.
  */
-export async function getChatAiHistory(params) {
-  const query = new URLSearchParams();
-  if (params.session_key) query.append('session_key', params.session_key);
-  if (params.chat_session_id) query.append('chat_session_id', params.chat_session_id);
-
-  const url = `${apiV1Base()}/chat/ai/history?${query.toString()}`;
-
-  const res = await fetch(url, {
-    method: 'GET',
+export function notifyChatAiUserClosing(sessionKey) {
+  if (isFeChatAgentRuntime()) {
+    return Promise.resolve(null);
+  }
+  const key = String(sessionKey || "").trim();
+  if (!key || typeof fetch === "undefined") {
+    return Promise.resolve(null);
+  }
+  const url = `${apiV1Base()}/chat/ai/session/user-close`;
+  return fetch(url, {
+    method: "POST",
     headers: {
-      Accept: 'application/json',
+      "Content-Type": "application/json",
+      Accept: "application/json",
       ...chatAiAuthHeaders(),
     },
+    body: JSON.stringify({ session_key: key }),
+    keepalive: true,
+  }).then(async (res) => {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
   });
+}
 
-  const text = await res.text().catch(() => '');
-  let body;
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = {};
+/**
+ * Reload / đóng tab: đánh dấu mọi phiên live support đang mở của widget key là closed (admin không reply tiếp).
+ */
+export function notifyLiveSupportWidgetDisconnect(chatWidgetSessionKey) {
+  const key = String(chatWidgetSessionKey || "").trim();
+  if (!key || typeof fetch === "undefined") {
+    return Promise.resolve(null);
   }
-
-  if (!res.ok) {
-    const msg = (body && body.message) || `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return body;
+  const url = `${apiV1Base()}/agent/support/sessions/widget-disconnect`;
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...chatAiAuthHeaders(),
+    },
+    body: JSON.stringify({ chat_widget_session_key: key }),
+    keepalive: true,
+  }).then(async (res) => {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  });
 }
 
 // Force Vite HMR reload
-
-
 
 

@@ -6,36 +6,37 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class ChatSession extends Model
+final class ChatSession extends Model
 {
+    protected $table = 'chat_sessions';
+
     protected $fillable = [
         'session_key',
         'id_khach_hang',
-        'id_nha_xe',
-        'loai_ho_tro',
-        'tieu_de',
         'structured_context',
+        'status',
+        'assistant_read_through_message_id',
+        'customer_read_through_message_id',
+        'user_closed_at',
+        'resolution_note',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'structured_context' => 'array',
-        ];
-    }
+    protected $casts = [
+        'structured_context' => 'array',
+        'user_closed_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 
-    public function khachHang(): BelongsTo
-    {
-        return $this->belongsTo(KhachHang::class, 'id_khach_hang');
-    }
-
-    public function nhaXe(): BelongsTo
-    {
-        return $this->belongsTo(NhaXe::class, 'id_nha_xe');
-    }
-
+    /** @return HasMany<ChatMessage, $this> */
     public function messages(): HasMany
     {
         return $this->hasMany(ChatMessage::class, 'chat_session_id')->orderBy('id');
+    }
+
+    /** @return BelongsTo<KhachHang, $this> */
+    public function khachHang(): BelongsTo
+    {
+        return $this->belongsTo(KhachHang::class, 'id_khach_hang');
     }
 }

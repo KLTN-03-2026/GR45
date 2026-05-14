@@ -369,6 +369,22 @@ class KhachHangController extends Controller
         ]);
     }
 
+    /** GET /api/v1/chuyen-xe/{id}/tom-tat — tóm tắt chuyến cho chat/widget (không cần đăng nhập). */
+    public function showChuyenXeTomTat(int $id): JsonResponse
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $this->service->getChuyenXeTomTat($id),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 404);
+        }
+    }
+
     public function getVoucherCongKhai(Request $request): JsonResponse
     {
         return response()->json([

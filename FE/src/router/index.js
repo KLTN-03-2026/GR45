@@ -272,6 +272,12 @@ const router = createRouter({
           component: () => import('../views/operator/ho-tro/HoTroView.vue'),
         },
         {
+          path: 'ho-tro-khach-hang',
+          name: 'operator-ho-tro-khach-hang',
+          component: () =>
+            import('../views/operator/ho-tro/HoTroKhachHangOperatorView.vue'),
+        },
+        {
           path: 'thong-ke',
           name: 'operator-thong-ke',
           component: () => import('../views/operator/thong-ke/ThongKeView.vue'),
@@ -397,6 +403,7 @@ const router = createRouter({
         },
       ],
     },
+
 
     // ============================================================
     // 6. LỖI — ErrorLayout (404)

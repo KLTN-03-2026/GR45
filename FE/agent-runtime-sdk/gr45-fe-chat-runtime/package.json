@@ -1,0 +1,23 @@
+{
+  "name": "@fe-agent/gr45-fe-chat-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./catalog": "./src/catalog/index.js",
+    "./gr45-planner-policy": "./src/gr45-planner-policy.js",
+    "./runtime": "./src/runtime.js"
+  },
+  "dependencies": {
+    "@fe-agent/sdk": "0.1.0",
+    "zod": "^3.24.0"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('js package, no build')\""
+  },
+  "files": [
+    "src"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "fe-agent-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "gr45-fe-chat-runtime",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "demo:fe-env": "node apps/fe-env-demo/index.js"
+  },
+  "dependencies": {
+    "@langchain/groq": "^1.2.0",
+    "@langchain/ollama": "^1.2.7"
+  }
+}

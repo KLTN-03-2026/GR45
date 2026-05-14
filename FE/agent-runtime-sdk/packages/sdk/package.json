@@ -1,0 +1,26 @@
+{
+  "name": "@fe-agent/sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@fe-agent/core": "0.1.0",
+    "@fe-agent/adapters-session-http": "0.1.0",
+    "@fe-agent/adapters-vector-http": "0.1.0",
+    "@fe-agent/graph-runtime": "0.1.0",
+    "@fe-agent/memory": "0.1.0",
+    "@fe-agent/rag": "0.1.0",
+    "@fe-agent/shared-zod-schemas": "0.1.0",
+    "@fe-agent/streaming": "0.1.0",
+    "@fe-agent/tools": "0.1.0"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('js package, no build')\""
+  },
+  "files": [
+    "src"
+  ]
+}

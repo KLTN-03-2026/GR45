@@ -3,8 +3,10 @@
 use App\Http\Middleware\CheckAdminPermission;
 use App\Http\Middleware\CheckAdminToken;
 use App\Http\Middleware\CheckKhachHangToken;
+use App\Http\Middleware\OptionalKhachHangToken;
 use App\Http\Middleware\CheckNhaXeToken;
 use App\Http\Middleware\CheckTaiXeToken;
+use App\Http\Middleware\VerifyLiveSupportBridgeSecret;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,9 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Đăng ký alias cho middleware check token theo loại user
         $middleware->alias([
             'auth.admin' => CheckAdminToken::class,
+            'auth.khach-hang' => CheckKhachHangToken::class,
             'auth.tai-xe' => CheckTaiXeToken::class,
             'auth.nha-xe' => CheckNhaXeToken::class,
-            'auth.khach-hang' => CheckKhachHangToken::class,
+            'optional.khach-hang' => OptionalKhachHangToken::class,
+            'live-support.bridge' => VerifyLiveSupportBridgeSecret::class,
             'permission' => CheckAdminPermission::class,
         ]);
     })

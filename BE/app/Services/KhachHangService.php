@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class KhachHangService
 {
@@ -139,11 +140,23 @@ class KhachHangService
     }
 
     /**
-     * Dang xuat - thu hoi token hien tai.
+     * Dang xuat - thu hoi token hien tai (chi PersonalAccessToken; TransientToken la stateless).
      */
-    public function logout(KhachHang $khachHang): void
+    public function logout(?KhachHang $khachHang): void
     {
-        $khachHang->currentAccessToken()->delete();
+        if (!$khachHang) {
+            return;
+        }
+
+        $token = $khachHang->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+
+            return;
+        }
+
+        // Bearer đôi khi resolve thành TransientToken — vẫn cần huỷ PAT trong DB.
+        $khachHang->tokens()->delete();
     }
 
     // ── PROFILE ───────────────────────────────────────────────────────
@@ -563,5 +576,77 @@ class KhachHangService
         return \App\Models\LichSuDungDiem::where('id_khach_hang', $khachHang->id)
             ->orderByDesc('created_at')
             ->paginate($params['per_page'] ?? 10);
+    }
+
+    /**
+     * Tóm tắt chuyến xe công khai (chat/widget) — đồng bộ filter trạng thái với {@see searchChuyenXe}.
+     *
+     * @return array<string, mixed>
+     */
+    public function getChuyenXeTomTat(int $id): array
+    {
+        $cx = \App\Models\ChuyenXe::query()
+            ->with(['tuyenDuong.nhaXe', 'xe.loaiXe', 'taiXe'])
+            ->find($id);
+
+        if ($cx === null) {
+            throw new \Exception('Không tìm thấy chuyến xe.');
+        }
+
+        $allowed = ['ChoChay', 'hoat_dong', '1'];
+        if (! in_array((string) $cx->trang_thai, $allowed, true)) {
+            throw new \Exception('Chuyến không khả dụng để hiển thị (trạng thái: '.$cx->trang_thai.').');
+        }
+
+        $tuyen = $cx->tuyenDuong;
+        $nhaXe = $tuyen?->nhaXe;
+        $xe = $cx->xe;
+        $tx = $cx->taiXe;
+
+        $gioKh = null;
+        if ($cx->gio_khoi_hanh !== null) {
+            try {
+                $gioKh = $cx->gio_khoi_hanh instanceof \Carbon\CarbonInterface
+                    ? $cx->gio_khoi_hanh->format('H:i')
+                    : (string) $cx->gio_khoi_hanh;
+            } catch (\Throwable) {
+                $gioKh = (string) $cx->gio_khoi_hanh;
+            }
+        }
+
+        return [
+            'trip' => [
+                'id' => $cx->id,
+                'ngay_khoi_hanh' => $cx->ngay_khoi_hanh?->toDateString(),
+                'gio_khoi_hanh' => $gioKh,
+                'trang_thai' => $cx->trang_thai,
+                'thanh_toan_sau' => (bool) $cx->thanh_toan_sau,
+            ],
+            'route' => $tuyen ? [
+                'id' => $tuyen->id,
+                'ten_tuyen_duong' => $tuyen->ten_tuyen_duong ?? null,
+                'diem_bat_dau' => $tuyen->diem_bat_dau ?? null,
+                'diem_ket_thuc' => $tuyen->diem_ket_thuc ?? null,
+                'gia_ve_co_ban' => $tuyen->gia_ve_co_ban ?? null,
+                'ma_nha_xe' => $tuyen->ma_nha_xe ?? null,
+            ] : null,
+            'operator' => $nhaXe ? [
+                'ma_nha_xe' => $nhaXe->ma_nha_xe ?? null,
+                'ten_nha_xe' => $nhaXe->ten_nha_xe ?? null,
+            ] : null,
+            'vehicle' => $xe ? [
+                'id' => $xe->id,
+                'bien_so' => $xe->bien_so ?? null,
+                'loai_xe' => $xe->loaiXe?->ten_loai ?? null,
+            ] : null,
+            'driver' => $tx ? [
+                'id' => $tx->id,
+                'ho_va_ten' => $tx->ho_va_ten ?? null,
+            ] : null,
+            'pricing' => [
+                'gia_ve_co_ban' => $tuyen?->gia_ve_co_ban ?? null,
+                'tong_tien_chuyen' => $cx->tong_tien ?? null,
+            ],
+        ];
     }
 }
