@@ -2,6 +2,11 @@
 
 namespace App\Providers;
 
+use App\Console\Commands\ServeCommand;
+use App\Models\ThanhToan;
+use App\Models\Ve;
+use App\Observers\ThanhToanObserver;
+use App\Observers\VeObserver;
 use App\Repositories\Admin\AdminRepository;
 use App\Repositories\Admin\AdminRepositoryInterface;
 use App\Repositories\BaoDong\BaoDongRepository;
@@ -22,23 +27,9 @@ use App\Repositories\Voucher\VoucherRepository;
 use App\Repositories\Voucher\VoucherRepositoryInterface;
 use App\Repositories\Xe\XeRepository;
 use App\Repositories\Xe\XeRepositoryInterface;
-use App\Services\AiAgent\AI\RAG\MysqlVectorStore;
-use App\Services\AiAgent\AI\RAG\VectorStore;
-use App\Services\AiAgent\AI\Support\ProvinceCatalogEmbedSync;
-use App\Services\AiAgent\Domain\Tools\Builtin\BookTicketTool;
-use App\Services\AiAgent\Domain\Tools\Builtin\ListMyTicketsTool;
-use App\Services\AiAgent\Domain\Tools\Builtin\ListSeatsForTripTool;
-use App\Services\AiAgent\Domain\Tools\Builtin\ListTramsForTripTool;
-use App\Services\AiAgent\Domain\Tools\Builtin\SearchTripsTool;
-use App\Services\AiAgent\Domain\Tools\ToolRegistry;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Foundation\Console\ServeCommand as IlluminateServeCommand;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
-use App\Models\Ve;
-use App\Models\ThanhToan;
-use App\Observers\VeObserver;
-use App\Observers\ThanhToanObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -47,6 +38,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(IlluminateServeCommand::class, ServeCommand::class);
+
         $this->app->bind(AdminRepositoryInterface::class, AdminRepository::class);
         $this->app->bind(KhachHangRepositoryInterface::class, KhachHangRepository::class);
         $this->app->bind(NhaXeRepositoryInterface::class, NhaXeRepository::class);
@@ -57,24 +50,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(ThanhToanRepositoryInterface::class, ThanhToanRepository::class);
         $this->app->bind(XeRepositoryInterface::class, XeRepository::class);
         $this->app->bind(BaoDongRepositoryInterface::class, BaoDongRepository::class);
-        $this->app->bind(VectorStore::class, MysqlVectorStore::class);
-
-        $this->app->singleton(ToolRegistry::class, function ($app) {
-            $registry = new ToolRegistry;
-            $registry->register($app->make(ListMyTicketsTool::class));
-            $registry->register($app->make(BookTicketTool::class));
-            $registry->register($app->make(SearchTripsTool::class));
-            $registry->register($app->make(ListTramsForTripTool::class));
-            $registry->register($app->make(ListSeatsForTripTool::class));
-
-            $registry->bindIntent('my_tickets', 'list_my_tickets');
-            $registry->bindIntent('book_ticket', 'book_ticket');
-            $registry->bindIntent('trip_search', 'search_trips');
-            $registry->bindIntent('trip_stops', 'list_trams_for_trip');
-            $registry->bindIntent('trip_seats', 'list_seats_for_trip');
-
-            return $registry;
-        });
     }
 
     /**
@@ -89,14 +64,6 @@ class AppServiceProvider extends ServiceProvider
         $appUrl = config('app.url');
         if (is_string($appUrl) && str_starts_with($appUrl, 'https://')) {
             URL::forceScheme('https');
-        }
-
-        if ((bool) config('ai.province_catalog_sync_on_boot', false) && Schema::hasTable('tinh_thanhs')) {
-            try {
-                $this->app->make(ProvinceCatalogEmbedSync::class)->syncIfStale();
-            } catch (\Throwable $e) {
-                Log::warning('province_catalog_embed_boot_failed', ['e' => $e->getMessage()]);
-            }
         }
     }
 }

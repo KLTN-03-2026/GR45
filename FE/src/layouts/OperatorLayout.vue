@@ -5,7 +5,7 @@ import OperatorSidebar from "@/components/layout/OperatorSidebar.vue";
 import BaseToast from "@/components/common/BaseToast.vue";
 import { useOperatorStore } from "@/stores/operatorStore";
 import Echo from "laravel-echo";
-import Pusher from "pusher-js";
+import { buildLaravelEchoTransportOptions } from "@/utils/echo.js";
 
 // Store state
 const operatorStore = useOperatorStore();
@@ -47,22 +47,16 @@ let echoInstance = null;
 
 onMounted(() => {
   if (operatorStore.user && operatorStore.token) {
-    // Gán biến global để Echo dùng
-    window.Pusher = Pusher;
+    const transport = buildLaravelEchoTransportOptions();
+    if (!transport) return;
 
-    // Lấy config từ môi trường (hoặc fallback mặc định)
-    const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
-    const pusherCluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
     let apiUrl =
-      import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/v1/";
+      import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/";
     if (!apiUrl.endsWith("/")) apiUrl += "/";
 
     echoInstance = new Echo({
-      broadcaster: "pusher",
-      key: pusherKey,
-      cluster: pusherCluster,
-      forceTLS: true,
-      authEndpoint: `${apiUrl}nha-xe/broadcasting/auth`, // Router API để verify Channel
+      ...transport,
+      authEndpoint: `${apiUrl}v1/nha-xe/broadcasting/auth`,
       auth: {
         headers: {
           Authorization: `Bearer ${operatorStore.token}`,
@@ -238,6 +232,8 @@ onUnmounted(() => {
   max-width: 100%;
   margin: 0 auto;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Overlay che nền khi mở sidebar trên Mobile */

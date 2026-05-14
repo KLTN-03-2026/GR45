@@ -89,6 +89,8 @@ provide('closeSidebar', closeSidebar)
   max-width: 100%;
   margin: 0 auto;
   min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Overlay che nền khi mở sidebar trên thiết bị di động */

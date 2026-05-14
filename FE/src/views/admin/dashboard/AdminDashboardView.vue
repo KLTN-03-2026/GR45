@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import Echo from 'laravel-echo'
-import Pusher from 'pusher-js'
+import { buildLaravelEchoTransportOptions } from '@/utils/echo.js'
 import {
   DollarSign, Ticket, ShieldAlert, BusFront, Users, TrendingUp,
   Siren, MapPin, BellRing, Activity, Clock3, Radio, ArrowRight,
@@ -119,13 +119,12 @@ const onRealtimeViolation = (payload) => {
 const initWs = () => {
   if (!adminStore.token) return
   try {
-    const key = import.meta.env.VITE_PUSHER_APP_KEY
-    const cluster = import.meta.env.VITE_PUSHER_APP_CLUSTER
-    if (!key || !cluster) return
-    window.Pusher = Pusher
+    const transport = buildLaravelEchoTransportOptions()
+    if (!transport) return
     let url = import.meta.env.VITE_API_URL || 'https://api.bussafe.io.vn/api/'
     if (!url.endsWith('/')) url += '/'
-    echoInstance = new Echo({ broadcaster:'pusher', key, cluster, forceTLS:true, authEndpoint:`${url}v1/admin/broadcasting/auth`, auth:{ headers:{ Authorization:`Bearer ${adminStore.token}`, Accept:'application/json', 'ngrok-skip-browser-warning':'true' } } })
+    /** Kênh `he-thong.giam-sat` là public — không cần auth; vẫn giữ transport Reverb/Pusher thống nhất. */
+    echoInstance = new Echo(transport)
     const ch = echoInstance.channel('he-thong.giam-sat')
     ch.listen('.bao-dong.vi-pham', onRealtimeViolation)
     ch.listen('.ai.canh-bao', onRealtimeViolation)

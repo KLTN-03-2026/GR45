@@ -120,9 +120,17 @@ const menuList = [
   // --- Dịch vụ ---
   {
     id: "ho-tro",
-    name: "Yêu cầu hỗ trợ",
-    path: "/nha-xe/ho-tro",
+    name: "Hỗ trợ",
     icon: LifeBuoy,
+    children: [
+      { name: "Yêu cầu BusSafe", path: "/nha-xe/ho-tro", icon: LifeBuoy },
+      {
+        name: "Khách (live chat)",
+        path: "/nha-xe/ho-tro-khach-hang",
+        icon: LifeBuoy,
+      },
+    ],
+    paths: ["/nha-xe/ho-tro", "/nha-xe/ho-tro-khach-hang"],
   },
 
   // --- Báo cáo ---

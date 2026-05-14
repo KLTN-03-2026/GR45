@@ -1,4 +1,5 @@
 @import './base.css';
+@import './messenger-chat-layout.css';
 
 /* CSS Reset & Global Layout cho ứng dụng Dashboard/Admin */
 *, *::before, *::after {
@@ -83,4 +84,127 @@ html[data-theme='dark'] .muted,
 html[data-theme='dark'] th,
 html[data-theme='dark'] td {
   color: #b7c5d8 !important;
+}
+
+/* Messenger composer — Bootstrap Icons dùng ::before; đặt color/size để glyph send không “mất” trên nút primary */
+.messenger-send-btn {
+  color: #fff !important;
+}
+
+.messenger-send-btn .bi {
+  font-size: 1.125rem;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Hỗ trợ — nút Resolve phiên chat */
+.btn-resolve-session {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.42rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 163, 74, 0.4);
+  background: linear-gradient(165deg, #ecfdf5 0%, #d1fae5 55%, #bbf7d0 100%);
+  color: #166534;
+  box-shadow:
+    0 1px 2px rgba(21, 128, 61, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.14s ease;
+}
+
+.btn-resolve-session:hover:not(:disabled) {
+  background: linear-gradient(165deg, #d1fae5 0%, #bbf7d0 50%, #86efac 100%);
+  border-color: rgba(22, 163, 74, 0.72);
+  color: #14532d;
+  box-shadow: 0 3px 10px rgba(21, 128, 61, 0.14);
+  transform: translateY(-1px);
+}
+
+.btn-resolve-session:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(21, 128, 61, 0.12);
+}
+
+.btn-resolve-session:disabled {
+  cursor: default;
+}
+
+.btn-resolve-session--done,
+.btn-resolve-session.btn-resolve-session--done:disabled {
+  background: linear-gradient(165deg, #f8fafc 0%, #ecfdf5 100%);
+  border-color: rgba(100, 116, 139, 0.35);
+  color: #475569;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.btn-resolve-session .spinner-border-sm {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-width: 0.14em;
+}
+
+html[data-theme='dark'] .btn-resolve-session {
+  background: linear-gradient(165deg, rgba(20, 83, 45, 0.45) 0%, rgba(22, 101, 52, 0.35) 100%);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #bbf7d0;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html[data-theme='dark'] .btn-resolve-session:hover:not(:disabled) {
+  background: linear-gradient(165deg, rgba(22, 101, 52, 0.55) 0%, rgba(21, 128, 61, 0.45) 100%);
+  border-color: rgba(74, 222, 128, 0.5);
+  color: #d9f99d;
+}
+
+html[data-theme='dark'] .btn-resolve-session--done,
+html[data-theme='dark'] .btn-resolve-session.btn-resolve-session--done:disabled {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #94a3b8;
+}
+
+/* Live support — tên trong bubble: nền trắng = xanh đậm; nền xanh (#0084ff) = navy đậm hơn */
+.bubble-sender-line.bubble-sender-line--on-light {
+  color: #00546d !important;
+}
+
+.bubble-sender-line.bubble-sender-line--on-ai {
+  color: #0a6278 !important;
+}
+
+.bubble-sender-line.bubble-sender-line--on-solid-messenger {
+  color: #001a29 !important;
+}
+
+/* Hỗ trợ — cụm Resolve / ID / SĐT: wrap khi khung chat hẹp (vd. ~768px + sidebar) */
+.messenger-thread-header-actions {
+  min-width: 0;
+}
+
+.messenger-thread-header-actions .messenger-thread-header-meta {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/*
+ * Chỉ tablet/desktop hẹp (~768–991): meta xuống hàng riêng.
+ * Không áp dụng mobile (<768): đang flex-nowrap + cuộn ngang — flex-basis:100% làm nút Resolve biến mất.
+ */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .messenger-thread-header-actions .messenger-thread-header-meta {
+    flex-basis: 100%;
+  }
 }

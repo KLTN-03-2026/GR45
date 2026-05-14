@@ -317,22 +317,24 @@ const submitBooking = async () => {
       bookingResult.value = res.data;
       currentStep.value = 4; // Hoàn tất
 
-      // Bổ sung lắng nghe Websocket (Pusher/Echo)
       const echo = createEcho();
-      echo
-        .channel(`ve.${bookingResult.value.ma_ve}`)
-        .listen(".ve.huy_tu_dong", (e) => {
-          if (bookingResult.value) {
-            errorMessage.value =
-              e.message || "Giao dịch bị từ chối do hết thời gian thanh toán";
-            bookingResult.value.tinh_trang = "huy"; // Kích hoạt UI che QR lại
-          }
-        })
-        .listen(".ve.da_thanh_toan", (e) => {
-          if (bookingResult.value) {
-            bookingResult.value.tinh_trang = "da_thanh_toan";
-          }
-        });
+      if (echo) {
+        echo
+          .channel(`ve.${bookingResult.value.ma_ve}`)
+          .listen(".ve.huy_tu_dong", (e) => {
+            if (bookingResult.value) {
+              errorMessage.value =
+                e.message ||
+                "Giao dịch bị từ chối do hết thời gian thanh toán";
+              bookingResult.value.tinh_trang = "huy";
+            }
+          })
+          .listen(".ve.da_thanh_toan", () => {
+            if (bookingResult.value) {
+              bookingResult.value.tinh_trang = "da_thanh_toan";
+            }
+          });
+      }
     } else {
       errorMessage.value = res.message || "Đặt vé thất bại.";
     }

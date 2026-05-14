@@ -167,8 +167,7 @@ const adminApi = {
   approveWithdraw: (id) => axiosClient.patch(`/v1/admin/vi-nha-xe/yeu-cau-rut-tien/${id}/duyet`),
   rejectWithdraw: (id, data) => axiosClient.patch(`/v1/admin/vi-nha-xe/yeu-cau-rut-tien/${id}/tu-choi`, data),
 
-  /** Chat AI: upload PDF sync & logs */
-  ingestAiPdf: (formData) => axiosClient.post('/v1/admin/ai/upload-pdf-sync', formData),
+  /** Chat AI: logs / stats (ingest vector qua luồng khác → POST admin/agent/vectors/upsert) */
   deleteAiIngestLog: (id) => axiosClient.delete(`/v1/admin/ai/ingest-logs/${id}`),
   getAiStats: (params) => axiosClient.get('/v1/admin/ai/stats', { params }),
   getAiChatLogs: (params) => axiosClient.get('/v1/admin/ai/chat-logs', { params }),

@@ -1,0 +1,19 @@
+{
+  "name": "@fe-agent/shared-zod-schemas",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Schema-first Zod contracts for the FE Agent Runtime SDK",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('js package, no build')\""
+  },
+  "files": [
+    "src"
+  ]
+}

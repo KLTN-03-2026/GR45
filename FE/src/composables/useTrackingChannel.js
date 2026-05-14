@@ -11,11 +11,12 @@ import { createEcho } from '@/utils/echo.js';
  *   unsubscribeAll()                          // Dừng tất cả
  */
 export function useTrackingChannel() {
-  let echoInstance = null;
+  /** @type {ReturnType<typeof createEcho> | undefined} */
+  let echoInstance;
   const subscribedChannels = ref(new Map()); // tripId → channel name
 
   const getEcho = () => {
-    if (!echoInstance) {
+    if (echoInstance === undefined) {
       echoInstance = createEcho();
     }
     return echoInstance;
@@ -30,6 +31,8 @@ export function useTrackingChannel() {
     if (subscribedChannels.value.has(tripId)) return; // Đã subscribe rồi
 
     const echo = getEcho();
+    if (!echo) return;
+
     const channelName = `tracking.trip.${tripId}`;
 
     echo.channel(channelName)
@@ -74,8 +77,8 @@ export function useTrackingChannel() {
     unsubscribeAll();
     if (echoInstance) {
       echoInstance.disconnect();
-      echoInstance = null;
     }
+    echoInstance = undefined;
   });
 
   return {

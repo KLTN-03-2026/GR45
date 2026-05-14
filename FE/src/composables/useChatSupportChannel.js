@@ -12,12 +12,12 @@ import { createEcho } from '@/utils/echo.js';
  *   unsubscribeAll()                         // Dừng tất cả
  */
 export function useChatSupportChannel() {
-  let echoInstance = null;
+  /** @type {ReturnType<typeof createEcho> | undefined} */
+  let echoInstance;
   const subscribedChannels = ref(new Map()); // sessionId → channel name
 
   const getEcho = () => {
-    if (!echoInstance) {
-      // Chat support dùng public channel, không cần token
+    if (echoInstance === undefined) {
       echoInstance = createEcho(null);
     }
     return echoInstance;
@@ -32,6 +32,8 @@ export function useChatSupportChannel() {
     if (subscribedChannels.value.has(sessionId)) return; // Đã subscribe rồi
 
     const echo = getEcho();
+    if (!echo) return;
+
     const channelName = `chat-support.session.${sessionId}`;
 
     echo.channel(channelName)
@@ -76,8 +78,8 @@ export function useChatSupportChannel() {
     unsubscribeAll();
     if (echoInstance) {
       echoInstance.disconnect();
-      echoInstance = null;
     }
+    echoInstance = undefined;
   });
 
   return {

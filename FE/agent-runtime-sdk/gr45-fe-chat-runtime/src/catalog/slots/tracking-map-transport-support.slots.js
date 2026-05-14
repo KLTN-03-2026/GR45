@@ -1,0 +1,187 @@
+export const TRACKING_TOOL_SLOTS = {
+  get_live_vehicle_location: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: [],
+    step: ["GET /api/v1/chuyen-xe/{id}/tracking/live"],
+  },
+  get_trip_progress: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: [],
+    step: ["Tracking live + tiến độ"],
+  },
+  estimate_arrival_time: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: ["target_station_id", "lat", "lng"],
+    step: ["ETA từ vị trí xe"],
+  },
+  get_trip_current_status: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: [],
+    step: ["trang_thai + tracking"],
+  },
+  get_vehicle_speed: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id|vehicle_id"],
+    optionalSlots: [],
+    step: ["Tốc độ mới nhất từ tracking"],
+  },
+};
+
+export const MAP_LOCATION_TOOL_SLOTS = {
+  map_trip: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: [],
+    step: ["GET /api/v1/map/direction hoặc map/osrm-route"],
+  },
+  get_live_route_map: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: [],
+    step: ["Polyline từ tracking + route"],
+  },
+  find_nearby_trips: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["lat", "lng"],
+    optionalSlots: ["radius_km", "ngay_khoi_hanh", "diem_den", "loai_xe"],
+    step: ["tram_dungs near user → trips"],
+  },
+  find_nearby_pickup_points: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["lat", "lng"],
+    optionalSlots: ["route_id", "trip_id", "radius_km"],
+    step: ["tram_dungs pickup"],
+  },
+  get_nearest_station: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["lat", "lng"],
+    optionalSlots: ["station_type", "radius_km"],
+    step: ["Nearest tram_dung"],
+  },
+  calculate_distance_to_vehicle: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id", "lat", "lng"],
+    optionalSlots: [],
+    step: ["Khoảng cách đến xe"],
+  },
+};
+
+export const TRANSPORT_INFO_TOOL_SLOTS = {
+  get_vehicle_info: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["vehicle_id|trip_id"],
+    optionalSlots: [],
+    step: ["Resolve xe từ trip"],
+  },
+  get_vehicle_status: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["vehicle_id|trip_id"],
+    optionalSlots: [],
+    step: ["Trạng thái xe"],
+  },
+  get_vehicle_amenities: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["vehicle_id|trip_id|loai_xe"],
+    optionalSlots: [],
+    step: ["Tiện ích loại xe"],
+  },
+  get_driver_info: {
+    authPolicy: "public_limited",
+    confirm: false,
+    requiredSlots: ["driver_id|trip_id"],
+    optionalSlots: [],
+    step: ["Thông tin tài xế public"],
+  },
+  get_driver_status: {
+    authPolicy: "public_limited",
+    confirm: false,
+    requiredSlots: ["driver_id|trip_id"],
+    optionalSlots: [],
+    step: ["Trạng thái tài xế"],
+  },
+  get_operator_info: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["ma_nha_xe|operator_id|trip_id|route_id"],
+    optionalSlots: [],
+    step: ["Thông tin nhà xe"],
+  },
+  get_trip_vehicle: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: [],
+    step: ["chuyen_xes.id_xe"],
+  },
+  get_trip_driver: {
+    authPolicy: "public_limited",
+    confirm: false,
+    requiredSlots: ["trip_id"],
+    optionalSlots: [],
+    step: ["chuyen_xes.id_tai_xe"],
+  },
+};
+
+export const SUPPORT_TOOL_SLOTS = {
+  create_support_session: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["target"],
+    optionalSlots: [
+      "guest_name",
+      "guest_phone",
+      "guest_email",
+      "ma_nha_xe",
+      "trip_id",
+      "initial_message",
+      "chat_widget_session_key",
+    ],
+    step: ["POST /api/v1/agent/support/sessions (Bearer khách tùy chọn — không dùng bridge secret)"],
+  },
+  send_support_message: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["public_id", "client_token", "message"],
+    optionalSlots: [],
+    step: ["POST /api/v1/agent/support/sessions/{publicId}/messages"],
+  },
+  get_support_messages: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["public_id", "client_token"],
+    optionalSlots: [],
+    step: ["GET /api/v1/agent/support/sessions/{publicId}/messages"],
+  },
+  escalate_to_human: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: ["public_id"],
+    optionalSlots: ["target", "reason"],
+    step: ["PATCH session"],
+  },
+  close_support_session: {
+    authPolicy: "public",
+    confirm: true,
+    requiredSlots: ["public_id", "client_token"],
+    optionalSlots: [],
+    step: ["PATCH session close"],
+  },
+};

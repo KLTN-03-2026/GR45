@@ -221,4 +221,87 @@ class VoucherService
                 $q->where('khach_hang_id', $khachHangId);
             })->first();
     }
+
+    /**
+     * Kiểm tra mã voucher cho chat/booking — không đổi trạng thái trong DB.
+     *
+     * @return array<string, mixed>
+     */
+    public function validateVoucherCodeForChat(string $code): array
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return ['valid' => false, 'reason' => 'Thiếu mã voucher.'];
+        }
+
+        /** @var \App\Models\Voucher|null $v */
+        $v = \App\Models\Voucher::query()->where('ma_voucher', $code)->first();
+        if ($v === null) {
+            return ['valid' => false, 'reason' => 'Không tìm thấy mã voucher.'];
+        }
+
+        if ($v->trang_thai !== 'hoat_dong') {
+            return ['valid' => false, 'reason' => 'Voucher không hoạt động ('.$v->trang_thai.').'];
+        }
+
+        if ($v->so_luong_con_lai !== null && (float) $v->so_luong_con_lai <= 0) {
+            return ['valid' => false, 'reason' => 'Voucher đã hết lượt.'];
+        }
+
+        $now = now()->startOfDay();
+        if ($v->ngay_bat_dau && $now->lt($v->ngay_bat_dau)) {
+            return ['valid' => false, 'reason' => 'Voucher chưa đến ngày áp dụng.'];
+        }
+        if ($v->ngay_ket_thuc && $now->gt($v->ngay_ket_thuc)) {
+            return ['valid' => false, 'reason' => 'Voucher đã hết hạn.'];
+        }
+
+        return [
+            'valid' => true,
+            'voucher' => [
+                'id' => $v->id,
+                'ma_voucher' => $v->ma_voucher,
+                'ten_voucher' => $v->ten_voucher,
+                'loai_voucher' => $v->loai_voucher,
+                'gia_tri' => $v->gia_tri,
+                'ngay_bat_dau' => $v->ngay_bat_dau?->toDateString(),
+                'ngay_ket_thuc' => $v->ngay_ket_thuc?->toDateString(),
+            ],
+        ];
+    }
+
+    /**
+     * Ước giảm giá (preview) — không gắn vé; percent hoặc số tiền cố định theo loai_voucher.
+     *
+     * @return array<string, mixed>
+     */
+    public function previewDiscountForChat(string $code, float $bookingAmount): array
+    {
+        $base = $this->validateVoucherCodeForChat($code);
+        if (($base['valid'] ?? false) !== true) {
+            return $base;
+        }
+
+        /** @var array<string, mixed> $info */
+        $info = $base['voucher'];
+        $amount = max(0.0, $bookingAmount);
+        $giaTri = isset($info['gia_tri']) ? (float) $info['gia_tri'] : 0.0;
+        $loai = isset($info['loai_voucher']) ? strtolower((string) $info['loai_voucher']) : '';
+
+        $discount = 0.0;
+        if (str_contains($loai, 'phan_tram') || str_contains($loai, 'percent')) {
+            $discount = round($amount * min(100.0, max(0.0, $giaTri)) / 100.0, 2);
+        } else {
+            $discount = round(min($amount, $giaTri), 2);
+        }
+
+        return [
+            'valid' => true,
+            'booking_amount' => $amount,
+            'discount_amount' => $discount,
+            'payable_after_discount' => round(max(0.0, $amount - $discount), 2),
+            'voucher' => $info,
+            'note' => 'Chỉ là tính toán gợi ý — áp dụng thực tế khi đặt vé.',
+        ];
+    }
 }

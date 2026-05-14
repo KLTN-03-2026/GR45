@@ -46,4 +46,9 @@ return [
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
+
+    'live_support' => [
+        'bridge_secret' => env('LIVE_SUPPORT_BRIDGE_SECRET'),
+    ],
+
 ];

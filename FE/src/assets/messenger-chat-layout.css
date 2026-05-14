@@ -1,0 +1,116 @@
+/**
+ * Layout khung chat hỗ trợ (Messenger-style): grid 2 cột desktop, stack mobile.
+ * Mobile: flex column + chiều cao shell gần 100svh (bubble cần parent có height xác định).
+ */
+.msg-messenger-shell {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 0%;
+  align-self: stretch;
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(228, 230, 235, 0.95);
+  box-shadow:
+    0 4px 24px rgba(15, 23, 42, 0.06),
+    0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+/* Desktop / tablet ngang: chat không chiếm trọn viewport — cap chiều cao */
+@media (min-width: 768px) {
+  .msg-messenger-shell {
+    min-height: max(320px, calc(100dvh - 320px));
+    min-height: max(320px, calc(100svh - 320px));
+    max-height: min(520px, calc(100dvh - 220px));
+    max-height: min(520px, calc(100svh - 220px));
+  }
+}
+
+.msg-messenger-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+  border-right: 1px solid #e4e6eb;
+}
+
+.msg-messenger-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.msg-messenger-sidebar .session-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@media (max-width: 767.98px) {
+  /*
+    Flex + height cố định: grid 2 hàng với height:auto khiến fr không chia được → khung tin nhắn co,
+    bubble không thấy. Sidebar cap nhỏ — list user cuộn trong .session-list.
+  */
+  .msg-messenger-shell {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    width: 100%;
+    min-height: 340px;
+    height: calc(100svh - 158px);
+    flex: 0 1 auto;
+  }
+
+  .msg-messenger-sidebar {
+    border-right: none !important;
+    border-bottom: 1px solid #e4e6eb;
+    flex: 0 1 auto;
+    flex-shrink: 0;
+    max-height: min(248px, 35svh);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .msg-messenger-sidebar .session-list {
+    flex: 1 1 0%;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .msg-messenger-pane {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .msg-messenger-pane .chat-messages-container.flex-grow-1 {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+
+  /* Resolve + ID + SĐT một hàng; hẹp quá thì cuộn ngang */
+  .messenger-thread-header-actions {
+    flex-wrap: nowrap !important;
+    gap: 0.35rem !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    max-width: 100%;
+    justify-content: flex-end !important;
+  }
+
+  .messenger-thread-header-actions .messenger-thread-header-meta {
+    white-space: nowrap !important;
+    flex-shrink: 0;
+    flex-basis: auto !important;
+    max-width: none !important;
+    word-break: normal !important;
+  }
+
+}
