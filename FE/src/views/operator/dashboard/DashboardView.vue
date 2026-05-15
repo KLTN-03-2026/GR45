@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { RouterLink } from "vue-router";
 import Echo from "laravel-echo";
-import Pusher from "pusher-js";
+import { buildLaravelEchoTransportOptions } from "@/utils/echo.js";
 import {
   DollarSign,
   Ticket,
@@ -259,19 +259,14 @@ const onRealtime = (payload) => {
 const initWs = () => {
   if (!store.token) return;
   try {
-    const key = import.meta.env.VITE_PUSHER_APP_KEY,
-      cluster = import.meta.env.VITE_PUSHER_APP_CLUSTER;
-    if (!key || !cluster) return;
-    window.Pusher = Pusher;
+    const transport = buildLaravelEchoTransportOptions();
+    if (!transport) return;
     let url =
-      import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/v1/";
+      import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/";
     if (!url.endsWith("/")) url += "/";
     echoInst = new Echo({
-      broadcaster: "pusher",
-      key,
-      cluster,
-      forceTLS: true,
-      authEndpoint: `${url}nha-xe/broadcasting/auth`,
+      ...transport,
+      authEndpoint: `${url}v1/nha-xe/broadcasting/auth`,
       auth: {
         headers: {
           Authorization: `Bearer ${store.token}`,

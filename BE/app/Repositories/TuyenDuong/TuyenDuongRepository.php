@@ -384,4 +384,94 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
         $tuyenDuong->tinh_trang = 'khong_hoat_dong';
         return $tuyenDuong->save();
     }
+
+    /**
+     * Tuyến hoạt động, tra cứu công khai (điểm đi/đến giống luồng tìm chuyến).
+     *
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator<int, TuyenDuong>
+     */
+    public function getPublicListing(array $filters = [])
+    {
+        $query = $this->model->query()
+            ->with(['tramDungs', 'nhaXe'])
+            ->where('tinh_trang', 'hoat_dong');
+
+        if (!empty($filters['ma_nha_xe'])) {
+            $query->where('ma_nha_xe', $filters['ma_nha_xe']);
+        }
+
+        if (!empty($filters['nha_xe'])) {
+            $kw = trim((string) $filters['nha_xe']);
+            if ($kw !== '') {
+                $query->whereHas('nhaXe', function ($q) use ($kw) {
+                    $q->where('ten_nha_xe', 'like', '%' . $kw . '%')
+                        ->orWhere('ma_nha_xe', 'like', '%' . $kw . '%');
+                });
+            }
+        }
+
+        if (!empty($filters['diem_di'])) {
+            $patterns = $this->locationLikePatterns((string) $filters['diem_di']);
+            if ($patterns !== []) {
+                $query->where(function ($q) use ($patterns) {
+                    $q->where(function ($qStart) use ($patterns) {
+                        foreach ($patterns as $p) {
+                            $qStart->orWhere('diem_bat_dau', 'LIKE', '%' . $p . '%');
+                        }
+                    });
+                    $q->orWhereHas('tramDons', function ($qTram) use ($patterns) {
+                        $qTram->where(function ($qt) use ($patterns) {
+                            foreach ($patterns as $p) {
+                                $qt->orWhere('ten_tram', 'LIKE', '%' . $p . '%')
+                                    ->orWhere('dia_chi', 'LIKE', '%' . $p . '%');
+                            }
+                        });
+                    });
+                });
+            }
+        }
+
+        if (!empty($filters['diem_den'])) {
+            $patterns = $this->locationLikePatterns((string) $filters['diem_den']);
+            if ($patterns !== []) {
+                $query->where(function ($q) use ($patterns) {
+                    $q->where(function ($qEnd) use ($patterns) {
+                        foreach ($patterns as $p) {
+                            $qEnd->orWhere('diem_ket_thuc', 'LIKE', '%' . $p . '%');
+                        }
+                    });
+                    $q->orWhereHas('tramTras', function ($qTram) use ($patterns) {
+                        $qTram->where(function ($qt) use ($patterns) {
+                            foreach ($patterns as $p) {
+                                $qt->orWhere('ten_tram', 'LIKE', '%' . $p . '%')
+                                    ->orWhere('dia_chi', 'LIKE', '%' . $p . '%');
+                            }
+                        });
+                    });
+                });
+            }
+        }
+
+        return $query->orderBy('ten_tuyen_duong')
+            ->paginate((int) ($filters['per_page'] ?? 15));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function locationLikePatterns(string $value): array
+    {
+        $base = trim($value);
+        if ($base === '') {
+            return [];
+        }
+
+        $patterns = [
+            $base,
+            str_replace(['Đ', 'đ'], ['D', 'd'], $base),
+            str_replace(['D', 'd'], ['Đ', 'đ'], $base),
+        ];
+
+        return array_values(array_unique(array_filter($patterns)));
+    }
 }

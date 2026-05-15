@@ -133,8 +133,7 @@ const menuList = [
   // --- Dịch vụ ---
   {
     id: "ho-tro",
-    name: "Yêu cầu hỗ trợ",
-    path: "/nha-xe/ho-tro",
+    name: "Hỗ trợ",
     icon: LifeBuoy,
     // Nhà xe luôn thấy
   },

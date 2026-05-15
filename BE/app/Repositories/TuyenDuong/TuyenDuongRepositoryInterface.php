@@ -16,4 +16,7 @@ interface TuyenDuongRepositoryInterface
     public function confirm(int $id): bool;
     //huy tuyen duong
     public function cancel(int $id): bool;
+
+    /** Danh sách tuyến công khai (khách/search) — không yêu cầu đăng nhập. */
+    public function getPublicListing(array $filters = []);
 }

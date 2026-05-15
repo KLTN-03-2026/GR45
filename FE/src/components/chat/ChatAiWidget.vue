@@ -1,7 +1,13 @@
 <script setup>
-import { ref, computed, nextTick, watch, onMounted } from "vue";
-import { callChatAiMessage, parseAssistantUiPayload, getChatAiHistory } from "@/api/chatAiApi.js";
-import { useChatSupportChannel } from "@/composables/useChatSupportChannel";
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from "vue";
+import {
+  callChatAiMessage,
+  coerceAssistantStructured,
+  parseAssistantUiPayload,
+  notifyChatAiUserClosing,
+  notifyLiveSupportWidgetDisconnect,
+} from "@/api/chatAiApi.js";
+import { useLiveSupportChannel } from "@/composables/useLiveSupportChannel";
 // Force Vite HMR reload
 
 const open = ref(false);
@@ -23,21 +29,68 @@ const chatAiSessionId = ref("");
 let scrollRaf = null;
 const loginPath = String(import.meta.env.VITE_CHAT_LOGIN_PATH || "/auth/login").trim() || "/auth/login";
 
-const { subscribe, unsubscribeAll, isSubscribed } = useChatSupportChannel();
+/** Đồng bộ prefix với `@fe-agent/sdk` `createBrowserSessionProvider` — xóa khi đổi phiên widget. */
+const FE_AGENT_SESSION_STORAGE_PREFIX = "fe-agent-chat-ai:";
 
-function subscribeToSession(sessionId) {
-  if (!sessionId || isSubscribed(sessionId)) return;
-  subscribe(sessionId, (message) => {
-    // Chỉ thêm tin nhắn của admin, tin nhắn của user/assistant đã được handle qua flow chuẩn
-    if (message.role === "admin") {
-      messages.value.push({
-        role: message.role,
-        text: message.content,
-        metadata: message.meta || {},
-      });
-      scrollToEnd();
-    }
-  });
+/** Phiên chỉ khóa theo widget — không tải lịch sử DB khi mount; admin xem transcript qua message-log BE. */
+const threadLocked = ref(false);
+
+function flushUserCloseBeacon() {
+  const key =
+    chatAiSessionId.value?.trim() ||
+    (typeof localStorage !== "undefined"
+      ? localStorage.getItem("chat_session_key")
+      : "");
+  if (!key) return;
+  void notifyChatAiUserClosing(key);
+  void notifyLiveSupportWidgetDisconnect(key);
+}
+
+const {
+  subscribe: subscribeLiveSupport,
+  unsubscribe: unsubscribeLiveSupport,
+  unsubscribeAll,
+  isSubscribed,
+} = useLiveSupportChannel("customer_widget");
+
+function liveSupportEndedAssistantText(kind) {
+  if (kind === "resolved") {
+    return "Phiên hỗ trợ trực tiếp đã kết thúc (nhân viên đã xử lý xong). Bạn vẫn có thể chat với bot; nếu cần người thật, hãy yêu cầu lại để mở phiên mới.";
+  }
+  return "Phiên hỗ trợ đã đóng (ví dụ bạn tải lại hoặc rời trang). Bạn vẫn có thể chat với bot; nếu cần người thật, hãy yêu cầu lại để mở phiên mới.";
+}
+
+function subscribeToLiveSupportPublicId(publicId) {
+  const pid = String(publicId || "").trim();
+  if (!pid || isSubscribed(pid)) return;
+  subscribeLiveSupport(
+    pid,
+    (message) => {
+      if (message.role === "admin") {
+        messages.value.push({
+          role: message.role,
+          text: message.content,
+          metadata: message.meta || {},
+        });
+        scrollToEnd();
+      }
+    },
+    {
+      onSessionEnded: (detail) => {
+        if (String(detail?.public_id || "").trim() !== pid) return;
+        unsubscribeLiveSupport(pid);
+        messages.value.push({
+          role: "assistant",
+          text: liveSupportEndedAssistantText(detail.kind),
+          metadata: {
+            live_support_session_ended: true,
+            live_support_end_reason: detail.kind,
+          },
+        });
+        scrollToEnd();
+      },
+    },
+  );
 }
 
 /** Link từ tool (tickets_url — tìm chuyến dùng chip suggestions open_search). */
@@ -59,14 +112,28 @@ function goToolHref(href) {
   window.location.href = href.startsWith("/") ? href : `/${href}`;
 }
 
+/**
+ * Chuẩn hoá chip gợi ý — hỗ trợ string[], object có text/action/payload hoặc params.
+ */
 function normalizeQuickReplies(items) {
   const out = [];
   const seen = new Set();
-  for (const s of Array.isArray(items) ? items : []) {
+  for (const raw of Array.isArray(items) ? items : []) {
+    let s = raw;
+    if (typeof raw === "string") {
+      const text = raw.trim();
+      if (!text) continue;
+      s = { text, action: "", payload: {} };
+    }
     if (!s || typeof s !== "object") continue;
     const text = typeof s.text === "string" ? s.text.trim() : "";
     if (!text) continue;
-    const payload = s.payload && typeof s.payload === "object" ? s.payload : {};
+    const payload =
+      s.payload && typeof s.payload === "object"
+        ? s.payload
+        : s.params && typeof s.params === "object"
+          ? s.params
+          : {};
     const actionFromPayload =
       typeof payload.action === "string" ? payload.action.toLowerCase().trim() : "";
     const action =
@@ -82,7 +149,12 @@ function normalizeQuickReplies(items) {
   return out;
 }
 
-onMounted(async () => {
+onMounted(() => {
+  if (typeof window !== "undefined") {
+    window.addEventListener("pagehide", flushUserCloseBeacon);
+    window.addEventListener("beforeunload", flushUserCloseBeacon);
+  }
+
   let storedKey = localStorage.getItem("chat_session_key");
   if (!storedKey) {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -93,50 +165,38 @@ onMounted(async () => {
     localStorage.setItem("chat_session_key", storedKey);
   }
   chatAiSessionId.value = storedKey;
-
-  try {
-    const res = await getChatAiHistory({ session_key: storedKey });
-    if (res && res.success && Array.isArray(res.data)) {
-      if (res.session_id) {
-        subscribeToSession(res.session_id);
-      }
-      messages.value = res.data.map(msg => {
-        let text = msg.content;
-        try {
-          const payload = parseAssistantJsonPayload(msg.content);
-          if (payload && payload.answer) {
-            text = payload.answer;
-          }
-        } catch {
-          // keep original
-        }
-        return {
-          role: msg.role,
-          text: text,
-          metadata: msg.meta || {}
-        };
-      });
-    }
-  } catch (err) {
-    console.error("Lỗi tải lịch sử chat AI:", err);
-  }
 });
 
 function startNewChatSession() {
   if (streaming.value) return;
-  
+
+  const prevKey = String(chatAiSessionId.value || "").trim();
+
+  unsubscribeAll();
+
+  if (prevKey && typeof localStorage !== "undefined") {
+    try {
+      const sid = prevKey.slice(0, 96);
+      localStorage.removeItem(FE_AGENT_SESSION_STORAGE_PREFIX + sid);
+    } catch {
+      /* ignore */
+    }
+  }
+
   let newKey;
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     newKey = crypto.randomUUID();
   } else {
     newKey = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
-  
+
   localStorage.setItem("chat_session_key", newKey);
   chatAiSessionId.value = newKey;
   messages.value = [];
   quickReplies.value = [];
   input.value = "";
+  assistantBuffer.value = "";
+  threadLocked.value = false;
 }
 
 function refreshGeoOnce() {
@@ -174,7 +234,7 @@ function refreshGeoOnce() {
 }
 
 const canSend = computed(
-  () => input.value.trim().length > 0 && !streaming.value,
+  () => input.value.trim().length > 0 && !streaming.value && !threadLocked.value,
 );
 
 function showAssistantBubble(m, idx) {
@@ -290,7 +350,7 @@ function parseAssistantJsonPayload(rawText) {
 /** Gửi message + vị trí (lat/lon) + history + session_id — không gửi payload bổ sung. */
 async function submitMessage(text) {
   const displayText = String(text || "").trim();
-  if (!displayText || streaming.value) return;
+  if (!displayText || streaming.value || threadLocked.value) return;
   if (!lastGeo.value) {
     await refreshGeoOnce();
   }
@@ -317,8 +377,13 @@ async function submitMessage(text) {
   try {
     const body = await callChatAiMessage(displayText, undefined, opts);
 
-    if (body.session_id) {
-      subscribeToSession(body.session_id);
+    const lsIds =
+      body.metadata?.ai?.live_support_public_ids &&
+      Array.isArray(body.metadata.ai.live_support_public_ids)
+        ? body.metadata.ai.live_support_public_ids
+        : [];
+    for (const pid of lsIds) {
+      subscribeToLiveSupportPublicId(pid);
     }
 
     waitingFirstToken.value = false;
@@ -334,20 +399,33 @@ async function submitMessage(text) {
 
     const last = messages.value[messages.value.length - 1];
     if (last && last.role === "assistant") {
-      const rawForUi = String(body.assistant ?? "").trim();
-      assistantBuffer.value = rawForUi;
-      last.text = rawForUi;
       if (body.metadata && typeof body.metadata === "object") {
         last.metadata = body.metadata;
       }
-      const payload = parseAssistantJsonPayload(rawForUi);
-      if (payload) {
-        const ans = String(payload.answer || "").trim();
-        if (ans) {
-          last.text = ans;
+
+      const structured = coerceAssistantStructured(body.assistant);
+      let suggestionsForQuick = [];
+
+      if (structured) {
+        const ans = String(structured.answer ?? "").trim();
+        assistantBuffer.value = ans;
+        last.text = ans;
+        suggestionsForQuick = Array.isArray(structured.suggestions)
+          ? structured.suggestions
+          : [];
+      } else {
+        const rawForUi = String(body.assistant ?? "").trim();
+        assistantBuffer.value = rawForUi;
+        last.text = rawForUi;
+        const parsed = parseAssistantJsonPayload(rawForUi);
+        if (parsed?.answer?.trim()) {
+          last.text = parsed.answer.trim();
+          assistantBuffer.value = last.text;
         }
-        quickReplies.value = normalizeQuickReplies(payload.suggestions);
+        suggestionsForQuick = parsed?.suggestions ?? [];
       }
+
+      quickReplies.value = normalizeQuickReplies(suggestionsForQuick);
       const meta = last.metadata && typeof last.metadata === "object" ? last.metadata : {};
       if (meta.login_required === true) {
         quickReplies.value = normalizeQuickReplies([
@@ -370,6 +448,10 @@ async function submitMessage(text) {
   } catch (e) {
     waitingFirstToken.value = false;
     patchAssistant(`\n${formatChatAiFetchError(e)}`);
+    const msg = String(e?.message || e || "");
+    if (/đã kết thúc|thread_locked|chỉ xem lịch sử/i.test(msg)) {
+      threadLocked.value = true;
+    }
     quickReplies.value = [];
   } finally {
     streaming.value = false;
@@ -386,7 +468,7 @@ async function send() {
 }
 
 function onQuickChip(label) {
-  if (streaming.value) return;
+  if (streaming.value || threadLocked.value) return;
   const action = String(label?.action || "").toLowerCase().trim();
   if (label && typeof label === "object" && action === "login") {
     if (typeof window !== "undefined") {
@@ -452,6 +534,13 @@ watch(open, (v) => {
 watch([quickReplies, streaming], () => {
   void scrollToEnd();
 }, { deep: true, flush: "post" });
+
+onUnmounted(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("pagehide", flushUserCloseBeacon);
+    window.removeEventListener("beforeunload", flushUserCloseBeacon);
+  }
+});
 </script>
 
 <template>
@@ -460,6 +549,7 @@ watch([quickReplies, streaming], () => {
       type="button"
       class="rag-chat__fab"
       aria-label="Mở trợ lý BusSafe"
+      data-testid="chat-ai-fab"
       @click="toggle"
     >
       <span class="material-symbols-outlined">smart_toy</span>
@@ -471,6 +561,7 @@ watch([quickReplies, streaming], () => {
         class="rag-chat__panel"
         role="dialog"
         aria-modal="true"
+        data-testid="chat-ai-panel"
       >
         <header class="rag-chat__head">
           <div>
@@ -553,7 +644,7 @@ watch([quickReplies, streaming], () => {
               type="button"
               class="rag-chat__quick-chip"
               role="listitem"
-              :disabled="streaming"
+              :disabled="streaming || threadLocked"
               @click="onQuickChip(q)"
             >
               {{ q.text }}
@@ -562,18 +653,24 @@ watch([quickReplies, streaming], () => {
         </div>
 
         <footer class="rag-chat__foot">
+          <p v-if="threadLocked" class="rag-chat__locked">
+            Phiên đã kết thúc — chỉ xem lịch sử.
+          </p>
           <div class="rag-chat__composer">
             <textarea
               v-model="input"
               rows="1"
               class="rag-chat__input rag-chat__input--grow"
               placeholder="Nhập câu hỏi..."
+              data-testid="chat-ai-input"
+              :disabled="threadLocked"
               @keydown.enter.exact.prevent="send"
             />
             <div class="rag-chat__composer-actions">
               <button
                 type="button"
                 class="rag-chat__btn rag-chat__btn--primary"
+                data-testid="chat-ai-send"
                 :disabled="!canSend"
                 @click="send"
               >
@@ -822,6 +919,16 @@ watch([quickReplies, streaming], () => {
     transform: translateY(-0.28rem);
     opacity: 1;
   }
+}
+
+.rag-chat__locked {
+  margin: 0 0 0.45rem;
+  padding: 0.35rem 0.45rem;
+  font-size: 0.72rem;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 0.35rem;
+  border: 1px solid #fcd34d;
 }
 
 .rag-chat__foot {

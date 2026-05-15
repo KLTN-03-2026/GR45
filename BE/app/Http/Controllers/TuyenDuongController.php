@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\TuyenDuong\StoreTuyenDuongRequest;
 use App\Http\Requests\TuyenDuong\UpdateTuyenDuongRequest;
 use App\Repositories\TuyenDuong\TuyenDuongRepositoryInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TuyenDuongController extends Controller
@@ -14,6 +15,33 @@ class TuyenDuongController extends Controller
     public function __construct(TuyenDuongRepositoryInterface $tuyenDuongRepo)
     {
         $this->tuyenDuongRepo = $tuyenDuongRepo;
+    }
+
+    /**
+     * GET /api/v1/tuyen-duong/public — tra cứu tuyến (không auth), phục vụ chat agent / FE khách.
+     */
+    public function indexPublic(Request $request): JsonResponse
+    {
+        try {
+            $filters = $request->only([
+                'diem_di',
+                'diem_den',
+                'nha_xe',
+                'ma_nha_xe',
+                'per_page',
+            ]);
+            $data = $this->tuyenDuongRepo->getPublicListing($filters);
+
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
+        }
     }
 
     public function index(Request $request)

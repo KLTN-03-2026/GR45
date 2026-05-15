@@ -1,0 +1,21 @@
+{
+  "name": "@fe-agent/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@langchain/community": "^1.1.28",
+    "@langchain/groq": "^1.2.0",
+    "@langchain/ollama": "^1.2.7",
+    "@huggingface/inference": "^4.13.0"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('js package, no build')\""
+  },
+  "files": [
+    "src"
+  ]
+}

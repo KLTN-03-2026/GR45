@@ -1,44 +1,49 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import {
-  FileUp,
   Sparkles,
   BarChart3,
   History,
   FolderOpen,
   RefreshCw,
   Trash2,
-  Loader2,
+  Upload,
 } from "lucide-vue-next";
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from "chart.js";
-import { Bar } from "vue-chartjs";
+import { Line } from "vue-chartjs";
 import adminApi from "@/api/adminApi.js";
+import { coerceAssistantStructured } from "@/api/chatAiApi.js";
+import pdfjsWorkerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
+  Filler,
 );
 
 /** Đồng bộ với NO_KB_ANSWER backend (FaqService / AiChatController). */
 const NO_KB_OUTCOME_LABEL =
   "Xin lỗi, mình chưa tìm được thông tin để trả lời câu này. Bạn thử hỏi lại giúp mình, hoặc gọi hotline nhà xe để được hỗ trợ trực tiếp nhé.";
 
-const fileInput = ref(null);
-const uploading = ref(false);
 const message = ref("");
 const error = ref("");
+const ingestUploading = ref(false);
+const ingestUploadName = ref("");
 
 const chatDateFrom = ref("");
 const chatDateTo = ref("");
@@ -47,20 +52,12 @@ const ingestDateTo = ref("");
 const chatSearch = ref("");
 const ingestSearch = ref("");
 
-const chartTotalFrom = ref("");
-const chartTotalTo = ref("");
-const chartOkFrom = ref("");
-const chartOkTo = ref("");
-const chartBadFrom = ref("");
-const chartBadTo = ref("");
+const chartKnowledgeFrom = ref("");
+const chartKnowledgeTo = ref("");
 
-const statsTotal = ref(null);
-const statsOk = ref(null);
-const statsBad = ref(null);
+const statsUnified = ref(null);
 const statsError = ref("");
-const loadingChartTotal = ref(false);
-const loadingChartOk = ref(false);
-const loadingChartBad = ref(false);
+const loadingKnowledgeChart = ref(false);
 
 const chatLogs = ref([]);
 const ingestLogs = ref([]);
@@ -87,8 +84,6 @@ const ingestMeta = ref({
   per_page: 15,
 });
 
-const pickFile = () => fileInput.value?.click();
-
 function formatDt(v) {
   if (!v) return "—";
   try {
@@ -98,75 +93,122 @@ function formatDt(v) {
   }
 }
 
+/** yyyy-mm-dd theo giờ địa phương (tránh lệch ngày do `toISOString()` UTC). */
+function formatDateInputLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Mặc định tab chat: 7 ngày gần nhất. */
 function defaultDateRangeStrings() {
   const to = new Date();
   const from = new Date(to);
   from.setDate(from.getDate() - 6);
-  const iso = (d) => d.toISOString().slice(0, 10);
-  return { from: iso(from), to: iso(to) };
+  return { from: formatDateInputLocal(from), to: formatDateInputLocal(to) };
+}
+
+/** Mặc định tab PDF đã nhúng: 1 năm (vector vẫn trên DB; bảng chỉ lọc theo ngày). */
+function defaultIngestDateRangeStrings() {
+  const to = new Date();
+  const from = new Date(to);
+  from.setFullYear(from.getFullYear() - 1);
+  return { from: formatDateInputLocal(from), to: formatDateInputLocal(to) };
 }
 
 function unwrapStats(res) {
   return res?.data != null ? res.data : res;
 }
 
-async function loadChartTotal() {
-  statsError.value = "";
-  loadingChartTotal.value = true;
+function adminBearerHeaders() {
+  const token = String(localStorage.getItem("auth.admin.token") || "").trim();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function handlePdfUploadChange(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  message.value = "";
+  error.value = "";
+  ingestUploadName.value = file.name;
+
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
+    error.value = "Chỉ nhận file PDF.";
+    input.value = "";
+    return;
+  }
+
+  ingestUploading.value = true;
   try {
-    const res = await adminApi.getAiStats({
-      date_from: chartTotalFrom.value || undefined,
-      date_to: chartTotalTo.value || undefined,
+    const {
+      createAuthenticatedHttpVectorProvider,
+      createLangChainRagEmbedderDeps,
+      ingestPdfToVectorCollection,
+      resolveBrowserAgentRuntimeConfig,
+    } = await import("@fe-agent/sdk");
+
+    const config = resolveBrowserAgentRuntimeConfig({
+      env: import.meta.env,
+      locationOrigin: window.location.origin,
     });
-    statsTotal.value = unwrapStats(res);
+    const fetchImpl = window.fetch.bind(window);
+    const vector = createAuthenticatedHttpVectorProvider({
+      baseUrl: config.adminVectorBaseUrl,
+      fetchImpl,
+      getHeaders: adminBearerHeaders,
+    });
+    const embedder = createLangChainRagEmbedderDeps({
+      ollamaEmbedModel: config.ollamaEmbedModel,
+      ollamaBaseUrl: config.ollamaBaseUrl,
+      fetchImpl,
+    });
+
+    const result = await ingestPdfToVectorCollection({
+      file,
+      pdfjsWorkerSrc,
+      collection: config.collection,
+      docId: crypto.randomUUID(),
+      documentFilename: file.name,
+      embedder,
+      vector,
+      sessionId: `admin-pdf-${Date.now()}`,
+      correlationId: crypto.randomUUID(),
+      embeddingModel: config.ollamaEmbedModel,
+    });
+
+    message.value = `Đã nhúng xong ${file.name} (${result.chunks} chunk).`;
+    await Promise.allSettled([loadKnowledgeChart(), loadIngestLogs()]);
   } catch (e) {
-    statsTotal.value = null;
-    statsError.value =
+    error.value =
       e?.response?.data?.message ||
       e?.message ||
-      "Không tải được thống kê (tổng tin).";
+      "Không nhúng được PDF.";
   } finally {
-    loadingChartTotal.value = false;
+    ingestUploading.value = false;
+    input.value = "";
   }
 }
 
-async function loadChartOk() {
+async function loadKnowledgeChart() {
   statsError.value = "";
-  loadingChartOk.value = true;
+  loadingKnowledgeChart.value = true;
   try {
     const res = await adminApi.getAiStats({
-      date_from: chartOkFrom.value || undefined,
-      date_to: chartOkTo.value || undefined,
+      date_from: chartKnowledgeFrom.value || undefined,
+      date_to: chartKnowledgeTo.value || undefined,
     });
-    statsOk.value = unwrapStats(res);
+    statsUnified.value = unwrapStats(res);
   } catch (e) {
-    statsOk.value = null;
+    statsUnified.value = null;
     statsError.value =
       e?.response?.data?.message ||
       e?.message ||
-      "Không tải được thống kê (hỗ trợ được).";
+      "Không tải được thống kê tri thức.";
   } finally {
-    loadingChartOk.value = false;
-  }
-}
-
-async function loadChartBad() {
-  statsError.value = "";
-  loadingChartBad.value = true;
-  try {
-    const res = await adminApi.getAiStats({
-      date_from: chartBadFrom.value || undefined,
-      date_to: chartBadTo.value || undefined,
-    });
-    statsBad.value = unwrapStats(res);
-  } catch (e) {
-    statsBad.value = null;
-    statsError.value =
-      e?.response?.data?.message ||
-      e?.message ||
-      "Không tải được thống kê (không hỗ trợ được).";
-  } finally {
-    loadingChartBad.value = false;
+    loadingKnowledgeChart.value = false;
   }
 }
 
@@ -284,24 +326,19 @@ async function applyIngestFilters() {
 
 async function refreshDashboard() {
   const r = defaultDateRangeStrings();
-  chartTotalFrom.value = r.from;
-  chartTotalTo.value = r.to;
-  chartOkFrom.value = r.from;
-  chartOkTo.value = r.to;
-  chartBadFrom.value = r.from;
-  chartBadTo.value = r.to;
+  const ri = defaultIngestDateRangeStrings();
+  chartKnowledgeFrom.value = r.from;
+  chartKnowledgeTo.value = r.to;
   chatDateFrom.value = r.from;
   chatDateTo.value = r.to;
-  ingestDateFrom.value = r.from;
-  ingestDateTo.value = r.to;
+  ingestDateFrom.value = ri.from;
+  ingestDateTo.value = ri.to;
   chatSearch.value = "";
   ingestSearch.value = "";
   chatPage.value = 1;
   ingestPage.value = 1;
   await Promise.all([
-    loadChartTotal(),
-    loadChartOk(),
-    loadChartBad(),
+    loadKnowledgeChart(),
     loadChatLogs(),
     loadIngestLogs(),
   ]);
@@ -321,9 +358,7 @@ async function deleteIngestRow(id) {
     if (body?.success) {
       message.value = `Đã xóa (${body.deleted_chunks ?? 0} chunk).`;
       await Promise.all([
-        loadChartTotal(),
-        loadChartOk(),
-        loadChartBad(),
+        loadKnowledgeChart(),
         loadIngestLogs(),
       ]);
     } else {
@@ -366,11 +401,44 @@ function outcomeLabel(row) {
 }
 
 /**
- * Chỉ parse `assistant_message` (JSON đầy đủ). `assistant_display` là text answer → không dùng.
+ * Chuỗi trả lời hiển thị trong bảng (không dùng `String(object)` → [object Object]).
+ */
+function adminAssistantReplyText(row) {
+  const fromDisp = coerceAssistantStructured(row?.assistant_display);
+  if (fromDisp?.answer?.trim()) return fromDisp.answer.trim();
+  const fromAm = coerceAssistantStructured(row?.assistant_message);
+  if (fromAm?.answer?.trim()) return fromAm.answer.trim();
+  const raw =
+    typeof row?.assistant_message === "string" ? row.assistant_message.trim() : "";
+  if (raw === "[object Object]" || raw === "") return "—";
+  return raw || "—";
+}
+
+/**
+ * Chỉ parse JSON assistant (đầy đủ có suggestions). Ưu `assistant_message` (object|string).
  * @returns {string[]}
  */
 function suggestionTextsFromAssistant(row) {
   const raw = row?.assistant_message ?? "";
+  /** @type {unknown} */
+  let source = raw;
+  if ((!raw || String(raw).trim() === "") && row?.assistant_display) {
+    source = row.assistant_display;
+  }
+  const coerced = coerceAssistantStructured(source);
+  if (
+    coerced &&
+    typeof coerced === "object" &&
+    Array.isArray(coerced.suggestions)
+  ) {
+    return coerced.suggestions
+      .map((x) =>
+        typeof x === "string"
+          ? String(x).trim()
+          : String(x?.text ?? "").trim(),
+      )
+      .filter((x) => x.length > 0);
+  }
   if (!raw || typeof raw !== "string") return [];
   const t = raw.trim();
   if (!t.startsWith("{")) return [];
@@ -453,60 +521,19 @@ async function selectIngestPage(p) {
 
 onMounted(() => {
   const r = defaultDateRangeStrings();
-  chartTotalFrom.value = r.from;
-  chartTotalTo.value = r.to;
-  chartOkFrom.value = r.from;
-  chartOkTo.value = r.to;
-  chartBadFrom.value = r.from;
-  chartBadTo.value = r.to;
+  const ri = defaultIngestDateRangeStrings();
+  chartKnowledgeFrom.value = r.from;
+  chartKnowledgeTo.value = r.to;
   chatDateFrom.value = r.from;
   chatDateTo.value = r.to;
-  ingestDateFrom.value = r.from;
-  ingestDateTo.value = r.to;
+  ingestDateFrom.value = ri.from;
+  ingestDateTo.value = ri.to;
   void Promise.all([
-    loadChartTotal(),
-    loadChartOk(),
-    loadChartBad(),
+    loadKnowledgeChart(),
     loadChatLogs(),
     loadIngestLogs(),
   ]);
 });
-
-const onFileChange = async (e) => {
-  const file = e.target?.files?.[0];
-  if (!file) return;
-  error.value = "";
-  message.value = "";
-  uploading.value = true;
-  try {
-    const fd = new FormData();
-    fd.append("pdf", file);
-    const res = await adminApi.ingestAiPdf(fd);
-    const body = res?.data != null ? res.data : res;
-    if (body?.success) {
-      const chunks = body?.chunks_processed ?? body?.chunks ?? 0;
-      message.value = `Đã nhúng xong: ${chunks ?? 0} đoạn văn bản vào corpus Chat AI.`;
-      await Promise.all([
-        loadChartTotal(),
-        loadChartOk(),
-        loadChartBad(),
-        loadChatLogs(),
-        loadIngestLogs(),
-      ]);
-    } else {
-      error.value = body?.error || body?.message || "Upload thất bại.";
-    }
-  } catch (err) {
-    error.value =
-      err?.response?.data?.message ||
-      err?.response?.data?.error ||
-      err?.message ||
-      "Lỗi khi gọi API.";
-  } finally {
-    uploading.value = false;
-    if (fileInput.value) fileInput.value.value = "";
-  }
-};
 
 function dailyFromStats(st) {
   const raw = st?.chat?.daily;
@@ -520,12 +547,62 @@ function labelForRows(rows) {
   };
 }
 
-function barOptionsSingle(rows) {
+function rowLabels(rows) {
+  return rows.map((r) => {
+    const parts = String(r.date || "").split("-");
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+    return String(r.date || "");
+  });
+}
+
+const lastUpload = computed(() =>
+  formatDt(statsUnified.value?.ingest?.last_upload_at),
+);
+
+const knowledgeRows = computed(() => dailyFromStats(statsUnified.value));
+
+const knowledgeLineData = computed(() => ({
+  labels: rowLabels(knowledgeRows.value),
+  datasets: [
+    {
+      label: "Tổng tin nhắn theo ngày",
+      data: knowledgeRows.value.map((r) => Number(r.total) || 0),
+      borderColor: "rgba(37, 99, 235, 1)",
+      backgroundColor: "rgba(37, 99, 235, 0.08)",
+      tension: 0.35,
+      fill: true,
+      pointRadius: 3,
+    },
+    {
+      label: "Đã hỗ trợ",
+      data: knowledgeRows.value.map((r) => Number(r.success) || 0),
+      borderColor: "rgba(22, 163, 74, 1)",
+      backgroundColor: "rgba(22, 163, 74, 0.06)",
+      tension: 0.35,
+      fill: true,
+      pointRadius: 3,
+    },
+    {
+      label: "Chưa hỗ trợ",
+      data: knowledgeRows.value.map(
+        (r) => (Number(r.failed) || 0) + (Number(r.unknown) || 0),
+      ),
+      borderColor: "rgba(239, 68, 68, 1)",
+      backgroundColor: "rgba(239, 68, 68, 0.06)",
+      tension: 0.35,
+      fill: true,
+      pointRadius: 3,
+    },
+  ],
+}));
+
+const knowledgeLineOptions = computed(() => {
+  const rows = knowledgeRows.value;
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: false },
+      legend: { display: true, position: "bottom", labels: { boxWidth: 12 } },
       title: { display: false },
       tooltip: {
         callbacks: { title: labelForRows(rows) },
@@ -543,78 +620,7 @@ function barOptionsSingle(rows) {
       },
     },
   };
-}
-
-function rowLabels(rows) {
-  return rows.map((r) => {
-    const parts = String(r.date || "").split("-");
-    if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
-    return String(r.date || "");
-  });
-}
-
-const lastUpload = computed(() =>
-  formatDt(
-    statsTotal.value?.ingest?.last_upload_at ??
-      statsOk.value?.ingest?.last_upload_at ??
-      statsBad.value?.ingest?.last_upload_at,
-  ),
-);
-
-const rowsTotal = computed(() => dailyFromStats(statsTotal.value));
-const rowsOk = computed(() => dailyFromStats(statsOk.value));
-const rowsBad = computed(() => dailyFromStats(statsBad.value));
-
-const chartTotalBarData = computed(() => ({
-  labels: rowLabels(rowsTotal.value),
-  datasets: [
-    {
-      label: "Tổng tin",
-      data: rowsTotal.value.map((r) => Number(r.total) || 0),
-      backgroundColor: "rgba(37, 99, 235, 0.55)",
-      borderColor: "rgba(29, 78, 216, 0.9)",
-      borderWidth: 1,
-      borderRadius: 6,
-      maxBarThickness: 32,
-    },
-  ],
-}));
-
-const chartOkBarData = computed(() => ({
-  labels: rowLabels(rowsOk.value),
-  datasets: [
-    {
-      label: "Đã hỗ trợ",
-      data: rowsOk.value.map((r) => Number(r.success) || 0),
-      backgroundColor: "rgba(22, 163, 74, 0.65)",
-      borderColor: "rgba(21, 128, 61, 0.95)",
-      borderWidth: 1,
-      borderRadius: 6,
-      maxBarThickness: 32,
-    },
-  ],
-}));
-
-const chartBadBarData = computed(() => ({
-  labels: rowLabels(rowsBad.value),
-  datasets: [
-    {
-      label: "Chưa / lỗi hỗ trợ",
-      data: rowsBad.value.map(
-        (r) => (Number(r.failed) || 0) + (Number(r.unknown) || 0),
-      ),
-      backgroundColor: "rgba(239, 68, 68, 0.55)",
-      borderColor: "rgba(185, 28, 28, 0.9)",
-      borderWidth: 1,
-      borderRadius: 6,
-      maxBarThickness: 32,
-    },
-  ],
-}));
-
-const chartTotalBarOptions = computed(() => barOptionsSingle(rowsTotal.value));
-const chartOkBarOptions = computed(() => barOptionsSingle(rowsOk.value));
-const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
+});
 </script>
 
 <template>
@@ -626,48 +632,10 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
       <div>
         <h1>Tri thức Chat AI</h1>
         <p class="head-sub">
-          Cập nhật tài liệu PDF, xem thống kê và lịch sử hội thoại / file đã
-          nhúng.
+          Xem thống kê và lịch sử hội thoại / file đã nhúng vào corpus Chat AI.
         </p>
       </div>
     </header>
-
-    <article class="card">
-      <h2><FileUp class="inline-icon" /> Nhúng PDF vào corpus</h2>
-
-      <input
-        ref="fileInput"
-        type="file"
-        accept="application/pdf"
-        class="hidden-input"
-        @change="onFileChange"
-      />
-
-      <div class="actions">
-        <button
-          type="button"
-          class="btn primary"
-          :disabled="uploading"
-          @click="pickFile"
-        >
-          <Loader2
-            v-if="uploading"
-            class="inline-icon spin"
-            aria-hidden="true"
-          />
-          <FileUp v-else class="inline-icon" aria-hidden="true" />
-          Chọn file PDF
-        </button>
-      </div>
-
-      <p v-if="message" class="ok">{{ message }}</p>
-      <p v-if="error" class="err">{{ error }}</p>
-
-      <p class="last-upload-line">
-        <span class="last-upload-label">Upload gần nhất (log)</span>
-        <span class="last-upload-value">{{ lastUpload }}</span>
-      </p>
-    </article>
 
     <div class="stats-toolbar">
       <h2 class="stats-title">
@@ -677,9 +645,7 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
         type="button"
         class="btn ghost btn-sm"
         :disabled="
-          loadingChartTotal ||
-          loadingChartOk ||
-          loadingChartBad ||
+          loadingKnowledgeChart ||
           loadingChatLogs ||
           loadingIngestLogs
         "
@@ -689,9 +655,7 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
           class="inline-icon"
           :class="{
             spin:
-              loadingChartTotal ||
-              loadingChartOk ||
-              loadingChartBad ||
+              loadingKnowledgeChart ||
               loadingChatLogs ||
               loadingIngestLogs,
           }"
@@ -701,102 +665,36 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
     </div>
     <p v-if="statsError" class="err">{{ statsError }}</p>
 
-    <div class="charts-grid">
-      <article class="card card--chart">
-        <div class="chart-head">
-          <h2><BarChart3 class="inline-icon" /> Tổng tin nhắn theo ngày</h2>
-          <div class="chart-controls">
-            <label class="chart-date"
-              ><span>Từ</span><input v-model="chartTotalFrom" type="date"
-            /></label>
-            <label class="chart-date"
-              ><span>Đến</span><input v-model="chartTotalTo" type="date"
-            /></label>
-            <button
-              type="button"
-              class="btn primary btn-sm"
-              :disabled="loadingChartTotal"
-              @click="loadChartTotal"
-            >
-              Xem
-            </button>
-          </div>
-        </div>
-        <div class="chart-wrap">
-          <Bar
-            v-if="rowsTotal.length"
-            :data="chartTotalBarData"
-            :options="chartTotalBarOptions"
-          />
-          <p v-else class="chart-empty">
-            Chưa có dữ liệu trong khoảng đã chọn.
-          </p>
-        </div>
-      </article>
-
+    <div class="charts-grid charts-grid--single">
       <article class="card card--chart">
         <div class="chart-head">
           <h2>
-            <BarChart3 class="inline-icon" /> Tri thức / thao tác đã đạt (theo
+            <BarChart3 class="inline-icon" /> Thống kê tri thức chatbot (theo
             ngày)
           </h2>
           <div class="chart-controls">
             <label class="chart-date"
-              ><span>Từ</span><input v-model="chartOkFrom" type="date"
+              ><span>Từ</span
+              ><input v-model="chartKnowledgeFrom" type="date"
             /></label>
             <label class="chart-date"
-              ><span>Đến</span><input v-model="chartOkTo" type="date"
+              ><span>Đến</span><input v-model="chartKnowledgeTo" type="date"
             /></label>
             <button
               type="button"
               class="btn primary btn-sm"
-              :disabled="loadingChartOk"
-              @click="loadChartOk"
+              :disabled="loadingKnowledgeChart"
+              @click="loadKnowledgeChart"
             >
               Xem
             </button>
           </div>
         </div>
-        <div class="chart-wrap">
-          <Bar
-            v-if="rowsOk.length"
-            :data="chartOkBarData"
-            :options="chartOkBarOptions"
-          />
-          <p v-else class="chart-empty">
-            Chưa có dữ liệu trong khoảng đã chọn.
-          </p>
-        </div>
-      </article>
-
-      <article class="card card--chart">
-        <div class="chart-head">
-          <h2>
-            <BarChart3 class="inline-icon" /> Tri thức / thao tác chưa đạt + lỗi
-            (theo ngày)
-          </h2>
-          <div class="chart-controls">
-            <label class="chart-date"
-              ><span>Từ</span><input v-model="chartBadFrom" type="date"
-            /></label>
-            <label class="chart-date"
-              ><span>Đến</span><input v-model="chartBadTo" type="date"
-            /></label>
-            <button
-              type="button"
-              class="btn primary btn-sm"
-              :disabled="loadingChartBad"
-              @click="loadChartBad"
-            >
-              Xem
-            </button>
-          </div>
-        </div>
-        <div class="chart-wrap">
-          <Bar
-            v-if="rowsBad.length"
-            :data="chartBadBarData"
-            :options="chartBadBarOptions"
+        <div class="chart-wrap chart-wrap--tall">
+          <Line
+            v-if="knowledgeRows.length"
+            :data="knowledgeLineData"
+            :options="knowledgeLineOptions"
           />
           <p v-else class="chart-empty">
             Chưa có dữ liệu trong khoảng đã chọn.
@@ -900,7 +798,9 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
                   </template>
                 </td>
                 <td class="col-customer">
-                  {{ row.customer_name || "Ẩn danh" }}
+                  <div class="cell-customer-name">
+                    {{ row.customer_name || "Ẩn danh" }}
+                  </div>
                 </td>
                 <td class="col-user">
                   <div class="cell-scroll cell-scroll--wide">
@@ -909,7 +809,7 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
                 </td>
                 <td class="col-asst">
                   <div class="cell-scroll cell-scroll--wide">
-                    {{ row.assistant_display ?? row.assistant_message }}
+                    {{ adminAssistantReplyText(row) }}
                   </div>
                 </td>
               </tr>
@@ -976,7 +876,34 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
     </article>
 
     <article class="card">
+      <h2><Upload class="inline-icon" /> Nhúng PDF vào corpus</h2>
+      <p class="muted">
+        Chọn file PDF để đưa vào kho tri thức Chat AI.
+      </p>
+      <label class="pdf-upload-box">
+        <input
+          type="file"
+          accept="application/pdf,.pdf"
+          :disabled="ingestUploading"
+          @change="handlePdfUploadChange"
+        />
+        <span class="pdf-upload-main">
+          {{ ingestUploading ? "Đang nhúng PDF..." : "Chọn file PDF" }}
+        </span>
+        <span v-if="ingestUploadName" class="pdf-upload-name">
+          {{ ingestUploadName }}
+        </span>
+      </label>
+    </article>
+
+    <article class="card">
       <h2><FolderOpen class="inline-icon" /> Lịch sử file PDF đã nhúng</h2>
+      <p class="last-upload-line ingest-last-upload">
+        <span class="last-upload-label">Upload gần nhất (thống kê)</span>
+        <span class="last-upload-value">{{ lastUpload }}</span>
+      </p>
+      <p v-if="message" class="ok ok-tight">{{ message }}</p>
+      <p v-if="error" class="err err-tight">{{ error }}</p>
       <div class="table-toolbar">
         <label class="chart-date">
           <span>Từ ngày</span>
@@ -1040,7 +967,7 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
                   <button
                     type="button"
                     class="btn danger btn-sm btn-icon"
-                    :disabled="deletingIngestId === row.id || uploading"
+                    :disabled="deletingIngestId === row.id"
                     title="Xóa bản nhúng này"
                     @click="deleteIngestRow(row.id)"
                   >
@@ -1131,6 +1058,10 @@ const chartBadBarOptions = computed(() => barOptionsSingle(rowsBad.value));
   gap: 20px;
 }
 
+.charts-grid--single {
+  grid-template-columns: 1fr;
+}
+
 .mono {
   font-size: 0.85rem;
   word-break: break-all;
@@ -1192,8 +1123,44 @@ h1 {
   gap: 8px;
 }
 
-.hidden-input {
-  display: none;
+.muted {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.pdf-upload-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.pdf-upload-box input {
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  pointer-events: none;
+}
+
+.pdf-upload-main {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.pdf-upload-name {
+  min-width: 0;
+  color: #334155;
+  word-break: break-word;
 }
 
 .actions {
@@ -1272,6 +1239,10 @@ h1 {
   margin: 14px 0 0;
   color: #15803d;
   font-size: 0.9rem;
+}
+
+.ok-tight {
+  margin: 0 0 10px;
 }
 
 .err {
@@ -1390,6 +1361,10 @@ h1 {
   margin-top: 4px;
 }
 
+.card--chart .chart-wrap--tall {
+  height: 320px;
+}
+
 .stat-label {
   font-size: 0.78rem;
   color: #64748b;
@@ -1477,8 +1452,18 @@ h1 {
 }
 
 .data-table--chat-logs .col-customer {
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
   color: #475569;
+}
+
+.data-table--chat-logs .cell-customer-name {
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.35;
 }
 
 .data-table {
@@ -1615,6 +1600,12 @@ h1 {
 .last-upload-value {
   color: #0f172a;
   font-weight: 600;
+}
+
+.ingest-last-upload {
+  margin: 6px 0 12px;
+  padding-top: 0;
+  border-top: none;
 }
 
 .table-toolbar {

@@ -7,6 +7,7 @@ use App\Http\Middleware\CheckNhanVienToken;
 use App\Http\Middleware\CheckNhaXeToken;
 use App\Http\Middleware\CheckOperatorToken;
 use App\Http\Middleware\CheckTaiXeToken;
+use App\Http\Middleware\VerifyLiveSupportBridgeSecret;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;

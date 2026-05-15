@@ -160,6 +160,38 @@ class VoucherController extends Controller
         ]);
     }
 
+    /** POST /api/v1/voucher/validate-for-chat — kiểm tra mã (chat AI). */
+    public function validateForChat(Request $request)
+    {
+        $data = $request->validate([
+            'voucher_code' => 'required|string|max:64',
+        ]);
+        $result = $this->voucherService->validateVoucherCodeForChat($data['voucher_code']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
+    }
+
+    /** POST /api/v1/voucher/preview-discount-for-chat — tính giảm giá gợi ý (không đặt vé). */
+    public function previewDiscountForChat(Request $request)
+    {
+        $data = $request->validate([
+            'voucher_code' => 'required|string|max:64',
+            'booking_amount' => 'required|numeric|min:0',
+        ]);
+        $result = $this->voucherService->previewDiscountForChat(
+            $data['voucher_code'],
+            (float) $data['booking_amount']
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
+    }
+
     // ========== API CHO ADMIN ==========
 
     public function indexAdmin()

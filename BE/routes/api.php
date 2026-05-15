@@ -1,33 +1,46 @@
 <?php
 
+use App\Http\Controllers\AgentBookingToolController;
+use App\Http\Controllers\AgentSupportSessionController;
+use App\Http\Controllers\AgentVectorQueryController;
+use App\Http\Controllers\AgentVectorUpsertController;
 use App\Http\Controllers\AdminChatAiKnowledgeController;
 use App\Http\Controllers\AdminChatSupportController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\ChatAiController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminLiveSupportBusSafeController;
+use App\Http\Controllers\AdminLiveSupportCustomerController;
+use App\Http\Controllers\AdminViNhaXeController;
+use App\Http\Controllers\BaoCaoController;
+use App\Http\Controllers\BaoDongController;
 use App\Http\Controllers\ChucNangController;
 use App\Http\Controllers\ChucVuController;
-use App\Http\Controllers\NhanVienNhaXeController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\KhachHangController;
-use App\Http\Controllers\TaiXeController;
-use App\Http\Controllers\NhaXeController;
-use App\Http\Controllers\TuyenDuongController;
+use App\Http\Controllers\ChatAiFeMessageLogController;
 use App\Http\Controllers\ChuyenXeController;
-use App\Http\Controllers\ThanhToanController;
-use App\Http\Controllers\VoucherController;
-use App\Http\Controllers\VeController;
-use App\Http\Controllers\XeController;
-use App\Http\Controllers\BaoDongController;
-use App\Http\Controllers\AdminDashboardController;
-use App\Http\Controllers\MapProxyController;
-use App\Http\Controllers\LoaiXeController;
+use App\Http\Controllers\KhachHangController;
+use App\Http\Controllers\LiveSupportBridgeController;
 use App\Http\Controllers\LoaiGheController;
+use App\Http\Controllers\LoaiXeController;
+use App\Http\Controllers\MapProxyController;
+use App\Http\Controllers\NhanVienNhaXeController;
+use App\Http\Controllers\NhaXeController;
+use App\Http\Controllers\OperatorChatSupportController;
+use App\Http\Controllers\OperatorDashboardController;
+use App\Http\Controllers\OperatorLiveSupportCustomerController;
 use App\Http\Controllers\RatingController;
-use App\Http\Controllers\BaoCaoController;
+use App\Http\Controllers\TaiXeController;
+use App\Http\Controllers\ThanhToanController;
+use App\Http\Controllers\TuyenDuongController;
+use App\Http\Controllers\VeController;
+use App\Http\Controllers\ViNhaXeController;
+use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\XeController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
-    //API public
+    // API public
     Route::get('tuyen-duong/public', [TuyenDuongController::class, 'indexPublic']);
     Route::get('xe/public', [XeController::class, 'indexPublic']);
     Route::get('tai-xe/public', [TaiXeController::class, 'indexPublic']);
@@ -36,8 +49,8 @@ Route::prefix('v1')->group(function () {
     Route::post('sepay/webhook', [ThanhToanController::class, 'sepayWebhook']);
 
     // API dành cho khách hàng
-    Route::post('dang-nhap',  [KhachHangController::class, 'login']);
-    Route::post('dang-ky',    [KhachHangController::class, 'register']);
+    Route::post('dang-nhap', [KhachHangController::class, 'login']);
+    Route::post('dang-ky', [KhachHangController::class, 'register']);
     Route::post('kich-hoat-tai-khoan', [KhachHangController::class, 'kichHoatTaiKhoan']);
     Route::post('quen-mat-khau', [KhachHangController::class, 'requestPasswordReset']);
     Route::post('dat-lai-mat-khau', [KhachHangController::class, 'resetPassword']);
@@ -45,16 +58,16 @@ Route::prefix('v1')->group(function () {
     // Đặt vé: Bearer tùy chọn — có token gắn vé tài khoản; không token thì khách vãng lai (SĐT + họ tên).
     Route::post('ve/dat-ve', [VeController::class, 'datVeKhachHang']);
 
-    Route::get('voucher/public',           [KhachHangController::class, 'getVoucherCongKhai']);
+    Route::get('voucher/public', [KhachHangController::class, 'getVoucherCongKhai']);
     Route::middleware('auth.khach-hang')->group(function () {
-        Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
-        Route::post('dang-xuat',    [KhachHangController::class, 'logout']);
-        Route::get('profile',       [KhachHangController::class, 'profile']);
-        Route::put('profile',       [KhachHangController::class, 'updateProfile']);
+        Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
+        Route::post('dang-xuat', [KhachHangController::class, 'logout']);
+        Route::get('profile', [KhachHangController::class, 'profile']);
+        Route::put('profile', [KhachHangController::class, 'updateProfile']);
         Route::post('doi-mat-khau', [KhachHangController::class, 'doiMatKhau']);
 
-        Route::get('ve',            [VeController::class, 'indexKhachHang']);
-        Route::get('ve/{id}',       [VeController::class, 'showKhachHang']);
+        Route::get('ve', [VeController::class, 'indexKhachHang']);
+        Route::get('ve/{id}', [VeController::class, 'showKhachHang']);
         Route::patch('ve/{id}/huy', [VeController::class, 'huyVeKhachHang']);
 
         Route::get('voucher', [VoucherController::class, 'indexKhachHang']);
@@ -78,25 +91,59 @@ Route::prefix('v1')->group(function () {
     Route::get('map/direction', [MapProxyController::class, 'direction']);
     Route::get('map/osrm-route', [MapProxyController::class, 'osrmRoute']);
 
-    Route::get('tinh-thanh',           [KhachHangController::class, 'getProvinces']);
-    Route::get('chuyen-xe/search',     [KhachHangController::class, 'searchChuyenXe']);
-    Route::get('chuyen-xe/{id}/ghe',       [KhachHangController::class, 'getGheChuyenXe']);
+    Route::get('tinh-thanh', [KhachHangController::class, 'getProvinces']);
+    Route::get('chuyen-xe/search', [KhachHangController::class, 'searchChuyenXe']);
+    Route::get('chuyen-xe/{id}/ghe', [KhachHangController::class, 'getGheChuyenXe']);
     Route::get('chuyen-xe/{id}/tram-dung', [KhachHangController::class, 'getTramDungChuyenXe']);
     Route::get('chuyen-xe/{id}/danh-gia', [RatingController::class, 'listRatingsByTrip']);
     Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
+    Route::get('chuyen-xe/{id}/tom-tat', [KhachHangController::class, 'showChuyenXeTomTat'])->whereNumber('id');
     Route::post('tracking/lookup-by-phone', [ChuyenXeController::class, 'lookupTripsByPhone']);
 
-    // Chat AI — widget khách; Bearer tùy chọn để gắn session khách.
-    Route::post('chat/ai/message', [ChatAiController::class, 'message']);
-    Route::get('chat/ai/history', [ChatAiController::class, 'history']);
+    Route::post('voucher/validate-for-chat', [VoucherController::class, 'validateForChat']);
+    Route::post('voucher/preview-discount-for-chat', [VoucherController::class, 'previewDiscountForChat']);
+
+    Route::middleware(['optional.khach-hang', 'throttle:120,1'])->group(function () {
+        Route::post('chat/ai/message-log', [ChatAiFeMessageLogController::class, 'store']);
+        Route::get('chat/ai/history', [ChatAiFeMessageLogController::class, 'history']);
+    });
+
+    // FE Agent RAG — vector cosine trên corpus PDF admin ingest (tri thức Chat AI).
+    Route::prefix('agent')->group(function () {
+        Route::post('vectors/query', [AgentVectorQueryController::class, 'query']);
+
+        Route::middleware(['optional.khach-hang', 'throttle:120,1'])->prefix('support')->group(function () {
+            Route::post('sessions/widget-disconnect', [AgentSupportSessionController::class, 'widgetDisconnect']);
+            Route::post('sessions', [AgentSupportSessionController::class, 'store']);
+            Route::get('sessions/{publicId}', [AgentSupportSessionController::class, 'showSession']);
+            Route::get('sessions/{publicId}/messages', [AgentSupportSessionController::class, 'indexMessages']);
+            Route::post('sessions/{publicId}/messages', [AgentSupportSessionController::class, 'storeMessage']);
+        });
+
+        Route::middleware(['optional.khach-hang', 'throttle:120,1'])->prefix('booking-tools')->group(function () {
+            Route::post('payment-status', [AgentBookingToolController::class, 'paymentStatus']);
+            Route::post('refund-estimate', [AgentBookingToolController::class, 'refundEstimate']);
+        });
+    });
+
+    // Kiểm tra Laravel trước khi POST bridge /sessions — không cần Bearer bridge.
+    Route::get('live-support/bridge/ping', [LiveSupportBridgeController::class, 'ping']);
+
+    Route::middleware('live-support.bridge')->prefix('live-support/bridge')->group(function () {
+        Route::post('sessions', [LiveSupportBridgeController::class, 'storeSession']);
+        Route::get('sessions/{publicId}', [LiveSupportBridgeController::class, 'showSession']);
+        Route::patch('sessions/{publicId}', [LiveSupportBridgeController::class, 'updateSession']);
+        Route::get('sessions/{publicId}/messages', [LiveSupportBridgeController::class, 'indexMessages']);
+        Route::post('sessions/{publicId}/messages', [LiveSupportBridgeController::class, 'storeMessage']);
+    });
 
     // quản lý tài xế (DRIVER APP)
     Route::prefix('tai-xe')->group(function () {
         Route::post('dang-nhap', [TaiXeController::class, 'login']);
         Route::middleware('auth.tai-xe')->group(function () {
-            Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
-            Route::post('dang-xuat',    [TaiXeController::class, 'logout']);
-            Route::get('profile',       [TaiXeController::class, 'profile']);
+            Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
+            Route::post('dang-xuat', [TaiXeController::class, 'logout']);
+            Route::get('profile', [TaiXeController::class, 'profile']);
             Route::post('doi-mat-khau', [TaiXeController::class, 'doiMatKhau']);
 
             Route::post('bao-dong', [BaoDongController::class, 'store']);
@@ -104,7 +151,7 @@ Route::prefix('v1')->group(function () {
             Route::get('cau-hinh-ai', [BaoDongController::class, 'getCauHinhAi']);
 
             Route::get('chuyen-xe/lich-trinh-ca-nhan', [ChuyenXeController::class, 'getLichTrinhCaNhan']);
-            Route::get('stats',         [TaiXeController::class, 'stats']);
+            Route::get('stats', [TaiXeController::class, 'stats']);
             Route::get('upcoming-trips', [TaiXeController::class, 'upcomingTrips']);
 
             Route::get('chuyen-xe/{id}/lich-trinh', [ChuyenXeController::class, 'getLichTrinh']);
@@ -128,31 +175,31 @@ Route::prefix('v1')->group(function () {
             Route::post('dang-xuat',    [NhaXeController::class, 'logout']);
             Route::get('profile',       [NhaXeController::class, 'profile']);
             Route::post('doi-mat-khau', [NhaXeController::class, 'doiMatKhau']);
-            Route::get('phan-quyen',    [NhaXeController::class, 'getPhanQuyen']);
+            Route::get('phan-quyen', [NhaXeController::class, 'getPhanQuyen']);
 
             // ── Quản lý nhân viên nhà xe ─────────────────────────────────────────
-            Route::get('nhan-vien',                          [NhanVienNhaXeController::class, 'index']);
-            Route::get('nhan-vien/{id}',                     [NhanVienNhaXeController::class, 'show']);
-            Route::post('nhan-vien',                         [NhanVienNhaXeController::class, 'store']);
-            Route::put('nhan-vien/{id}',                     [NhanVienNhaXeController::class, 'update']);
-            Route::delete('nhan-vien/{id}',                  [NhanVienNhaXeController::class, 'destroy']);
-            Route::patch('nhan-vien/{id}/trang-thai',        [NhanVienNhaXeController::class, 'toggleStatus']);
+            Route::get('nhan-vien', [NhanVienNhaXeController::class, 'index']);
+            Route::get('nhan-vien/{id}', [NhanVienNhaXeController::class, 'show']);
+            Route::post('nhan-vien', [NhanVienNhaXeController::class, 'store']);
+            Route::put('nhan-vien/{id}', [NhanVienNhaXeController::class, 'update']);
+            Route::delete('nhan-vien/{id}', [NhanVienNhaXeController::class, 'destroy']);
+            Route::patch('nhan-vien/{id}/trang-thai', [NhanVienNhaXeController::class, 'toggleStatus']);
 
             // ── Phân quyền chức vụ nhà xe ────────────────────────────────────────
-            Route::get('chuc-vus',                           [NhanVienNhaXeController::class, 'getChucVus']);
-            Route::get('chuc-nangs',                         [NhanVienNhaXeController::class, 'getChucNangs']);
-            Route::get('chuc-vus/{id}/phan-quyen',           [NhanVienNhaXeController::class, 'getPhanQuyenChucVu']);
-            Route::post('chuc-vus/{id}/phan-quyen',          [NhanVienNhaXeController::class, 'syncPhanQuyenChucVu']);
+            Route::get('chuc-vus', [NhanVienNhaXeController::class, 'getChucVus']);
+            Route::get('chuc-nangs', [NhanVienNhaXeController::class, 'getChucNangs']);
+            Route::get('chuc-vus/{id}/phan-quyen', [NhanVienNhaXeController::class, 'getPhanQuyenChucVu']);
+            Route::post('chuc-vus/{id}/phan-quyen', [NhanVienNhaXeController::class, 'syncPhanQuyenChucVu']);
 
-            Route::post('broadcasting/auth', function (\Illuminate\Http\Request $request) {
-                return \Illuminate\Support\Facades\Broadcast::auth($request);
+            Route::post('broadcasting/auth', function (Request $request) {
+                return Broadcast::auth($request);
             });
 
-            Route::get('ve',                     [VeController::class, 'indexNhaXe']);
-            Route::get('ve/{id}',                [VeController::class, 'showNhaXe']);
-            Route::post('ve/dat-ve',             [VeController::class, 'datVeNhaXe']);
-            Route::patch('ve/{id}/trang-thai',   [VeController::class, 'capNhatTrangThaiNhaXe']);
-            Route::patch('ve/{id}/huy',          [VeController::class, 'huyVeNhaXe']);
+            Route::get('ve', [VeController::class, 'indexNhaXe']);
+            Route::get('ve/{id}', [VeController::class, 'showNhaXe']);
+            Route::post('ve/dat-ve', [VeController::class, 'datVeNhaXe']);
+            Route::patch('ve/{id}/trang-thai', [VeController::class, 'capNhatTrangThaiNhaXe']);
+            Route::patch('ve/{id}/huy', [VeController::class, 'huyVeNhaXe']);
 
             Route::get('tuyen-duong', [TuyenDuongController::class, 'index']);
             Route::get('tuyen-duong/{id}', [TuyenDuongController::class, 'show']);
@@ -217,21 +264,32 @@ Route::prefix('v1')->group(function () {
             Route::get('thong-ke/export', [BaoCaoController::class, 'export']);
 
             // Dashboard KPIs tổng hợp
-            Route::get('dashboard-kpis', [\App\Http\Controllers\OperatorDashboardController::class, 'index']);
+            Route::get('dashboard-kpis', [OperatorDashboardController::class, 'index']);
 
             // Ví nhà xe
-            Route::get('vi-nha-xe', [\App\Http\Controllers\ViNhaXeController::class, 'getWalletInfo']);
-            Route::post('vi-nha-xe/update-bank', [\App\Http\Controllers\ViNhaXeController::class, 'updateBankInfo']);
-            Route::post('vi-nha-xe/withdraw', [\App\Http\Controllers\ViNhaXeController::class, 'requestWithdraw']);
-            Route::post('vi-nha-xe/topup', [\App\Http\Controllers\ViNhaXeController::class, 'requestTopup']);
-            Route::get('vi-nha-xe/giao-dich/{id}', [\App\Http\Controllers\ViNhaXeController::class, 'getTransactionDetail']);
-            
-            // Hỗ trợ chat nhà xe
+            Route::get('vi-nha-xe', [ViNhaXeController::class, 'getWalletInfo']);
+            Route::post('vi-nha-xe/update-bank', [ViNhaXeController::class, 'updateBankInfo']);
+            Route::post('vi-nha-xe/withdraw', [ViNhaXeController::class, 'requestWithdraw']);
+            Route::post('vi-nha-xe/topup', [ViNhaXeController::class, 'requestTopup']);
+            Route::get('vi-nha-xe/giao-dich/{id}', [ViNhaXeController::class, 'getTransactionDetail']);
+
+            // Hỗ trợ chat nhà xe ↔ admin (operator ↔ admin realtime)
             Route::prefix('ho-tro')->group(function () {
-                Route::get('sessions', [\App\Http\Controllers\OperatorChatSupportController::class, 'index']);
-                Route::get('sessions/{id}', [\App\Http\Controllers\OperatorChatSupportController::class, 'show']);
-                Route::post('sessions', [\App\Http\Controllers\OperatorChatSupportController::class, 'store']);
-                Route::post('sessions/{id}/reply', [\App\Http\Controllers\OperatorChatSupportController::class, 'reply']);
+                Route::get('stats-daily', [OperatorChatSupportController::class, 'statsDaily']);
+                Route::get('sessions', [OperatorChatSupportController::class, 'index']);
+                Route::get('sessions/{id}', [OperatorChatSupportController::class, 'show']);
+                Route::post('sessions', [OperatorChatSupportController::class, 'store']);
+                Route::post('sessions/{id}/reply', [OperatorChatSupportController::class, 'reply']);
+                Route::post('sessions/{id}/resolve', [OperatorChatSupportController::class, 'resolve']);
+            });
+
+            // Hỗ trợ khách live chat → nhà xe (LiveSupportSession target=nha_xe)
+            Route::prefix('ho-tro/khach-hang')->group(function () {
+                Route::get('stats-daily', [OperatorLiveSupportCustomerController::class, 'statsDaily']);
+                Route::get('sessions', [OperatorLiveSupportCustomerController::class, 'sessions']);
+                Route::get('sessions/{id}', [OperatorLiveSupportCustomerController::class, 'show']);
+                Route::post('sessions/{id}/reply', [OperatorLiveSupportCustomerController::class, 'reply']);
+                Route::post('sessions/{id}/resolve', [OperatorLiveSupportCustomerController::class, 'resolve']);
             });
         });
     });
@@ -280,7 +338,7 @@ Route::prefix('v1')->group(function () {
         Route::post('login', [AdminController::class, 'login']);
 
         Route::middleware('auth.admin')->group(function () {
-            Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
+            Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
             Route::get('phan-quyen', [AdminController::class, 'getPhanQuyen']);
             Route::get('chuc-nangs', [ChucNangController::class, 'index']);
             Route::get('chuc-vus', [ChucVuController::class, 'index']);
@@ -387,29 +445,37 @@ Route::prefix('v1')->group(function () {
             // Đánh giá
             Route::get('ratings', [RatingController::class, 'getAdminRatings']);
 
-            // Chat AI — tri thức / log (admin UI)
+            // Tri thức Chat AI (stats, log) — ingest PDF qua FE `@fe-agent/rag` + POST admin/agent/vectors/upsert
             Route::prefix('ai')->group(function () {
                 Route::get('stats', [AdminChatAiKnowledgeController::class, 'stats']);
                 Route::get('chat-logs', [AdminChatAiKnowledgeController::class, 'chatLogs']);
                 Route::get('ingest-logs', [AdminChatAiKnowledgeController::class, 'ingestLogs']);
                 Route::delete('ingest-logs/{id}', [AdminChatAiKnowledgeController::class, 'destroyIngestLog']);
-                Route::post('upload-pdf-sync', [AdminChatAiKnowledgeController::class, 'uploadPdfSync']);
+            });
+
+            /** Nạp embedding tri thức (payload HttpVectorProvider) — chỉ admin đăng nhập. */
+            Route::prefix('agent')->group(function () {
+                Route::post('vectors/upsert', [AgentVectorUpsertController::class, 'upsert']);
             });
 
             // Kênh hỗ trợ admin (chat realtime với khách hàng & nhà xe)
             Route::prefix('ho-tro')->group(function () {
                 // Hỗ trợ khách hàng
                 Route::prefix('khach-hang')->group(function () {
-                    Route::get('sessions', [AdminChatSupportController::class, 'sessionsKhachHang']);
-                    Route::get('sessions/{id}', [AdminChatSupportController::class, 'showSession']);
-                    Route::post('sessions/{id}/reply', [AdminChatSupportController::class, 'reply']);
+                    Route::get('stats-daily', [AdminChatSupportController::class, 'statsDailyKhachHang']);
+                    Route::get('sessions', [AdminLiveSupportCustomerController::class, 'sessions']);
+                    Route::get('sessions/{id}', [AdminLiveSupportCustomerController::class, 'show']);
+                    Route::post('sessions/{id}/reply', [AdminLiveSupportCustomerController::class, 'reply']);
+                    Route::post('sessions/{id}/resolve', [AdminLiveSupportCustomerController::class, 'resolve']);
                 });
                 // Hỗ trợ nhà xe
                 Route::prefix('nha-xe')->group(function () {
-                    Route::get('sessions', [AdminChatSupportController::class, 'sessionsNhaXe']);
-                    Route::get('sessions/{id}', [AdminChatSupportController::class, 'showSession']);
-                    Route::post('sessions/{id}/reply', [AdminChatSupportController::class, 'reply']);
-                    Route::post('sessions', [AdminChatSupportController::class, 'createNhaXeSession']);
+                    Route::get('stats-daily', [AdminChatSupportController::class, 'statsDailyNhaXe']);
+                    Route::get('sessions', [AdminLiveSupportBusSafeController::class, 'sessions']);
+                    Route::get('sessions/{id}', [AdminLiveSupportBusSafeController::class, 'show']);
+                    Route::post('sessions/{id}/reply', [AdminLiveSupportBusSafeController::class, 'reply']);
+                    Route::post('sessions/{id}/resolve', [AdminLiveSupportBusSafeController::class, 'resolve']);
+                    Route::post('sessions', [AdminLiveSupportBusSafeController::class, 'store']);
                 });
             });
 
@@ -430,11 +496,11 @@ Route::prefix('v1')->group(function () {
             Route::get('bao-cao/trang-thai-ve', [BaoCaoController::class, 'trangThaiVe']);
 
             // Quản lý ví nhà xe
-            Route::get('vi-nha-xe', [\App\Http\Controllers\AdminViNhaXeController::class, 'index']);
-            Route::get('vi-nha-xe/yeu-cau-rut-tien', [\App\Http\Controllers\AdminViNhaXeController::class, 'danhSachYeuCauRutTien']);
-            Route::get('vi-nha-xe/{id}', [\App\Http\Controllers\AdminViNhaXeController::class, 'show']);
-            Route::patch('vi-nha-xe/yeu-cau-rut-tien/{id}/duyet', [\App\Http\Controllers\AdminViNhaXeController::class, 'duyetRutTien']);
-            Route::patch('vi-nha-xe/yeu-cau-rut-tien/{id}/tu-choi', [\App\Http\Controllers\AdminViNhaXeController::class, 'tuChoiRutTien']);
+            Route::get('vi-nha-xe', [AdminViNhaXeController::class, 'index']);
+            Route::get('vi-nha-xe/yeu-cau-rut-tien', [AdminViNhaXeController::class, 'danhSachYeuCauRutTien']);
+            Route::get('vi-nha-xe/{id}', [AdminViNhaXeController::class, 'show']);
+            Route::patch('vi-nha-xe/yeu-cau-rut-tien/{id}/duyet', [AdminViNhaXeController::class, 'duyetRutTien']);
+            Route::patch('vi-nha-xe/yeu-cau-rut-tien/{id}/tu-choi', [AdminViNhaXeController::class, 'tuChoiRutTien']);
         });
     });
 });

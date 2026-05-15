@@ -5,30 +5,27 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ChatMessage extends Model
+final class ChatMessage extends Model
 {
+    protected $table = 'chat_messages';
+
     protected $fillable = [
         'chat_session_id',
-        'id_admin',
         'role',
         'content',
         'meta',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'meta' => 'array',
-        ];
-    }
+    /** @var array<string, string> */
+    protected $casts = [
+        'meta' => 'array',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 
-    public function session(): BelongsTo
+    /** @return BelongsTo<ChatSession, $this> */
+    public function chatSession(): BelongsTo
     {
         return $this->belongsTo(ChatSession::class, 'chat_session_id');
-    }
-
-    public function admin(): BelongsTo
-    {
-        return $this->belongsTo(\App\Models\Admin::class, 'id_admin');
     }
 }

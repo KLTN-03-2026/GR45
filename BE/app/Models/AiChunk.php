@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class AiChunk extends Model
+final class AiChunk extends Model
 {
     protected $table = 'ai_chunks';
 
@@ -15,18 +15,19 @@ class AiChunk extends Model
         'chunk_index',
         'content',
         'chunk_hash',
-        'embedding',
         'embedding_model',
         'embedding_dim',
+        'embedding',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'embedding' => 'array',
-        ];
-    }
+    /** @var array<string, string> */
+    protected $casts = [
+        'embedding' => 'array',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 
+    /** @return BelongsTo<AiDocument, $this> */
     public function document(): BelongsTo
     {
         return $this->belongsTo(AiDocument::class, 'ai_document_id');
