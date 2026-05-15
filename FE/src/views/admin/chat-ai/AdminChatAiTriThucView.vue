@@ -375,31 +375,6 @@ async function deleteIngestRow(id) {
   }
 }
 
-function hasSupportResult(row) {
-  if (!row || typeof row !== "object") return false;
-  if (row.outcome === "success") return true;
-  const m = row.ai_meta;
-  if (m && typeof m === "object") {
-    const ai = m.ai && typeof m.ai === "object" ? m.ai : m;
-    const sqlPreview =
-      typeof ai.sql_result_preview === "string"
-        ? ai.sql_result_preview.trim()
-        : "";
-    if (sqlPreview.length > 0) return true;
-    if (Array.isArray(ai.result) && ai.result.length > 0) return true;
-    if (Array.isArray(ai.results) && ai.results.length > 0) return true;
-    const resultText =
-      typeof ai.result_text === "string" ? ai.result_text.trim() : "";
-    if (resultText.length > 0) return true;
-  }
-  return false;
-}
-
-function outcomeLabel(row) {
-  if (hasSupportResult(row)) return "Đã hỗ trợ";
-  return "Chưa hỗ trợ";
-}
-
 /**
  * Chuỗi trả lời hiển thị trong bảng (không dùng `String(object)` → [object Object]).
  */
@@ -412,6 +387,36 @@ function adminAssistantReplyText(row) {
     typeof row?.assistant_message === "string" ? row.assistant_message.trim() : "";
   if (raw === "[object Object]" || raw === "") return "—";
   return raw || "—";
+}
+
+function hasSupportResult(row) {
+  if (!row || typeof row !== "object") return false;
+  if (row.outcome === "success") return true;
+  if (row.outcome === "failed" || row.outcome === "clarification") return false;
+  if (row.outcome === "unknown") {
+    /** Legacy log thiếu cờ runtime → fallback nguồn tool. */
+    const m = row.ai_meta;
+    if (m && typeof m === "object") {
+      const ai = m.ai && typeof m.ai === "object" ? m.ai : m;
+      const sqlPreview =
+        typeof ai.sql_result_preview === "string"
+          ? ai.sql_result_preview.trim()
+          : "";
+      if (sqlPreview.length > 0) return true;
+      if (Array.isArray(ai.result) && ai.result.length > 0) return true;
+      if (Array.isArray(ai.results) && ai.results.length > 0) return true;
+      const resultText =
+        typeof ai.result_text === "string" ? ai.result_text.trim() : "";
+      if (resultText.length > 0) return true;
+      if (Array.isArray(ai.hits) && ai.hits.length > 0) return true;
+    }
+  }
+  return false;
+}
+
+function outcomeLabel(row) {
+  if (hasSupportResult(row)) return "Đã hỗ trợ";
+  return "Chưa hỗ trợ";
 }
 
 /**

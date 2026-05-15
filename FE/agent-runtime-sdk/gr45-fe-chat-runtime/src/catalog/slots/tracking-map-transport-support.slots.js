@@ -141,6 +141,13 @@ export const TRANSPORT_INFO_TOOL_SLOTS = {
 };
 
 export const SUPPORT_TOOL_SLOTS = {
+  clarify_live_target: {
+    authPolicy: "public",
+    confirm: false,
+    requiredSlots: [],
+    optionalSlots: [],
+    step: ["Clarification only — không gọi HTTP; planner hỏi admin vs nhà xe khi có ngữ cảnh NX/tên nhà xe."],
+  },
   create_support_session: {
     authPolicy: "public",
     confirm: false,

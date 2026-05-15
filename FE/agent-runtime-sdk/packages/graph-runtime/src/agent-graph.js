@@ -83,6 +83,7 @@ export function compileAgentGraph(graphDependencies) {
     domainInstructions: resolvedGraphDependencies.domainInstructions,
     planPostProcessor: resolvedGraphDependencies.planPostProcessor,
     prePlannerHook: resolvedGraphDependencies.prePlannerHook,
+    intentClassifierOptions: resolvedGraphDependencies.intentClassifierOptions,
   });
 
   const isQuestionAnswerPdfOnly = Boolean(resolvedGraphDependencies.qaPdfOnly);
@@ -131,6 +132,8 @@ export function compileAgentGraph(graphDependencies) {
       (graphState) =>
         routeAfterIntentDetection(graphState, {
           qaPdfOnly: isQuestionAnswerPdfOnly,
+          intentClassifierOptions:
+            resolvedGraphDependencies.intentClassifierOptions,
         }),
       ["planner", "rag_retriever", "synthesizer"]
     )

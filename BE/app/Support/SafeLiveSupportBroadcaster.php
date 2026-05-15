@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Events\LiveSupportCustomerDisconnectedEvent;
+use App\Events\LiveSupportCustomerInboxPingEvent;
 use App\Events\LiveSupportMessageSentEvent;
 use App\Events\LiveSupportSessionResolvedEvent;
 use App\Models\LiveSupportMessage;
@@ -72,6 +73,7 @@ final class SafeLiveSupportBroadcaster
 
             $msg->loadMissing('liveSupportSession');
             broadcast(new LiveSupportMessageSentEvent($msg));
+            self::broadcastCustomerInboxPingIfEligible($msg, 'message');
         } catch (Throwable $e) {
             Log::warning('live_support.broadcast_failed', [
                 'message_id' => $messageId,
@@ -93,6 +95,7 @@ final class SafeLiveSupportBroadcaster
                 (string) $s->public_id,
                 $s->resolved_at->toISOString(),
             ));
+            self::broadcastCustomerInboxPingForSessionModel($s->fresh(), null, 'resolved');
         } catch (Throwable $e) {
             Log::warning('live_support.broadcast_resolved_failed', [
                 'session_id' => $sessionId,
@@ -114,9 +117,77 @@ final class SafeLiveSupportBroadcaster
                 (string) $s->public_id,
                 (string) $s->status,
             ));
+            self::broadcastCustomerInboxPingForSessionModel($s->fresh(), null, 'customer_left');
         } catch (Throwable $e) {
             Log::warning('live_support.broadcast_disconnected_failed', [
                 'session_id' => $sessionId,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Phiên khách ↔ admin BusSafe — ping màn admin refetch sidebar.
+     */
+    private static function broadcastCustomerInboxPingIfEligible(LiveSupportMessage $msg, string $kind): void
+    {
+        try {
+            $session = $msg->liveSupportSession;
+            if (! $session instanceof LiveSupportSession) {
+                return;
+            }
+
+            self::broadcastCustomerInboxPingForSessionModel($session, self::previewFromMessageBody($msg->body ?? ''), $kind);
+        } catch (Throwable $e) {
+            Log::warning('live_support.broadcast_inbox_ping_failed', [
+                'message_id' => $msg->id ?? null,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private static function previewFromMessageBody(?string $body): ?string
+    {
+        $t = trim((string) $body);
+        if ($t === '') {
+            return null;
+        }
+
+        if (function_exists('mb_substr')) {
+            return mb_substr($t, 0, 240);
+        }
+
+        return substr($t, 0, 240);
+    }
+
+    private static function broadcastCustomerInboxPingForSessionModel(
+        ?LiveSupportSession $session,
+        ?string $preview,
+        string $kind,
+    ): void {
+        try {
+            if ($session === null) {
+                return;
+            }
+
+            if ($session->target !== 'admin' || $session->thread_type !== LiveSupportSession::THREAD_KHACH_HANG) {
+                return;
+            }
+
+            $session->refresh();
+
+            broadcast(new LiveSupportCustomerInboxPingEvent(
+                (int) $session->id,
+                (string) $session->public_id,
+                $preview,
+                $session->updated_at?->toISOString() ?? now()->toIso8601String(),
+                $kind,
+            ));
+        } catch (Throwable $e) {
+            Log::warning('live_support.broadcast_inbox_ping_session_failed', [
+                'session_id' => $session->id ?? null,
                 'exception' => $e::class,
                 'error' => $e->getMessage(),
             ]);

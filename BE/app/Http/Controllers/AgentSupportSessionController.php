@@ -47,6 +47,9 @@ final class AgentSupportSessionController extends Controller
             'guest_name' => 'nullable|string|max:120',
             'guest_phone' => 'nullable|string|max:32',
             'guest_email' => 'nullable|string|max:160',
+            'initial_message' => 'nullable|string|max:16000',
+            /** Agent/widget: tạo phiên không broadcast tin khách — FE gửi POST .../messages sau khi invoke xong (tránh admin thấy tin trước khi bot load). */
+            'defer_customer_opening_message' => 'sometimes|boolean',
         ]);
 
         $target = isset($data['target']) ? trim((string) $data['target']) : '';
@@ -73,6 +76,12 @@ final class AgentSupportSessionController extends Controller
             ? trim((string) $data['chat_widget_session_key'])
             : '';
 
+        $initialMessage = isset($data['initial_message'])
+            ? trim((string) $data['initial_message'])
+            : '';
+
+        $deferOpening = (bool) ($data['defer_customer_opening_message'] ?? false);
+
         $existing = null;
         if ($widgetKey !== '') {
             $q = LiveSupportSession::query()
@@ -98,9 +107,13 @@ final class AgentSupportSessionController extends Controller
         }
 
         if ($existing instanceof LiveSupportSession) {
+            if (! $deferOpening && $initialMessage !== '') {
+                $this->appendOpeningCustomerMessage($existing, $initialMessage);
+            }
+
             return response()->json([
                 'success' => true,
-                'data' => $this->serializeSession($existing),
+                'data' => $this->serializeSession($existing, null, $deferOpening),
                 'reused_existing_session' => true,
             ], 200);
         }
@@ -123,9 +136,13 @@ final class AgentSupportSessionController extends Controller
             'status' => $this->defaultCreateStatus(),
         ]);
 
+        if (! $deferOpening) {
+            $this->appendOpeningCustomerMessage($session, $initialMessage);
+        }
+
         return response()->json([
             'success' => true,
-            'data' => $this->serializeSession($session, $plainClientToken),
+            'data' => $this->serializeSession($session, $plainClientToken, $deferOpening),
             'reused_existing_session' => false,
         ], 201);
     }
@@ -187,6 +204,83 @@ final class AgentSupportSessionController extends Controller
         return response()->json([
             'success' => true,
             'data' => ['closed_count' => $closed],
+        ]);
+    }
+
+    /**
+     * Khách chủ động thoát chat trực tiếp — đóng phiên (status closed), admin không reply tiếp.
+     *
+     * POST /api/v1/agent/support/sessions/{publicId}/customer-close
+     */
+    public function customerClose(Request $request, string $publicId): JsonResponse
+    {
+        if (! $this->tablesExist()) {
+            return response()->json(['success' => false, 'message' => 'Live support chưa migrate bảng.'], 503);
+        }
+
+        /** @var array<string, mixed> $data */
+        $data = $request->validate([
+            'chat_widget_session_key' => 'nullable|string|max:255',
+        ]);
+
+        $key = isset($data['chat_widget_session_key'])
+            ? trim((string) $data['chat_widget_session_key'])
+            : '';
+
+        /** @var LiveSupportSession|null $session */
+        $session = LiveSupportSession::query()->where('public_id', $publicId)->first();
+        if (! $session instanceof LiveSupportSession) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy phiên.'], 404);
+        }
+
+        $storedKey = $session->chat_widget_session_key !== null
+            ? trim((string) $session->chat_widget_session_key)
+            : '';
+        if ($storedKey !== '' && ($key === '' || $storedKey !== $key)) {
+            return response()->json(['success' => false, 'message' => 'Không khớp phiên widget.'], 403);
+        }
+
+        if ($session->target !== 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Phiên không thuộc kênh admin BusSafe.',
+            ], 422);
+        }
+
+        /** @var array<int|string, mixed>|mixed $allowedRaw */
+        $allowedRaw = config('live_support.allowed_session_statuses', ['open', 'closed', 'done']);
+        $allowedStatuses = is_array($allowedRaw)
+            ? array_values(array_filter(
+                array_map(static fn ($s) => is_string($s) ? trim($s) : '', $allowedRaw),
+                static fn ($s) => $s !== ''
+            ))
+            : ['open', 'closed', 'done'];
+
+        if (! in_array('closed', $allowedStatuses, true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cấu hình LIVE_SUPPORT_SESSION_STATUSES cần có closed để đóng phiên.',
+            ], 503);
+        }
+
+        $statusesOpen = $this->statusesAllowingNewMessages();
+
+        if ($session->resolved_at !== null || ! in_array((string) $session->status, $statusesOpen, true)) {
+            return response()->json([
+                'success' => true,
+                'data' => $this->serializeSession($session->fresh()),
+                'already_closed' => true,
+            ]);
+        }
+
+        $session->status = 'closed';
+        $session->save();
+
+        SafeLiveSupportBroadcaster::broadcastCustomerDisconnected($session->fresh());
+
+        return response()->json([
+            'success' => true,
+            'data' => $this->serializeSession($session->fresh()),
         ]);
     }
 
@@ -301,7 +395,7 @@ final class AgentSupportSessionController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function serializeSession(LiveSupportSession $session, ?string $clientTokenPlainOnce = null): array
+    private function serializeSession(LiveSupportSession $session, ?string $clientTokenPlainOnce = null, bool $deferredCustomerOpeningMessage = false): array
     {
         $payload = [
             'id' => $session->id,
@@ -325,6 +419,10 @@ final class AgentSupportSessionController extends Controller
             $payload['client_token'] = $clientTokenPlainOnce;
         }
 
+        if ($deferredCustomerOpeningMessage) {
+            $payload['deferred_customer_opening_message'] = true;
+        }
+
         return $payload;
     }
 
@@ -344,6 +442,38 @@ final class AgentSupportSessionController extends Controller
             'created_at' => $m->created_at?->toISOString(),
             'updated_at' => $m->updated_at?->toISOString(),
         ];
+    }
+
+    /**
+     * Tin khách đầu phiên (mở support) — broadcast realtime để admin/nhà xe nhận thông báo có phiên mới.
+     */
+    private function appendOpeningCustomerMessage(LiveSupportSession $session, string $initialMessage): void
+    {
+        $this->assertCanPostMessage($session);
+
+        $body = trim($initialMessage);
+        if ($body === '') {
+            $body = '[Chat widget] Khách vừa yêu cầu liên hệ hỗ trợ.';
+        }
+
+        $max = 16000;
+        if (function_exists('mb_strlen') && mb_strlen($body) > $max) {
+            $body = mb_substr($body, 0, $max);
+        } elseif (strlen($body) > $max) {
+            $body = substr($body, 0, $max);
+        }
+
+        $message = LiveSupportMessage::query()->create([
+            'live_support_session_id' => $session->id,
+            'sender_type' => 'customer',
+            'sender_admin_id' => null,
+            'sender_nha_xe_id' => null,
+            'body' => $body,
+        ]);
+
+        $session->touch();
+        $message->load('liveSupportSession');
+        SafeLiveSupportBroadcaster::broadcastMessage($message);
     }
 
     private function assertCanPostMessage(LiveSupportSession $session): void

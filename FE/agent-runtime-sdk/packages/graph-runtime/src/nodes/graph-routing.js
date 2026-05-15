@@ -9,7 +9,7 @@ function getLastUserContent(messages) {
 /**
  * Fast path: skip planner for non-operational intents to save 1 LLM call.
  * - operational / risk_sensitive / long_form → planner (tool calls needed)
- * - policy_or_document or needs_grounding → rag_retriever directly
+ * - policy_or_document (gồm cả câu dài >200 ký tự về PDF/KB) or needs_grounding → rag_retriever
  * - standard (greetings, simple questions) → synthesizer directly (1 LLM call total)
  * - standard + shouldRouteStandardThroughPlanner (mã vé, tra cứu…) → planner
  * - qaPdfOnly forces RAG first, including standard-looking PDF questions
@@ -23,7 +23,10 @@ export function routeAfterIntentDetection(graphState, options = {}) {
   const lastUserText = getLastUserContent(graphState.messages);
   const intent =
     signalsIntent === "standard" &&
-    shouldRouteStandardThroughPlanner(lastUserText)
+    shouldRouteStandardThroughPlanner(
+      lastUserText,
+      options.intentClassifierOptions,
+    )
       ? "operational"
       : signalsIntent;
 

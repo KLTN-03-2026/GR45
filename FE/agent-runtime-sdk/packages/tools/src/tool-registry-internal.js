@@ -67,13 +67,14 @@ export function emitToolEnd(ctx, { callId, toolName, startedAt, ok }) {
   });
 }
 
-export function toolFailureResult(callId, toolName, startedAt, error) {
+export function toolFailureResult(callId, toolName, startedAt, error, data = undefined) {
   const finishedAt = Date.now();
   return {
     callId,
     toolName,
     ok: false,
     error,
+    ...(data !== undefined ? { data } : {}),
     startedAt,
     finishedAt,
   };

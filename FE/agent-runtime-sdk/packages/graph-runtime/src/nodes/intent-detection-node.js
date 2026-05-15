@@ -12,7 +12,7 @@ export function createIntentDetectionNode(graphDependencies) {
   return async function intentDetectionGraphNode(graphState) {
     const text = getLastUserMessage(graphState.messages);
     const { intent, isOperational, isPolicyQuestion, isMoneyRisk } =
-      classifyIntentText(text);
+      classifyIntentText(text, graphDependencies.intentClassifierOptions);
 
     graphDependencies.bus?.emit("stage", {
       stage: "intent_detection",

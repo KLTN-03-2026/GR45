@@ -43,17 +43,15 @@ export const TRIP_TOOL_SLOTS = {
   search_trips: {
     authPolicy: "public",
     confirm: false,
-    requiredSlots: [],
-    requiredGroups: [
-      ["diem_di", "diem_den"],
-      ["nha_xe"],
-      ["ma_nha_xe"],
-    ],
-    optionalSlots: [
+    requiredSlots: [
       "diem_di",
       "diem_den",
       "ngay_khoi_hanh",
-      "gio_khoi_hanh",
+      "gio_khoi_hanh|gio_khoi_hanh_tu|gio_khoi_hanh_den",
+    ],
+    optionalSlots: [
+      "gio_khoi_hanh_tu",
+      "gio_khoi_hanh_den",
       "nha_xe",
       "ma_nha_xe",
       "loai_xe",
@@ -63,11 +61,11 @@ export const TRIP_TOOL_SLOTS = {
       "max_price",
     ],
     shortDescription:
-      "Tìm chuyến xe theo tuyến, ngày, giờ, nhà xe, loại xe hoặc giá vé.",
+      "Tìm chuyến xe theo điểm đi, điểm đến, ngày đi và giờ/khung giờ khởi hành.",
     slotRules: [
-      "Có thể search khi đủ diem_di+diem_den hoặc có nha_xe/ma_nha_xe.",
-      "Nếu thiếu cả tuyến và nhà xe thì hỏi lại.",
-      "Ngày và giờ map sang filter BE.",
+      "Bắt buộc có diem_di, diem_den, ngay_khoi_hanh và ít nhất một trường giờ.",
+      "nha_xe/ma_nha_xe chỉ là bộ lọc tùy chọn, không hỏi như slot bắt buộc.",
+      "Giờ map sang gio_khoi_hanh_tu/gio_khoi_hanh_den của BE.",
     ],
     step: [
       "GET /api/v1/chuyen-xe/search",

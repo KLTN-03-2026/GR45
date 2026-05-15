@@ -372,6 +372,115 @@ export async function callChatAiMessage(message, signal, opts = null) {
 }
 
 /**
+ * Gửi tin khách trong phiên live support (REST) — không qua chatbot.
+ * Admin / nhà xe nhận qua WebSocket; widget đã subscribe `live-support.session.{publicId}`.
+ *
+ * @param {string} publicId
+ * @param {string} bodyText
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<{ success: boolean, data?: unknown, message?: string }>}
+ */
+export async function postLiveSupportCustomerMessage(publicId, bodyText, signal) {
+  const pid = String(publicId || "").trim();
+  const body = String(bodyText || "").trim();
+  if (!pid || !body) {
+    throw new Error("Thiếu nội dung hoặc mã phiên hỗ trợ.");
+  }
+  const url = `${apiV1Base()}/agent/support/sessions/${encodeURIComponent(pid)}/messages`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...chatAiAuthHeaders(),
+    },
+    credentials: "omit",
+    body: JSON.stringify({ body, sender_type: "customer" }),
+    signal,
+  });
+  const text = await res.text().catch(() => "");
+  let json;
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    json = {};
+  }
+  if (!res.ok) {
+    const msg =
+      (json && typeof json.message === "string" && json.message.trim()) ||
+      (res.status >= 500
+        ? "Máy chủ hỗ trợ bận — thử lại sau."
+        : `Gửi tin hỗ trợ thất bại (${res.status}).`);
+    throw new Error(msg);
+  }
+  if (!json || typeof json !== "object" || json.success !== true) {
+    const msg =
+      (json && typeof json.message === "string" && json.message.trim()) ||
+      "Gửi tin hỗ trợ thất bại.";
+    throw new Error(msg);
+  }
+  return json;
+}
+
+/**
+ * Khách chủ động thoát chat trực tiếp — đóng phiên (admin không reply tiếp).
+ *
+ * @param {string} publicId
+ * @param {string} [chatWidgetSessionKey]
+ * @param {AbortSignal} [signal]
+ */
+export async function postLiveSupportCustomerClose(
+  publicId,
+  chatWidgetSessionKey,
+  signal,
+) {
+  const pid = String(publicId || "").trim();
+  if (!pid) {
+    throw new Error("Thiếu mã phiên hỗ trợ.");
+  }
+  const key =
+    typeof chatWidgetSessionKey === "string"
+      ? chatWidgetSessionKey.trim()
+      : "";
+  const url = `${apiV1Base()}/agent/support/sessions/${encodeURIComponent(pid)}/customer-close`;
+  const body =
+    key !== "" ? JSON.stringify({ chat_widget_session_key: key }) : "{}";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...chatAiAuthHeaders(),
+    },
+    credentials: "omit",
+    body,
+    signal,
+  });
+  const text = await res.text().catch(() => "");
+  let json;
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    json = {};
+  }
+  if (!res.ok) {
+    const msg =
+      (json && typeof json.message === "string" && json.message.trim()) ||
+      (res.status >= 500
+        ? "Máy chủ hỗ trợ bận — thử lại sau."
+        : `Đóng phiên hỗ trợ thất bại (${res.status}).`);
+    throw new Error(msg);
+  }
+  if (!json || typeof json !== "object" || json.success !== true) {
+    const msg =
+      (json && typeof json.message === "string" && json.message.trim()) ||
+      "Đóng phiên hỗ trợ thất bại.";
+    throw new Error(msg);
+  }
+  return json;
+}
+
+/**
  * Gửi khi khách reload / đóng tab để backend đặt user_closed_at.
  */
 export function notifyChatAiUserClosing(sessionKey) {

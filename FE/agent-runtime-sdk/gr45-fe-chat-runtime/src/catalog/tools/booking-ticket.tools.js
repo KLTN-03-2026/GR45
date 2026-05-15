@@ -1,3 +1,9 @@
+import {
+  extractBookingId,
+  extractMaVe,
+  extractSeatIds,
+  extractTripId,
+} from "../../fast-planner/text-utils.js";
 import { BOOKING_TOOL_SLOTS, TICKET_TOOL_SLOTS } from "../slots.js";
 
 function jsonBody(body) {
@@ -297,3 +303,129 @@ export function registerBookingTicketTools(ctx) {
       }),
   );
 }
+
+/**
+ * Rule-base triggers for booking + ticket tools.
+ * Order: booking-detail/create/cancel/reschedule THEN ticket-actions THEN ticket-list.
+ */
+export const BOOKING_TICKET_TOOL_PATTERNS = [
+  // booking_cancel_booking
+  {
+    test: (n) => /\b(huy (dat ve|booking|don dat))\b/.test(n),
+    build: (n) => {
+      const args = {};
+      const id = extractBookingId(n);
+      if (id) args.booking_id = id;
+      return {
+        toolName: "booking_cancel_booking",
+        rationale: "Khách hủy đặt vé.",
+        arguments: args,
+      };
+    },
+  },
+  // booking_reschedule_booking
+  {
+    test: (n) =>
+      /\b(doi (chuyen|lich) (cho )?(booking|dat ve)|reschedule)\b/.test(n),
+    build: (n) => {
+      const args = {};
+      const id = extractBookingId(n);
+      if (id) args.booking_id = id;
+      return {
+        toolName: "booking_reschedule_booking",
+        rationale: "Khách đổi chuyến cho đơn đặt.",
+        arguments: args,
+      };
+    },
+  },
+  // booking_get_booking_detail
+  {
+    test: (n) =>
+      /\b(chi tiet (don )?dat ve|chi tiet booking|xem booking)\b/.test(n),
+    build: (n) => {
+      const args = {};
+      const id = extractBookingId(n);
+      if (id) args.booking_id = id;
+      return {
+        toolName: "booking_get_booking_detail",
+        rationale: "Khách xem chi tiết đặt vé.",
+        arguments: args,
+      };
+    },
+  },
+  // booking_create_booking — "đặt vé chuyến 123 ghế A1"
+  {
+    test: (n) =>
+      /\b(dat ve|book ve|mua ve)\b/.test(n) &&
+      /\b(chuyen|trip)\s*(so|id|#)?\s*\d+/.test(n),
+    build: (n) => {
+      const args = {};
+      const tripId = extractTripId(n);
+      if (tripId) args.trip_id = tripId;
+      const seats = extractSeatIds(n);
+      if (seats.length) args.seat_ids = seats;
+      return {
+        toolName: "booking_create_booking",
+        rationale: "Khách đặt vé chuyến cụ thể.",
+        arguments: args,
+      };
+    },
+  },
+  // ticket_cancel_ticket — must precede ticket-list (and not collide with booking_cancel; "huy ve" needs literal contiguity)
+  {
+    test: (n) => /\b(huy ve|cancel ticket)\b/.test(n),
+    build: (n) => {
+      const args = {};
+      const ma = extractMaVe(n);
+      if (ma) args.ma_ve = ma;
+      return {
+        toolName: "ticket_cancel_ticket",
+        rationale: "Khách hủy vé.",
+        arguments: args,
+      };
+    },
+  },
+  // ticket_validate_ticket
+  {
+    test: (n) =>
+      /\b(kiem tra ve|xac thuc ve|validate ticket|ve.*hop le)\b/.test(n),
+    build: (n) => {
+      const args = {};
+      const ma = extractMaVe(n);
+      if (ma) args.ma_ve = ma;
+      return {
+        toolName: "ticket_validate_ticket",
+        rationale: "Khách kiểm tra vé.",
+        arguments: args,
+      };
+    },
+  },
+  // ticket_get_ticket_status / detail
+  {
+    test: (n) => /\b(trang thai ve|chi tiet ve|tinh trang ve)\b/.test(n),
+    build: (n) => {
+      const args = {};
+      const ma = extractMaVe(n);
+      if (ma) args.ma_ve = ma;
+      const isStatus = /\btrang thai\b|\btinh trang\b/.test(n);
+      return {
+        toolName: isStatus ? "ticket_get_ticket_status" : "ticket_get_ticket_detail",
+        rationale: isStatus ? "Khách xem trạng thái vé." : "Khách xem chi tiết vé.",
+        arguments: args,
+      };
+    },
+  },
+  // ticket_list_tickets
+  {
+    test: (n) =>
+      /\b(ve|nhung ve|cac ve|danh sach ve)\s+(cua toi|cua minh|da dat|toi da)\b/.test(
+        n,
+      ) ||
+      /\b(xem|liet ke)\s+(ve|cac ve|danh sach ve)\b/.test(n),
+    build: () => ({
+      toolName: "ticket_list_tickets",
+      rationale: "Khách muốn xem danh sách vé.",
+      arguments: {},
+    }),
+  },
+];

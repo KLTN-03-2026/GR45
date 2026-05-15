@@ -79,7 +79,15 @@ export function createCatalogToolRegistrar(registry) {
     } else if (opts.auth === "bearer") {
       const bearer = getKhachBearerHeaders();
       if (!bearer.Authorization) {
-        return { ok: false, error: "Cần đăng nhập (Bearer token)." };
+        return {
+          ok: false,
+          data: {
+            success: false,
+            auth_required: true,
+            error: "Bạn cần đăng nhập trước khi xem/quản lý tài khoản hoặc vé.",
+          },
+          error: "auth_required: Bearer token missing — khách chưa đăng nhập.",
+        };
       }
       Object.assign(headers, bearer);
     }

@@ -90,7 +90,70 @@ final class AgentVectorQueryController extends Controller
         usort($scored, static fn (array $a, array $b): int => ($b['score'] <=> $a['score']));
         $items = array_slice(array_column($scored, 'payload'), 0, $topK);
 
-        return response()->json(['items' => $items]);
+        $payload = ['items' => $items];
+        if ($items === [] && config('app.debug')) {
+            $payload['_rag_diagnose'] = $this->buildRagDiagnose($dim);
+        }
+
+        return response()->json($payload);
+    }
+
+    /**
+     * Chỉ gắn khi APP_DEBUG=true — giải thích vì sao RAG trả rỗng dù có bản ghi trong DB.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildRagDiagnose(int $queryVectorDim): array
+    {
+        $docs = AiDocument::query()->where('type', AiDocument::TYPE_PDF_KB)->count();
+
+        $base = AiChunk::query()
+            ->join('ai_documents', 'ai_documents.id', '=', 'ai_chunks.ai_document_id')
+            ->where('ai_documents.type', AiDocument::TYPE_PDF_KB);
+
+        $chunksTotal = (clone $base)->count();
+        $chunksWithEmb = (clone $base)->whereNotNull('ai_chunks.embedding')->count();
+        $chunksEmbDimNull = (clone $base)
+            ->whereNotNull('ai_chunks.embedding')
+            ->whereNull('ai_chunks.embedding_dim')
+            ->count();
+
+        $byDim = (clone $base)
+            ->whereNotNull('ai_chunks.embedding')
+            ->whereNotNull('ai_chunks.embedding_dim')
+            ->selectRaw('ai_chunks.embedding_dim as dim, COUNT(*) as cnt')
+            ->groupBy('ai_chunks.embedding_dim')
+            ->orderByDesc('cnt')
+            ->get()
+            ->map(static fn ($r) => ['embedding_dim' => (int) $r->dim, 'chunks' => (int) $r->cnt])
+            ->values()
+            ->all();
+
+        $hint = [];
+        if ($docs === 0) {
+            $hint[] = 'Chưa có bản ghi ai_documents với type pdf_kb.';
+        }
+        if ($chunksTotal > 0 && $chunksWithEmb === 0) {
+            $hint[] = 'Có chunk nhưng embedding đang NULL — cần ingest lại PDF (tạo vector) từ UI tri thức hoặc pipeline upsert.';
+        }
+        if ($chunksEmbDimNull > 0) {
+            $hint[] = 'Có chunk đã có embedding nhưng embedding_dim NULL — truy vấn lọc theo chiều vector sẽ bỏ qua.';
+        }
+        $dimMatch = collect($byDim)->contains(static fn (array $row) => (int) $row['embedding_dim'] === $queryVectorDim);
+        if ($chunksWithEmb > 0 && $byDim !== [] && ! $dimMatch) {
+            $hint[] = 'Chiều vector câu hỏi ('.$queryVectorDim.') không khớp chunk trong KB. Phải dùng cùng model nhúng như lúc upload PDF (FE: VITE_OLLAMA_EMBED_MODEL / HF…).';
+        }
+
+        return [
+            'query_vector_dim' => $queryVectorDim,
+            'expected_collection_env' => (string) env('AI_VECTOR_COLLECTION', 'gr45_pdf_kb'),
+            'pdf_kb_documents' => $docs,
+            'pdf_kb_chunks_total' => $chunksTotal,
+            'pdf_kb_chunks_with_embedding' => $chunksWithEmb,
+            'pdf_kb_chunks_embedding_but_embedding_dim_null' => $chunksEmbDimNull,
+            'pdf_kb_chunks_by_embedding_dim' => $byDim,
+            'hints_vi' => $hint,
+        ];
     }
 
     /**

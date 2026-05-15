@@ -36,33 +36,11 @@ function hasConcreteContext({ latestUserMessage, finalAnswer, transcript }) {
     `${latestUserMessage}\n${finalAnswer}\n${transcript}`,
   );
 
-  return /chuyen|tuyen|ve|ghe|dat|huy|thanh toan|hoan tien|voucher|nha xe|lich|gio|diem don|diem tra|ho tro|tai khoan|dang nhap/.test(
-    joined,
-  );
+  return joined.split(/\s+/).filter(Boolean).length >= 3;
 }
 
-function fallbackRankLabels(labels, latestUserMessage, limit = 5) {
-  const text = normalize(latestUserMessage);
-
-  const scored = uniqueStrings(labels, 50).map((label) => {
-    const key = normalize(label);
-
-    let score = 0;
-
-    if (/ve|dat|ghe|chuyen|tuyen/.test(text) && /ve|dat|ghe|chuyen|tuyen/.test(key)) score += 3;
-    if (/thanh toan|payment/.test(text) && /thanh toan|payment/.test(key)) score += 3;
-    if (/huy|hoan tien|refund/.test(text) && /huy|hoan|refund/.test(key)) score += 3;
-    if (/voucher|ma giam/.test(text) && /voucher|giam/.test(key)) score += 3;
-    if (/ho tro|nhan vien|admin/.test(text) && /ho tro|nhan vien|admin/.test(key)) score += 3;
-
-    return { label, score };
-  });
-
-  return scored
-    .sort((a, b) => b.score - a.score)
-    .filter((x) => x.score > 0)
-    .map((x) => x.label)
-    .slice(0, limit);
+function fallbackRankLabels() {
+  return [];
 }
 
 /**

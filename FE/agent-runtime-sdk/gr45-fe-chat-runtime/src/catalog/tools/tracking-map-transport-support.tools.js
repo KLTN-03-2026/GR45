@@ -1,13 +1,28 @@
 import {
+  extractMaNhaXe,
+  extractOperatorNameLoose,
+} from "../../fast-planner/text-utils.js";
+import {
   MAP_LOCATION_TOOL_SLOTS,
   SUPPORT_TOOL_SLOTS,
   TRACKING_TOOL_SLOTS,
   TRANSPORT_INFO_TOOL_SLOTS,
 } from "../slots.js";
 
+/**
+ * Live-support session tool name — colocated with the support handler
+ * so other modules (collector, planner-policy) can reference the literal.
+ */
+export const GR45_LIVE_SUPPORT_SESSION_TOOL_NAME =
+  "support_create_support_session";
+
 const SUPPORT_PUBLIC_ID_RE = /^[a-zA-Z0-9_-]{3,120}$/;
 const SUPPORT_PHONE_RE = /^[0-9+()\-\s]{8,24}$/;
 const SUPPORT_MESSAGE_MAX = 2000;
+
+/** Khớp ý định liên hệ / hỗ trợ — đồng bộ với SUPPORT_CONTACT_INTENT_RE (graph-runtime). */
+const SUPPORT_USER_TRIGGER_RE =
+  /\b(ho tro|gap admin|gap nha xe|gap nhan vien|tong dai|tu van vien|live support|chat voi nhan vien|chat voi nha xe|noi chuyen voi nguoi|lien he|lien lac|hotline|ket noi nhan vien|goi tong dai)\b/;
 
 function asString(value) {
   return String(value ?? "").trim();
@@ -328,18 +343,57 @@ export function registerTrackingMapTransportSupportTools(ctx) {
   }
 
   register(
+    "support_clarify_live_target",
+    SUPPORT_TOOL_SLOTS.clarify_live_target,
+    "safe",
+    ["Gặp admin hệ thống", "Gặp nhà xe"],
+    async () => ({
+      ok: true,
+      data: {
+        success: false,
+        clarification_needed: true,
+        missing_slots: ["live_support_target"],
+        suggested_questions_vi: [
+          "Trong cuộc trò chuyện có nhắc tới nhà xe — bạn muốn được hỗ trợ bởi admin hệ thống BusSafe hay nhà xe đó?",
+        ],
+        suggested_reply_chips_vi: ["Gặp admin hệ thống", "Gặp nhà xe"],
+      },
+      error: null,
+    }),
+  );
+
+  register(
     "support_create_support_session",
     SUPPORT_TOOL_SLOTS.create_support_session,
     "safe",
     ["Liên hệ hỗ trợ", "Gặp hỗ trợ admin", "Gặp nhà xe", "Liên hệ"],
-    async (args) => {
-      const built = buildSupportSessionBody(args);
+    async (args, ctx) => {
+      const widgetFromCtx =
+        ctx?.sessionId && typeof ctx.sessionId === "string"
+          ? String(ctx.sessionId).trim().slice(0, 255)
+          : "";
+      const mergedArgs = { ...args };
+      if (
+        widgetFromCtx &&
+        !String(asString(args.chat_widget_session_key)).trim()
+      ) {
+        mergedArgs.chat_widget_session_key = widgetFromCtx;
+      }
+
+      const built = buildSupportSessionBody(mergedArgs);
       if (!built.ok) return built;
+
+      /** Không gửi initial_message trong POST — Laravel không broadcast tin cho admin cho đến khi widget POST sau invoke. */
+      const payload = {
+        ...built.body,
+        defer_customer_opening_message: true,
+      };
+      delete payload.initial_message;
 
       return jsonResult("agent/support/sessions", {
         method: "POST",
         auth: "optional",
-        ...jsonBody(built.body),
+        ...jsonBody(payload),
       });
     },
   );
@@ -415,3 +469,189 @@ export function registerTrackingMapTransportSupportTools(ctx) {
     (args) => stub("support_close_support_session", args),
   );
 }
+
+/**
+ * Collect live-support `public_id`s from tool results so the widget can subscribe.
+ * Each row: `{ toolName, ok, data }` with `data` = Laravel `{ success, data: { public_id } }`.
+ */
+export function collectLiveSupportPublicIdsFromToolResults(toolResults) {
+  const seen = new Set();
+  const out = [];
+  const expected = String(GR45_LIVE_SUPPORT_SESSION_TOOL_NAME).trim();
+  for (const row of Array.isArray(toolResults) ? toolResults : []) {
+    if (!row?.ok || String(row.toolName ?? "").trim() !== expected) {
+      continue;
+    }
+    const body = row.data;
+    if (!body || typeof body !== "object") continue;
+    const inner = body.data;
+    const pid =
+      (inner && typeof inner === "object" && inner.public_id) ||
+      body.public_id ||
+      (typeof inner === "string" ? inner : undefined);
+    const s = String(pid ?? "").trim();
+    if (s && !seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+    }
+  }
+  return out;
+}
+
+/**
+ * Phiên support_create_support_session được tạo với defer_customer_opening_message —
+ * widget phải POST tin khách sau khi invoke xong.
+ */
+export function collectLiveSupportDeferredOpeningFromToolResults(toolResults) {
+  const expected = String(GR45_LIVE_SUPPORT_SESSION_TOOL_NAME).trim();
+  for (const row of Array.isArray(toolResults) ? toolResults : []) {
+    if (!row?.ok || String(row.toolName ?? "").trim() !== expected) {
+      continue;
+    }
+    const body = row.data;
+    if (!body || typeof body !== "object") continue;
+    const inner = body.data;
+    if (inner && typeof inner === "object" && inner.deferred_customer_opening_message === true) {
+      return true;
+    }
+    if (body.deferred_customer_opening_message === true) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Rule-base triggers for tracking / map / transport-info / support.
+ * Specific tracking patterns (ETA / speed / status) BEFORE generic live-location.
+ */
+export const TRACKING_MAP_TRANSPORT_SUPPORT_TOOL_PATTERNS = [
+  // tracking_estimate_arrival_time
+  {
+    test: (n) => /\b(khi nao (toi|den)|du kien (toi|den)|eta|gio den)\b/.test(n),
+    build: () => ({
+      toolName: "tracking_estimate_arrival_time",
+      rationale: "Khách hỏi giờ đến dự kiến.",
+      arguments: {},
+    }),
+  },
+  // tracking_get_vehicle_speed
+  {
+    test: (n) => /\b(toc do (xe|chuyen)|van toc|speed)\b/.test(n),
+    build: () => ({
+      toolName: "tracking_get_vehicle_speed",
+      rationale: "Khách hỏi tốc độ xe.",
+      arguments: {},
+    }),
+  },
+  // tracking_get_trip_current_status
+  {
+    test: (n) =>
+      /\b(trang thai chuyen|chuyen da chay chua|trip status)\b/.test(n),
+    build: () => ({
+      toolName: "tracking_get_trip_current_status",
+      rationale: "Khách xem trạng thái chuyến.",
+      arguments: {},
+    }),
+  },
+  // tracking_get_live_vehicle_location (catch-all live position)
+  {
+    test: (n) =>
+      /\b(xe (dang )?o dau|vi tri (xe|chuyen)|tracking|theo doi (xe|chuyen)|xe da toi)\b/.test(
+        n,
+      ),
+    build: () => ({
+      toolName: "tracking_get_live_vehicle_location",
+      rationale: "Khách hỏi vị trí xe.",
+      arguments: {},
+    }),
+  },
+  // map_find_nearby_pickup_points
+  {
+    test: (n) => /\b(diem don gan|gan day.*(diem don|pickup))\b/.test(n),
+    build: () => ({
+      toolName: "map_find_nearby_pickup_points",
+      rationale: "Khách tìm điểm đón gần.",
+      arguments: {},
+    }),
+  },
+  // map_find_nearby_trips
+  {
+    test: (n) => /\b(chuyen gan day|chuyen sap chay gan)\b/.test(n),
+    build: () => ({
+      toolName: "map_find_nearby_trips",
+      rationale: "Khách tìm chuyến gần.",
+      arguments: {},
+    }),
+  },
+  // get_trip_driver / vehicle info
+  {
+    test: (n) => /\b(tai xe|lai xe|driver|thong tin xe|bien so xe)\b/.test(n),
+    build: () => ({
+      toolName: "get_trip_driver",
+      rationale: "Khách hỏi thông tin tài xế / xe.",
+      arguments: {},
+    }),
+  },
+  // support_send_support_message
+  {
+    test: (n) => /\b(gui tin nhan ho tro|gui ho tro|tra loi ho tro)\b/.test(n),
+    build: () => ({
+      toolName: "support_send_support_message",
+      rationale: "Khách gửi tin nhắn cho hỗ trợ.",
+      arguments: {},
+    }),
+  },
+  // Khi đã có ngữ cảnh nhà xe (mã NX / tên sau "nhà xe") nhưng khách chưa nói rõ
+  // đích — hỏi admin BusSafe hay nhà xe. Đặt TRƯỚC support_create_support_session.
+  {
+    test: (n, raw) => {
+      const r = String(raw ?? "");
+      if (!SUPPORT_USER_TRIGGER_RE.test(n)) {
+        return false;
+      }
+      if (
+        /\b(gap nha xe|chat voi nha xe|lien he nha xe|noi chuyen voi nha xe)\b/.test(
+          n,
+        )
+      ) {
+        return false;
+      }
+      if (
+        /\b(gap admin|chat voi admin|lien he admin|tu van vien|tong dai|gap nhan vien|nhan vien ho tro)\b/.test(
+          n,
+        )
+      ) {
+        return false;
+      }
+      const ma = extractMaNhaXe(n);
+      const op = extractOperatorNameLoose(r);
+      return Boolean(ma || op);
+    },
+    build: () => ({
+      toolName: "support_clarify_live_target",
+      rationale:
+        "Khách muốn hỗ trợ nhưng hội thoại có nhắc nhà xe — cần chọn admin hay nhà xe.",
+      arguments: {},
+    }),
+  },
+  // support_create_support_session (admin / operator)
+  {
+    test: (n) => SUPPORT_USER_TRIGGER_RE.test(n),
+    build: (n) => {
+      const wantsOperator =
+        /\b(gap nha xe|chat voi nha xe|lien he nha xe)\b/.test(n);
+      const maNhaXe = extractMaNhaXe(n);
+      return {
+        toolName: GR45_LIVE_SUPPORT_SESSION_TOOL_NAME,
+        rationale: wantsOperator
+          ? "Khách muốn mở phiên hỗ trợ với nhà xe."
+          : "Khách muốn gặp hỗ trợ viên/admin.",
+        arguments:
+          wantsOperator && maNhaXe
+            ? { target: "nha_xe", ma_nha_xe: maNhaXe }
+            : { target: "admin" },
+      };
+    },
+  },
+];

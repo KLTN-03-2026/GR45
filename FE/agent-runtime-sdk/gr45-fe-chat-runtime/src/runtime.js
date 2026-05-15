@@ -12,12 +12,20 @@ import {
 import { registerGr45CatalogTools } from './catalog/index.js';
 import { gr45FastPlanner } from './gr45-fast-planner.js';
 import {
+  collectLiveSupportDeferredOpeningFromToolResults,
   collectLiveSupportPublicIdsFromToolResults,
-  GR45_PLANNER_DOMAIN_INSTRUCTIONS,
   GR45_REPLY_SURFACE_TRANSPORT_VI,
   postProcessGr45Plan,
 } from './gr45-planner-policy.js';
-import { enhanceGr45TripSearchArguments } from './trip-search-slot-extractor.js';
+import {
+  GR45_INTENT_CLASSIFIER_OPTIONS,
+  GR45_PINNED_SUGGESTION_LABELS,
+  GR45_SUPPORT_SUGGESTION_LABEL,
+  GR45_SUGGESTION_INTENT_GROUPS,
+} from './gr45-agent-domain-config.js';
+import { deriveRuntimeOutcome } from './gr45-runtime-outcome.js';
+import { summarizeToolResults } from './gr45-tool-summary.js';
+import { enhanceGr45TripSearchArgumentsRuleOnly } from './trip-search-slot-extractor.js';
 
 let defaultRuntime = null;
 
@@ -102,13 +110,22 @@ export function createFeChatAgentRuntime(opts = {}) {
     // No compile-time signal; per-request signal is passed via graph state _signal.
     checkpointer: false,
     confirmToolCall: opts.confirmToolCall,
-    domainInstructions: opts.domainInstructions ?? GR45_PLANNER_DOMAIN_INSTRUCTIONS,
+    domainInstructions: opts.domainInstructions,
     synthesizerDomainInstructions:
       opts.synthesizerDomainInstructions ?? GR45_REPLY_SURFACE_TRANSPORT_VI,
+    synthesizerReplyOverride: opts.synthesizerReplyOverride,
+    intentClassifierOptions:
+      opts.intentClassifierOptions ?? GR45_INTENT_CLASSIFIER_OPTIONS,
+    suggestionIntentGroups:
+      opts.suggestionIntentGroups ?? GR45_SUGGESTION_INTENT_GROUPS,
+    pinnedSuggestionLabels:
+      opts.pinnedSuggestionLabels ?? GR45_PINNED_SUGGESTION_LABELS,
+    supportSuggestionLabel:
+      opts.supportSuggestionLabel ?? GR45_SUPPORT_SUGGESTION_LABEL,
     planPostProcessor: opts.planPostProcessor ?? postProcessGr45Plan,
     prePlannerHook: opts.prePlannerHook ?? gr45FastPlanner,
     enhanceToolCallArguments:
-      opts.enhanceToolCallArguments ?? enhanceGr45TripSearchArguments,
+      opts.enhanceToolCallArguments ?? enhanceGr45TripSearchArgumentsRuleOnly,
     suggestionSource: opts.suggestionSource || 'tool_labels',
     qaPdfOnly: opts.qaPdfOnly,
     restrictedAnswerSources: opts.restrictedAnswerSources,
@@ -161,7 +178,16 @@ export function createFeChatAgentRuntime(opts = {}) {
 
     const suggestions = Array.isArray(out?.suggestions) ? out.suggestions : [];
     const answer = String(out?.finalAnswer ?? '').trim();
-    const liveSupportPublicIds = collectLiveSupportIds(out?.toolResults);
+    const toolResults = Array.isArray(out?.toolResults) ? out.toolResults : [];
+    const liveSupportPublicIds = collectLiveSupportIds(toolResults);
+    const liveSupportDeferredOpening =
+      collectLiveSupportDeferredOpeningFromToolResults(toolResults);
+    const ragContext = Array.isArray(out?.ragContext) ? out.ragContext : [];
+    const outcome = deriveRuntimeOutcome({
+      toolResults,
+      ragContext,
+      answerText: answer,
+    });
     return {
       success: true,
       session_id: sessionId,
@@ -180,10 +206,15 @@ export function createFeChatAgentRuntime(opts = {}) {
       metadata: {
         ai: {
           runtime: 'fe_agent',
+          outcome,
           planner_loops_signal: out?.signals?.planner_loop,
-          rag_hits: Array.isArray(out?.ragContext) ? out.ragContext.length : undefined,
+          rag_hits: ragContext.length,
+          tool_summary: summarizeToolResults(toolResults),
           ...(liveSupportPublicIds.length
             ? { live_support_public_ids: liveSupportPublicIds }
+            : {}),
+          ...(liveSupportDeferredOpening
+            ? { live_support_deferred_opening: true }
             : {}),
         },
       },

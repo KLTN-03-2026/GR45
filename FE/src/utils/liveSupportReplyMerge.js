@@ -4,6 +4,14 @@ function messageIdsMatch(a, b) {
   return Number(a) === Number(b);
 }
 
+/** API/list đôi khi trả id number hoặc string — tránh badge unread/Echo lệch khi so sánh === strict. */
+export function sameLiveSupportSessionId(a, b) {
+  if (a == null || b == null) return false;
+  const na = Number(a);
+  const nb = Number(b);
+  return na === nb && !Number.isNaN(na);
+}
+
 /**
  * Gộp payload reply API vào danh sách tin live support (không chờ Echo).
  * @param {import('vue').Ref<unknown[]>} messagesRef
@@ -130,10 +138,9 @@ export function mergeEchoLiveSupportMessage(messagesRef, message) {
  */
 export function bumpLiveSupportSessionPreview(sessionsRef, sessionId, replyPayload) {
   if (sessionId == null || !replyPayload) return;
-  const id = Number(sessionId);
   const list = sessionsRef.value;
   if (!Array.isArray(list)) return;
-  const s = list.find((x) => x?.id === id);
+  const s = list.find((x) => sameLiveSupportSessionId(x?.id, sessionId));
   if (!s) return;
   if (!s.messages) s.messages = [];
   s.messages[0] = {
@@ -142,5 +149,8 @@ export function bumpLiveSupportSessionPreview(sessionsRef, sessionId, replyPaylo
     role: replyPayload.role,
     admin_name: replyPayload.admin_name ?? null,
   };
-  sessionsRef.value = [s, ...list.filter((x) => x?.id !== id)];
+  sessionsRef.value = [
+    s,
+    ...list.filter((x) => !sameLiveSupportSessionId(x?.id, sessionId)),
+  ];
 }
