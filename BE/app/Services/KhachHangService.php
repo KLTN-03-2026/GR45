@@ -338,7 +338,7 @@ class KhachHangService
                     foreach ($patterns as $p) {
                         $sub->orWhere('diem_bat_dau', 'LIKE', '%' . $p . '%');
                     }
-                })->orWhereHas('tramDons', function ($qTram) use ($patterns) {
+                })->orWhereHas('tramDungs', function ($qTram) use ($patterns) {
                     $qTram->where(function ($sub) use ($patterns) {
                         foreach ($patterns as $p) {
                             $sub->orWhere('ten_tram', 'LIKE', '%' . $p . '%')
@@ -357,7 +357,7 @@ class KhachHangService
                     foreach ($patterns as $p) {
                         $sub->orWhere('diem_ket_thuc', 'LIKE', '%' . $p . '%');
                     }
-                })->orWhereHas('tramTras', function ($qTram) use ($patterns) {
+                })->orWhereHas('tramDungs', function ($qTram) use ($patterns) {
                     $qTram->where(function ($sub) use ($patterns) {
                         foreach ($patterns as $p) {
                             $sub->orWhere('ten_tram', 'LIKE', '%' . $p . '%')
