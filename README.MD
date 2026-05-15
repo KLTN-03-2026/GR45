@@ -1,4 +1,4 @@
-"""# 🚌 SmartBus: Hệ thống Quản lý Xe khách Thông minh
+"""# 🚌 BusSafe: Hệ thống Quản lý Xe khách Thông minh
 
 > **Tích hợp AI Thị giác máy tính, Định vị thời gian thực và Quản trị vận tải hiện đại.**
 
@@ -8,7 +8,7 @@
 
 ### 1.1. Giới thiệu
 
-**SmartBus** không chỉ là một ứng dụng đặt vé xe khách thông thường. Đây là một hệ sinh thái vận tải thông minh được thiết kế để giải quyết hai vấn đề cốt lõi của ngành xe khách Việt Nam: **An toàn lái xe** và **Minh bạch trong quản lý**. Hệ thống ứng dụng trí tuệ nhân tạo (AI) để giám sát hành vi tài xế và công nghệ WebSockets để theo dõi hành trình theo thời gian thực.
+**BusSafe** không chỉ là một ứng dụng đặt vé xe khách thông thường. Đây là một hệ sinh thái vận tải thông minh được thiết kế để giải quyết hai vấn đề cốt lõi của ngành xe khách Việt Nam: **An toàn lái xe** và **Minh bạch trong quản lý**. Hệ thống ứng dụng trí tuệ nhân tạo (AI) để giám sát hành vi tài xế và công nghệ WebSockets để theo dõi hành trình theo thời gian thực.
 
 ### 1.2. Mục đích thiết lập
 

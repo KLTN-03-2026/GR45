@@ -137,17 +137,33 @@ const filterOptions = [
 const isPastTrip = (ticket) => {
   const cx = ticket?.chuyen_xe;
   if (!cx?.ngay_khoi_hanh) return false;
+  const dateStr = cx.ngay_khoi_hanh.includes("T")
+    ? cx.ngay_khoi_hanh.split("T")[0]
+    : cx.ngay_khoi_hanh;
   const gio = (cx.gio_khoi_hanh || "00:00").toString().substring(0, 5);
-  const dep = new Date(`${cx.ngay_khoi_hanh}T${gio}:00`);
-  return dep.getTime() < Date.now();
+  const dep = new Date(`${dateStr}T${gio}:00`);
+
+  // Tính thời gian kết thúc dựa trên giờ dự kiến (mặc định 2h nếu ko có)
+  const duration = cx.tuyen_duong?.gio_du_kien || 2;
+  const arrival = new Date(dep.getTime() + duration * 60 * 60 * 1000);
+
+  return arrival.getTime() < Date.now();
 };
 
 const categoryOf = (ticket) => {
   const tt = String(ticket?.tinh_trang || "").toLowerCase();
+  const cxtt = String(ticket?.chuyen_xe?.trang_thai || "").toLowerCase();
   if (tt === "dang_cho" || tt === "pending" || tt === "0") return "dang_cho";
   if (tt === "huy" || tt === "da_huy" || tt === "cancelled" || tt === "2")
     return "huy";
-  if (tt === "da_hoan_thanh" || tt === "completed") return "hoan_thanh";
+  if (
+    tt === "hoan_thanh" ||
+    tt === "da_hoan_thanh" ||
+    tt === "completed" ||
+    cxtt === "hoan_thanh" ||
+    cxtt === "hoan_thanh"
+  )
+    return "hoan_thanh";
   if (tt === "da_thanh_toan" || tt === "paid" || tt === "1") {
     return isPastTrip(ticket) ? "hoan_thanh" : "da_thanh_toan";
   }
@@ -1104,7 +1120,9 @@ onUnmounted(() => {
                       <button
                         type="button"
                         class="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-500 hover:bg-slate-200/80"
-                        :aria-label="showPwMoi ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+                        :aria-label="
+                          showPwMoi ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
+                        "
                         @click="showPwMoi = !showPwMoi"
                       >
                         <span class="material-symbols-outlined text-[22px]">{{
@@ -1336,7 +1354,7 @@ onUnmounted(() => {
 
                   <!-- đánh giá chuyến xe -->
                   <div
-                    v-if="ticket.tinh_trang === 'da_hoan_thanh'"
+                    v-if="categoryOf(ticket) === 'hoan_thanh'"
                     class="flex justify-end"
                   >
                     <button
@@ -1355,7 +1373,7 @@ onUnmounted(() => {
 
                 <!-- QR Section -->
                 <div
-                  v-if="ticket.tinh_trang === 'da_thanh_toan'"
+                  v-if="categoryOf(ticket) === 'da_thanh_toan'"
                   class="w-full md:w-auto mt-8 md:mt-0 md:ml-12 flex justify-center shrink-0 relative z-10"
                 >
                   <div
@@ -1497,20 +1515,24 @@ onUnmounted(() => {
           >
             <!-- Loyalty Tabs Header -->
             <div class="flex border-b border-slate-100">
-              <button 
+              <button
                 @click="changeLoyaltyTab('info')"
                 :class="[
                   'flex-1 py-4 text-sm font-bold transition-all border-b-2',
-                  loyaltyTab === 'info' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  loyaltyTab === 'info'
+                    ? 'border-blue-600 text-blue-600 bg-blue-50/50'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50',
                 ]"
               >
                 Thông tin & Hạng
               </button>
-              <button 
+              <button
                 @click="changeLoyaltyTab('history')"
                 :class="[
                   'flex-1 py-4 text-sm font-bold transition-all border-b-2',
-                  loyaltyTab === 'history' ? 'border-blue-600 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  loyaltyTab === 'history'
+                    ? 'border-blue-600 text-blue-600 bg-blue-50/50'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50',
                 ]"
               >
                 Lịch sử giao dịch
@@ -1523,59 +1545,120 @@ onUnmounted(() => {
                 <div
                   class="w-24 h-24 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg relative"
                 >
-                  <span class="material-symbols-outlined text-5xl text-white">hotel_class</span>
-                  <div class="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-sm">
-                    <span class="material-symbols-outlined text-blue-600 text-xl font-black">verified</span>
+                  <span class="material-symbols-outlined text-5xl text-white"
+                    >hotel_class</span
+                  >
+                  <div
+                    class="absolute -bottom-1 -right-1 bg-white p-1 rounded-full shadow-sm"
+                  >
+                    <span
+                      class="material-symbols-outlined text-blue-600 text-xl font-black"
+                      >verified</span
+                    >
                   </div>
                 </div>
                 <h2 class="text-4xl font-black text-slate-900 mb-2">
-                  {{ displayPoints }} <span class="text-xl font-bold text-slate-400">điểm</span>
+                  {{ displayPoints }}
+                  <span class="text-xl font-bold text-slate-400">điểm</span>
                 </h2>
                 <div class="mb-8">
-                  <span :class="displayRank.class" class="px-6 py-1.5 rounded-full text-xs font-black border shadow-sm uppercase tracking-wider">
+                  <span
+                    :class="displayRank.class"
+                    class="px-6 py-1.5 rounded-full text-xs font-black border shadow-sm uppercase tracking-wider"
+                  >
                     {{ displayRank.label }}
                   </span>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left max-w-3xl mx-auto mt-10">
-                  <div class="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                    <h3 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                      <span class="material-symbols-outlined text-blue-600">stars</span>
+                <div
+                  class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left max-w-3xl mx-auto mt-10"
+                >
+                  <div
+                    class="bg-slate-50 rounded-2xl p-6 border border-slate-100"
+                  >
+                    <h3
+                      class="font-bold text-slate-900 mb-4 flex items-center gap-2"
+                    >
+                      <span class="material-symbols-outlined text-blue-600"
+                        >stars</span
+                      >
                       Cách tích điểm
                     </h3>
                     <ul class="space-y-3 text-sm text-slate-600">
                       <li class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
-                        <span>Mỗi <b>10.000đ</b> chi tiêu khi đặt vé bạn sẽ nhận được <b>1 điểm</b> thưởng.</span>
+                        <span
+                          class="material-symbols-outlined text-emerald-500 text-lg"
+                          >check_circle</span
+                        >
+                        <span
+                          >Mỗi <b>10.000đ</b> chi tiêu khi đặt vé bạn sẽ nhận
+                          được <b>1 điểm</b> thưởng.</span
+                        >
                       </li>
                       <li class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
-                        <span>Hoàn thành chuyến xe để điểm được cộng vào tài khoản chính thức.</span>
+                        <span
+                          class="material-symbols-outlined text-emerald-500 text-lg"
+                          >check_circle</span
+                        >
+                        <span
+                          >Hoàn thành chuyến xe để điểm được cộng vào tài khoản
+                          chính thức.</span
+                        >
                       </li>
                       <li class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
-                        <span>Tham gia các chương trình khuyến mãi đặc biệt để nhận nhân đôi điểm.</span>
+                        <span
+                          class="material-symbols-outlined text-emerald-500 text-lg"
+                          >check_circle</span
+                        >
+                        <span
+                          >Tham gia các chương trình khuyến mãi đặc biệt để nhận
+                          nhân đôi điểm.</span
+                        >
                       </li>
                     </ul>
                   </div>
 
-                  <div class="bg-slate-50 rounded-2xl p-6 border border-slate-100">
-                    <h3 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                      <span class="material-symbols-outlined text-orange-500">redeem</span>
+                  <div
+                    class="bg-slate-50 rounded-2xl p-6 border border-slate-100"
+                  >
+                    <h3
+                      class="font-bold text-slate-900 mb-4 flex items-center gap-2"
+                    >
+                      <span class="material-symbols-outlined text-orange-500"
+                        >redeem</span
+                      >
                       Quyền lợi hạng {{ displayRank.label }}
                     </h3>
                     <ul class="space-y-3 text-sm text-slate-600">
                       <li class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-orange-400 text-lg">bolt</span>
-                        <span>Đổi điểm nhận Voucher giảm giá trực tiếp vào giá vé.</span>
+                        <span
+                          class="material-symbols-outlined text-orange-400 text-lg"
+                          >bolt</span
+                        >
+                        <span
+                          >Đổi điểm nhận Voucher giảm giá trực tiếp vào giá
+                          vé.</span
+                        >
                       </li>
                       <li class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-orange-400 text-lg">bolt</span>
-                        <span>Ưu tiên chọn chỗ ngồi đẹp trên các chuyến xe cao cấp.</span>
+                        <span
+                          class="material-symbols-outlined text-orange-400 text-lg"
+                          >bolt</span
+                        >
+                        <span
+                          >Ưu tiên chọn chỗ ngồi đẹp trên các chuyến xe cao
+                          cấp.</span
+                        >
                       </li>
                       <li class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-orange-400 text-lg">bolt</span>
-                        <span>Hỗ trợ nhanh chóng qua đường dây nóng dành riêng cho VIP.</span>
+                        <span
+                          class="material-symbols-outlined text-orange-400 text-lg"
+                          >bolt</span
+                        >
+                        <span
+                          >Hỗ trợ nhanh chóng qua đường dây nóng dành riêng cho
+                          VIP.</span
+                        >
                       </li>
                     </ul>
                   </div>
@@ -1585,65 +1668,137 @@ onUnmounted(() => {
 
             <!-- Tab 2: History -->
             <div v-if="loyaltyTab === 'history'" class="p-6 sm:p-10">
-              <div v-if="isLoadingLoyaltyHistory" class="flex flex-col items-center justify-center py-20">
-                <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+              <div
+                v-if="isLoadingLoyaltyHistory"
+                class="flex flex-col items-center justify-center py-20"
+              >
+                <div
+                  class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"
+                ></div>
                 <p class="text-slate-500 font-medium">Đang tải lịch sử...</p>
               </div>
 
-              <div v-else-if="loyaltyHistory.length === 0" class="text-center py-20">
-                <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span class="material-symbols-outlined text-4xl text-slate-300">history</span>
+              <div
+                v-else-if="loyaltyHistory.length === 0"
+                class="text-center py-20"
+              >
+                <div
+                  class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4"
+                >
+                  <span
+                    class="material-symbols-outlined text-4xl text-slate-300"
+                    >history</span
+                  >
                 </div>
-                <h3 class="text-lg font-bold text-slate-800">Chưa có lịch sử giao dịch</h3>
-                <p class="text-slate-500 text-sm mt-1">Hãy đặt vé để tích lũy điểm thưởng ngay hôm nay!</p>
+                <h3 class="text-lg font-bold text-slate-800">
+                  Chưa có lịch sử giao dịch
+                </h3>
+                <p class="text-slate-500 text-sm mt-1">
+                  Hãy đặt vé để tích lũy điểm thưởng ngay hôm nay!
+                </p>
               </div>
 
               <div v-else class="overflow-x-auto">
                 <table class="w-full text-left">
                   <thead>
                     <tr class="border-b border-slate-100">
-                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider">Ngày GD</th>
-                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider">Nội dung</th>
-                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider">Loại</th>
-                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider text-right">Biến động</th>
-                      <th class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider text-right">Số dư</th>
+                      <th
+                        class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider"
+                      >
+                        Ngày GD
+                      </th>
+                      <th
+                        class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider"
+                      >
+                        Nội dung
+                      </th>
+                      <th
+                        class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider"
+                      >
+                        Loại
+                      </th>
+                      <th
+                        class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider text-right"
+                      >
+                        Biến động
+                      </th>
+                      <th
+                        class="pb-4 font-bold text-slate-400 text-xs uppercase tracking-wider text-right"
+                      >
+                        Số dư
+                      </th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-slate-50">
-                    <tr v-for="item in loyaltyHistory" :key="item.id" class="group hover:bg-slate-50 transition-colors">
+                    <tr
+                      v-for="item in loyaltyHistory"
+                      :key="item.id"
+                      class="group hover:bg-slate-50 transition-colors"
+                    >
                       <td class="py-4 pr-4">
-                        <div class="text-sm font-bold text-slate-900">{{ formatDate(item.created_at) }}</div>
-                        <div class="text-[10px] text-slate-400 font-mono">{{ item.created_at.substring(11, 16) }}</div>
+                        <div class="text-sm font-bold text-slate-900">
+                          {{ formatDate(item.created_at) }}
+                        </div>
+                        <div class="text-[10px] text-slate-400 font-mono">
+                          {{ item.created_at.substring(11, 16) }}
+                        </div>
                       </td>
                       <td class="py-4 pr-4">
-                        <div class="text-sm font-semibold text-slate-700 leading-snug">{{ item.ghi_chu }}</div>
-                        <div v-if="item.ma_tham_chieu" class="text-[11px] text-blue-500 font-bold mt-1">#{{ item.ma_tham_chieu }}</div>
+                        <div
+                          class="text-sm font-semibold text-slate-700 leading-snug"
+                        >
+                          {{ item.ghi_chu }}
+                        </div>
+                        <div
+                          v-if="item.ma_tham_chieu"
+                          class="text-[11px] text-blue-500 font-bold mt-1"
+                        >
+                          #{{ item.ma_tham_chieu }}
+                        </div>
                       </td>
                       <td class="py-4 pr-4">
-                        <span :class="getLoyaltyTypeInfo(item.loai_giao_dich).class" class="px-2.5 py-1 rounded-lg text-[11px] font-bold">
+                        <span
+                          :class="getLoyaltyTypeInfo(item.loai_giao_dich).class"
+                          class="px-2.5 py-1 rounded-lg text-[11px] font-bold"
+                        >
                           {{ getLoyaltyTypeInfo(item.loai_giao_dich).label }}
                         </span>
                       </td>
                       <td class="py-4 pr-4 text-right">
-                        <div :class="item.so_diem > 0 ? 'text-emerald-600' : 'text-rose-600'" class="text-base font-black">
-                          {{ item.so_diem > 0 ? '+' : '' }}{{ item.so_diem }}
+                        <div
+                          :class="
+                            item.so_diem > 0
+                              ? 'text-emerald-600'
+                              : 'text-rose-600'
+                          "
+                          class="text-base font-black"
+                        >
+                          {{ item.so_diem > 0 ? "+" : "" }}{{ item.so_diem }}
                         </div>
                       </td>
                       <td class="py-4 text-right">
-                        <div class="text-sm font-bold text-slate-500">{{ item.diem_sau }}</div>
+                        <div class="text-sm font-bold text-slate-500">
+                          {{ item.diem_sau }}
+                        </div>
                       </td>
                     </tr>
                   </tbody>
                 </table>
 
                 <!-- Pagination -->
-                <div v-if="loyaltyPagination.last_page > 1" class="mt-8 flex justify-center gap-2">
-                  <button 
-                    v-for="p in loyaltyPagination.last_page" :key="p"
+                <div
+                  v-if="loyaltyPagination.last_page > 1"
+                  class="mt-8 flex justify-center gap-2"
+                >
+                  <button
+                    v-for="p in loyaltyPagination.last_page"
+                    :key="p"
                     @click="fetchLoyaltyHistory(p)"
                     :class="[
                       'w-10 h-10 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center',
-                      loyaltyPagination.current_page === p ? 'bg-blue-600 text-white shadow-blue-200' : 'bg-white text-slate-600 hover:bg-blue-50 border border-slate-200'
+                      loyaltyPagination.current_page === p
+                        ? 'bg-blue-600 text-white shadow-blue-200'
+                        : 'bg-white text-slate-600 hover:bg-blue-50 border border-slate-200',
                     ]"
                   >
                     {{ p }}
@@ -1658,11 +1813,15 @@ onUnmounted(() => {
             class="bg-white p-6 sm:p-10 rounded-3xl shadow-sm border border-slate-200 animate-fade-in min-h-[400px]"
           >
             <div class="flex items-center justify-between mb-8">
-              <h2 class="text-2xl font-black text-slate-900 flex items-center gap-3">
-                <span class="material-symbols-outlined text-purple-600 text-3xl">local_activity</span>
+              <h2
+                class="text-2xl font-black text-slate-900 flex items-center gap-3"
+              >
+                <span class="material-symbols-outlined text-purple-600 text-3xl"
+                  >local_activity</span
+                >
                 Kho Voucher
               </h2>
-              <button 
+              <button
                 @click="router.push('/san-voucher')"
                 class="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-purple-100 transition flex items-center gap-2"
               >
@@ -1671,18 +1830,34 @@ onUnmounted(() => {
               </button>
             </div>
 
-            <div v-if="isLoadingVouchers" class="flex flex-col items-center justify-center py-20">
-              <div class="w-12 h-12 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+            <div
+              v-if="isLoadingVouchers"
+              class="flex flex-col items-center justify-center py-20"
+            >
+              <div
+                class="w-12 h-12 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin mb-4"
+              ></div>
               <p class="text-slate-500 font-medium">Đang tải kho voucher...</p>
             </div>
 
-            <div v-else-if="myVouchers.length === 0" class="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-              <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
-                <span class="material-symbols-outlined text-4xl text-slate-300">confirmation_number</span>
+            <div
+              v-else-if="myVouchers.length === 0"
+              class="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200"
+            >
+              <div
+                class="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm"
+              >
+                <span class="material-symbols-outlined text-4xl text-slate-300"
+                  >confirmation_number</span
+                >
               </div>
-              <h3 class="text-lg font-bold text-slate-800">Kho voucher trống</h3>
-              <p class="text-slate-500 text-sm mt-2 mb-8">Bạn chưa có voucher nào trong ví. Hãy săn ngay nhé!</p>
-              <button 
+              <h3 class="text-lg font-bold text-slate-800">
+                Kho voucher trống
+              </h3>
+              <p class="text-slate-500 text-sm mt-2 mb-8">
+                Bạn chưa có voucher nào trong ví. Hãy săn ngay nhé!
+              </p>
+              <button
                 @click="router.push('/san-voucher')"
                 class="bg-purple-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-purple-200 hover:bg-purple-700 transition active:scale-95"
               >
@@ -1691,69 +1866,122 @@ onUnmounted(() => {
             </div>
 
             <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div 
-                v-for="v in myVouchers" :key="v.id"
+              <div
+                v-for="v in myVouchers"
+                :key="v.id"
                 class="relative border rounded-2xl overflow-hidden transition-all duration-300 group flex h-full"
-                :class="getVoucherStatusInfo(v).isAvailable ? 'border-slate-200 hover:shadow-xl bg-white' : 'border-slate-100 opacity-75 grayscale-[0.5] bg-slate-50/50'"
+                :class="
+                  getVoucherStatusInfo(v).isAvailable
+                    ? 'border-slate-200 hover:shadow-xl bg-white'
+                    : 'border-slate-100 opacity-75 grayscale-[0.5] bg-slate-50/50'
+                "
               >
                 <!-- Left decoration -->
-                <div 
+                <div
                   class="w-4 flex-shrink-0"
-                  :class="getVoucherStatusInfo(v).isAvailable ? 'bg-purple-600' : 'bg-slate-300'"
+                  :class="
+                    getVoucherStatusInfo(v).isAvailable
+                      ? 'bg-purple-600'
+                      : 'bg-slate-300'
+                  "
                 ></div>
-                
+
                 <div class="p-5 flex-1 flex flex-col">
                   <div class="flex justify-between items-start mb-3">
-                    <span 
+                    <span
                       class="text-[10px] font-black px-2 py-1 rounded-lg uppercase tracking-wider border"
-                      :class="getVoucherStatusInfo(v).isAvailable ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-slate-100 text-slate-500 border-slate-200'"
+                      :class="
+                        getVoucherStatusInfo(v).isAvailable
+                          ? 'bg-purple-50 text-purple-700 border-purple-100'
+                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                      "
                     >
-                      {{ v.loai_voucher === 'percent' ? `Giảm ${parseFloat(v.gia_tri)}%` : `Giảm ${formatCurrency(v.gia_tri)}` }}
+                      {{
+                        v.loai_voucher === "percent"
+                          ? `Giảm ${parseFloat(v.gia_tri)}%`
+                          : `Giảm ${formatCurrency(v.gia_tri)}`
+                      }}
                     </span>
                     <div class="text-right">
-                      <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Hạn dùng</span>
-                      <span class="text-[10px] font-black text-slate-600">{{ formatDate(v.ngay_ket_thuc) }}</span>
+                      <span
+                        class="block text-[9px] font-bold text-slate-400 uppercase tracking-tighter"
+                        >Hạn dùng</span
+                      >
+                      <span class="text-[10px] font-black text-slate-600">{{
+                        formatDate(v.ngay_ket_thuc)
+                      }}</span>
                     </div>
                   </div>
-                  
-                  <h3 
+
+                  <h3
                     class="font-black text-slate-800 text-base leading-tight transition-colors mb-2"
-                    :class="getVoucherStatusInfo(v).isAvailable ? 'group-hover:text-purple-700' : 'text-slate-500'"
+                    :class="
+                      getVoucherStatusInfo(v).isAvailable
+                        ? 'group-hover:text-purple-700'
+                        : 'text-slate-500'
+                    "
                   >
                     {{ v.ten_voucher }}
                   </h3>
-                  
+
                   <div class="flex items-center gap-2 mb-4">
-                    <span class="text-[10px] text-slate-400 font-bold uppercase">Mã:</span>
-                    <span class="text-xs font-black text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{{ v.ma_voucher }}</span>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase"
+                      >Mã:</span
+                    >
+                    <span
+                      class="text-xs font-black text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                      >{{ v.ma_voucher }}</span
+                    >
                   </div>
-                  
-                  <div class="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+
+                  <div
+                    class="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between"
+                  >
                     <div class="flex flex-col">
-                      <span class="text-[9px] text-slate-400 font-bold uppercase leading-none mb-1">Trạng thái</span>
+                      <span
+                        class="text-[9px] text-slate-400 font-bold uppercase leading-none mb-1"
+                        >Trạng thái</span
+                      >
                       <div class="flex items-center gap-1">
-                        <span class="material-symbols-outlined text-sm" :class="getVoucherStatusInfo(v).class.split(' ')[0]">{{ getVoucherStatusInfo(v).icon }}</span>
-                        <span class="text-[11px] font-black" :class="getVoucherStatusInfo(v).class.split(' ')[0]">{{ getVoucherStatusInfo(v).label }}</span>
+                        <span
+                          class="material-symbols-outlined text-sm"
+                          :class="getVoucherStatusInfo(v).class.split(' ')[0]"
+                          >{{ getVoucherStatusInfo(v).icon }}</span
+                        >
+                        <span
+                          class="text-[11px] font-black"
+                          :class="getVoucherStatusInfo(v).class.split(' ')[0]"
+                          >{{ getVoucherStatusInfo(v).label }}</span
+                        >
                       </div>
                     </div>
-                    
-                    <button 
+
+                    <button
                       v-if="getVoucherStatusInfo(v).isAvailable"
                       @click="router.push('/')"
                       class="bg-slate-900 text-white text-xs font-bold px-5 py-2 rounded-xl hover:bg-blue-600 transition shadow-lg shadow-slate-100 active:scale-95"
                     >
                       Dùng ngay
                     </button>
-                    <div v-else class="text-[10px] font-bold text-slate-400 italic">
+                    <div
+                      v-else
+                      class="text-[10px] font-bold text-slate-400 italic"
+                    >
                       Không khả dụng
                     </div>
                   </div>
                 </div>
 
                 <!-- Punch holes effect -->
-                <div class="absolute top-1/2 -left-2.5 w-5 h-5 bg-slate-50 rounded-full -translate-y-1/2 border border-slate-200 z-10"></div>
-                <div class="absolute top-0 left-[75px] w-3 h-3 bg-slate-50 rounded-full -translate-x-1/2 -translate-y-1/2 border border-slate-200 z-10"></div>
-                <div class="absolute bottom-0 left-[75px] w-3 h-3 bg-slate-50 rounded-full -translate-x-1/2 translate-y-1/2 border border-slate-200 z-10"></div>
+                <div
+                  class="absolute top-1/2 -left-2.5 w-5 h-5 bg-slate-50 rounded-full -translate-y-1/2 border border-slate-200 z-10"
+                ></div>
+                <div
+                  class="absolute top-0 left-[75px] w-3 h-3 bg-slate-50 rounded-full -translate-x-1/2 -translate-y-1/2 border border-slate-200 z-10"
+                ></div>
+                <div
+                  class="absolute bottom-0 left-[75px] w-3 h-3 bg-slate-50 rounded-full -translate-x-1/2 translate-y-1/2 border border-slate-200 z-10"
+                ></div>
               </div>
             </div>
           </div>
@@ -1844,8 +2072,7 @@ onUnmounted(() => {
                         <p class="font-bold text-slate-900 text-lg">
                           {{
                             selectedTicket.chi_tiet_ves?.[0]?.tram_don
-                              ?.phuong_xa?.tinh_thanh
-                              ?.ten_tinh_thanh ||
+                              ?.phuong_xa?.tinh_thanh?.ten_tinh_thanh ||
                             selectedTicket.chuyen_xe?.tuyen_duong?.diem_bat_dau
                           }}
                           <span
@@ -1881,8 +2108,7 @@ onUnmounted(() => {
                         <p class="font-bold text-slate-900 text-lg">
                           {{
                             selectedTicket.chi_tiet_ves?.[0]?.tram_tra
-                              ?.phuong_xa?.tinh_thanh
-                              ?.ten_tinh_thanh ||
+                              ?.phuong_xa?.tinh_thanh?.ten_tinh_thanh ||
                             selectedTicket.chuyen_xe?.tuyen_duong?.diem_ket_thuc
                           }}
                           <span
@@ -2079,14 +2305,18 @@ onUnmounted(() => {
                         <div
                           class="flex items-center justify-between px-4 py-2 bg-white rounded-xl border border-blue-50"
                         >
-                          <span class="text-[10px] font-bold text-slate-400 uppercase"
+                          <span
+                            class="text-[10px] font-bold text-slate-400 uppercase"
                             >Nội dung CK</span
                           >
-                          <span class="font-black text-blue-700 tracking-wider"
+                          <span
+                            class="font-black text-blue-700 tracking-wider"
                             >{{ selectedTicket.ma_ve }}</span
                           >
                         </div>
-                        <p class="text-[10px] text-slate-500 font-medium italic">
+                        <p
+                          class="text-[10px] text-slate-500 font-medium italic"
+                        >
                           * Hệ thống sẽ tự động xác nhận sau khi nhận được tiền.
                         </p>
                       </div>

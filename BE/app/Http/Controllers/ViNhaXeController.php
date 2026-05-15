@@ -14,7 +14,7 @@ class ViNhaXeController extends Controller
      */
     public function getWalletInfo(Request $request)
     {
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe) {
             return response()->json(['message' => 'Không tìm thấy nhà xe'], 404);
         }
@@ -52,7 +52,7 @@ class ViNhaXeController extends Controller
             'so_tai_khoan' => 'required|string',
         ]);
 
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe) {
             return response()->json(['message' => 'Không tìm thấy nhà xe'], 404);
         }
@@ -80,7 +80,7 @@ class ViNhaXeController extends Controller
             'amount' => 'required|numeric|min:10000',
         ]);
 
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->operator_nha_xe;
         $viNhaXe = ViNhaXe::where('ma_nha_xe', $nhaXe->ma_nha_xe)->firstOrFail();
 
         $amount = $request->amount;
@@ -121,7 +121,7 @@ class ViNhaXeController extends Controller
             'amount' => 'required|numeric|min:10000',
         ]);
 
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->operator_nha_xe;
         $viNhaXe = ViNhaXe::where('ma_nha_xe', $nhaXe->ma_nha_xe)->firstOrFail();
         $amount = $request->amount;
 
@@ -156,7 +156,7 @@ class ViNhaXeController extends Controller
      */
     public function getTransactionDetail(int $id)
     {
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe) {
             return response()->json(['message' => 'Không tìm thấy nhà xe'], 404);
         }

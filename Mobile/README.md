@@ -1,6 +1,6 @@
-# 📱 SmartBus Mobile App
+# 📱 BusSafe Mobile App
 
-> **Ứng dụng di động dành cho Khách hàng và Tài xế trong hệ sinh thái SmartBus — Xây dựng bằng React Native & Expo (v54).**
+> **Ứng dụng di động dành cho Khách hàng và Tài xế trong hệ sinh thái BusSafe — Xây dựng bằng React Native & Expo (v54).**
 
 ---
 

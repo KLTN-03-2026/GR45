@@ -12,7 +12,9 @@ export function QuickActionGrid({ actions }: QuickActionGridProps) {
   const router = useRouter();
 
   const handlePress = (id: string) => {
-    if (id === "qa-4") {
+    if (id === "qa-2") {
+      router.push("/tracking");
+    } else if (id === "qa-4") {
       router.push("/chat");
     }
   };

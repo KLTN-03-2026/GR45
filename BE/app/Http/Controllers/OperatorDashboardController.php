@@ -17,13 +17,13 @@ class OperatorDashboardController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        // Sau middleware CheckNhaXeToken, Auth::user() đã là NhaXe model
-        $nhaXe = Auth::guard('nha_xe')->user();
-        if (!$nhaXe) {
+        // Sử dụng middleware CheckOperatorToken, user có thể là NhaXe hoặc NhanVienNhaXe
+        $operatorUser = $request->operator_user;
+        if (!$operatorUser) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
-        $maNhaXe = $nhaXe->ma_nha_xe;
+        $maNhaXe = $operatorUser->ma_nha_xe;
         $now = Carbon::now();
         $startOfDay = $now->copy()->startOfDay();
         $last24h = $now->copy()->subHours(24);

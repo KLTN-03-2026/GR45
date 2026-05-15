@@ -1,12 +1,12 @@
-# 🚌 SmartBus Backend (BE)
+# 🚌 BusSafe Backend (BE)
 
-> **Hệ thống điều hành và xử lý nghiệp vụ trung tâm cho SmartBus — Tích hợp Real-time WebSockets, AI Driver Safety và AI Chatbot Agent (RAG).**
+> **Hệ thống điều hành và xử lý nghiệp vụ trung tâm cho BusSafe — Tích hợp Real-time WebSockets, AI Driver Safety và AI Chatbot Agent (RAG).**
 
 ---
 
 ## 🛠️ 1. Công nghệ & Thư viện sử dụng
 
-Backend của hệ thống SmartBus được xây dựng trên nền tảng **Laravel 11.x** kết hợp với các thư viện chuyên dụng sau:
+Backend của hệ thống BusSafe được xây dựng trên nền tảng **Laravel 11.x** kết hợp với các thư viện chuyên dụng sau:
 
 | Thư viện                             | Mục đích sử dụng                                                                       |
 | :----------------------------------- | :------------------------------------------------------------------------------------- |

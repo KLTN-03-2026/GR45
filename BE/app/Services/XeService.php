@@ -34,10 +34,10 @@ class XeService
 
     public function getAll(array $filters = [])
     {
-        $user = Auth::user();
+        $user = request()->operator_user ?? Auth::user();
         if ($user instanceof Admin) {
             return $this->xeRepo->getAll($filters);
-        } elseif ($user instanceof NhaXe) {
+        } elseif ($user instanceof NhaXe || $user instanceof \App\Models\NhanVienNhaXe) {
             return $this->xeRepo->getByMaNhaXe($user->ma_nha_xe, $filters);
         }
         return null;
@@ -53,10 +53,10 @@ class XeService
         $xe = $this->xeRepo->getById($id);
         if (!$xe) return null;
 
-        $user = Auth::user();
+        $user = request()->operator_user ?? Auth::user();
         if ($user instanceof Admin) {
             return $xe;
-        } elseif ($user instanceof NhaXe) {
+        } elseif ($user instanceof NhaXe || $user instanceof \App\Models\NhanVienNhaXe) {
             if ($xe->ma_nha_xe === $user->ma_nha_xe) {
                 return $xe;
             }
@@ -81,9 +81,9 @@ class XeService
 
     public function create(array $data)
     {
-        $user = Auth::user();
+        $user = request()->operator_user ?? Auth::user();
 
-        if ($user instanceof NhaXe) {
+        if ($user instanceof NhaXe || $user instanceof \App\Models\NhanVienNhaXe) {
             $data['ma_nha_xe'] = $user->ma_nha_xe;
             $data['trang_thai'] = 'cho_duyet'; // Luôn chờ duyệt nếu là Nhà xe
         } elseif ($user instanceof Admin) {
@@ -117,8 +117,8 @@ class XeService
              throw new \Exception('Xe không tồn tại.');
         }
 
-        $user = Auth::user();
-        if ($user instanceof NhaXe) {
+        $user = request()->operator_user ?? Auth::user();
+        if ($user instanceof NhaXe || $user instanceof \App\Models\NhanVienNhaXe) {
             if ($xe->ma_nha_xe !== $user->ma_nha_xe) {
                 throw new \Exception('Bạn không có quyền chỉnh sửa xe này.');
             }
@@ -166,12 +166,12 @@ class XeService
             ];
         }
 
-        $user = Auth::user();
+        $user = request()->operator_user ?? Auth::user();
         try {
             if ($user instanceof Admin) {
                 return $this->deleteOrArchiveVehicle($xe);
             }
-            if ($user instanceof NhaXe) {
+            if ($user instanceof NhaXe || $user instanceof \App\Models\NhanVienNhaXe) {
                 if ($xe->ma_nha_xe !== $user->ma_nha_xe) {
                     throw new \Exception('Bạn không có quyền xóa xe này.');
                 }
@@ -292,7 +292,7 @@ class XeService
 
     public function updateStatus(int $id, string $status)
     {
-        $user = Auth::user();
+        $user = request()->operator_user ?? Auth::user();
         if (!($user instanceof Admin)) {
             throw new \Exception('Chỉ Admin mới có quyền cập nhật trạng thái.');
         }

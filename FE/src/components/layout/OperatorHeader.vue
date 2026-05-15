@@ -22,10 +22,26 @@ const toggleSidebar = inject("toggleSidebar");
 const router = useRouter();
 const operatorStore = useOperatorStore();
 
-// Thông tin nhà xe
+// Thông tin hiển thị — hoạt động cho cả chủ nhà xe lẫn nhân viên
 const operatorUser = computed(
-  () => operatorStore.user || { ten_nha_xe: "Nhà Xe", role: "Quản lý" },
+  () => operatorStore.user || {},
 );
+
+const displayName = computed(() => {
+  const u = operatorStore.user;
+  if (!u) return 'Nhà Xe';
+  if (operatorStore.isEmployee) return u.ho_va_ten || u.email || 'Nhân viên';
+  return u.ten_nha_xe || u.email || 'Nhà Xe';
+});
+
+const displayRole = computed(() => {
+  const u = operatorStore.user;
+  if (!u) return 'Quản lý nhà xe';
+  if (operatorStore.isEmployee) {
+    return u.chuc_vu?.ten_chuc_vu || 'Nhân viên';
+  }
+  return 'Chủ nhà xe';
+});
 
 // --- Profile dropdown ---
 const isProfileMenuOpen = ref(false);
@@ -216,10 +232,8 @@ const handleNotificationClick = (note) => {
             <UserCircle class="avatar-icon" />
           </div>
           <div class="user-info">
-            <span class="user-name">{{
-              operatorUser.ten_nha_xe || operatorUser.name || "Nhà Xe"
-            }}</span>
-            <span class="user-role">Quản lý nhà xe</span>
+            <span class="user-name">{{ displayName }}</span>
+            <span class="user-role">{{ displayRole }}</span>
           </div>
           <ChevronDown
             class="arrow-down"
@@ -236,13 +250,9 @@ const handleNotificationClick = (note) => {
                   <UserCircle class="avatar-icon-lg" />
                 </div>
                 <div>
-                  <p class="profile-name">
-                    {{
-                      operatorUser.ten_nha_xe || operatorUser.name || "Nhà Xe"
-                    }}
-                  </p>
+                  <p class="profile-name">{{ displayName }}</p>
                   <p class="profile-email">
-                    {{ operatorUser.email || "operator@smartbus.vn" }}
+                    {{ operatorUser.email || "operator@BusSafe.vn" }}
                   </p>
                 </div>
               </div>

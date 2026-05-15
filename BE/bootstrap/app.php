@@ -3,7 +3,9 @@
 use App\Http\Middleware\CheckAdminPermission;
 use App\Http\Middleware\CheckAdminToken;
 use App\Http\Middleware\CheckKhachHangToken;
+use App\Http\Middleware\CheckNhanVienToken;
 use App\Http\Middleware\CheckNhaXeToken;
+use App\Http\Middleware\CheckOperatorToken;
 use App\Http\Middleware\CheckTaiXeToken;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -22,11 +24,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Đăng ký alias cho middleware check token theo loại user
         $middleware->alias([
-            'auth.admin' => CheckAdminToken::class,
-            'auth.tai-xe' => CheckTaiXeToken::class,
-            'auth.nha-xe' => CheckNhaXeToken::class,
+            'auth.admin'      => CheckAdminToken::class,
+            'auth.tai-xe'     => CheckTaiXeToken::class,
+            'auth.nha-xe'     => CheckNhaXeToken::class,
+            'auth.nhan-vien'  => CheckNhanVienToken::class,
+            'auth.operator'   => CheckOperatorToken::class,
             'auth.khach-hang' => CheckKhachHangToken::class,
-            'permission' => CheckAdminPermission::class,
+            'permission'      => CheckAdminPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -123,7 +123,7 @@ Route::prefix('v1')->group(function () {
     // quản lý nhà xe (OPERATOR PANEL)
     Route::prefix('nha-xe')->group(function () {
         Route::post('dang-nhap', [NhaXeController::class, 'login']);
-        Route::middleware('auth.nha-xe')->group(function () {
+        Route::middleware('auth.operator')->group(function () {
             Route::get('check-token',   fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
             Route::post('dang-xuat',    [NhaXeController::class, 'logout']);
             Route::get('profile',       [NhaXeController::class, 'profile']);
@@ -233,6 +233,45 @@ Route::prefix('v1')->group(function () {
                 Route::post('sessions', [\App\Http\Controllers\OperatorChatSupportController::class, 'store']);
                 Route::post('sessions/{id}/reply', [\App\Http\Controllers\OperatorChatSupportController::class, 'reply']);
             });
+        });
+    });
+
+    // ── Nhân viên nhà xe (EMPLOYEE PORTAL) ──────────────────────────────────
+    // Nhân viên đăng nhập riêng với guard 'nhan_vien', token độc lập với chủ nhà xe.
+    Route::prefix('nhan-vien')->group(function () {
+        Route::post('dang-nhap', [NhanVienNhaXeController::class, 'login']);
+
+        Route::middleware('auth.nhan-vien')->group(function () {
+            Route::post('dang-xuat',    [NhanVienNhaXeController::class, 'logout']);
+            Route::get('me',            [NhanVienNhaXeController::class, 'me']);
+            Route::post('doi-mat-khau', [NhanVienNhaXeController::class, 'doiMatKhau']);
+
+            // Vé — nhân viên bán vé
+            Route::get('ve',                   [VeController::class, 'indexNhaXe']);
+            Route::get('ve/{id}',              [VeController::class, 'showNhaXe']);
+            Route::post('ve/dat-ve',           [VeController::class, 'datVeNhaXe']);
+            Route::patch('ve/{id}/trang-thai', [VeController::class, 'capNhatTrangThaiNhaXe']);
+            Route::patch('ve/{id}/huy',        [VeController::class, 'huyVeNhaXe']);
+
+            // Chuyến xe — nhân viên vận hành
+            Route::get('chuyen-xe',                     [ChuyenXeController::class, 'index']);
+            Route::get('chuyen-xe/dang-chay',          [ChuyenXeController::class, 'getActiveTrips']);
+            Route::get('chuyen-xe/{id}',               [ChuyenXeController::class, 'show']);
+            Route::get('chuyen-xe/{id}/so-do-ghe',     [ChuyenXeController::class, 'getSeatMap']);
+            Route::get('chuyen-xe/{id}/tracking',      [ChuyenXeController::class, 'getTracking']);
+            Route::get('chuyen-xe/{id}/tracking/live', [ChuyenXeController::class, 'getLiveTracking']);
+
+            // Tuyến đường — chỉ xem
+            Route::get('tuyen-duong',      [TuyenDuongController::class, 'index']);
+            Route::get('tuyen-duong/{id}', [TuyenDuongController::class, 'show']);
+
+            // Báo động
+            Route::get('bao-dong',      [BaoDongController::class, 'indexNhaXe']);
+            Route::get('bao-dong/{id}', [BaoDongController::class, 'showNhaXe']);
+
+            // Thống kê — chỉ xem
+            Route::get('thong-ke',            [BaoCaoController::class, 'dashboard']);
+            Route::get('thong-ke/theo-tuyen', [BaoCaoController::class, 'theoTuyenDuong']);
         });
     });
 

@@ -1,5 +1,5 @@
 <script setup>
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useOperatorStore } from '@/stores/operatorStore.js';
 import BaseInput from '@/components/common/BaseInput.vue';
@@ -20,29 +20,36 @@ const handleLogin = async () => {
   <div class="operator-login-container">
     <div class="bg-shape shape-1"></div>
     <div class="bg-shape shape-2"></div>
-    
+
     <div class="form-wrapper">
       <BaseCard class="operator-card">
         <div class="card-header-custom">
-          <div class="icon-box">🏢</div>
+          <div class="icon-box">
+            🏢
+          </div>
           <h2>Cổng Điều Hành</h2>
-          <p>Dành riêng cho các Đối Tác Nhà Xe</p>
+          <p>Dành cho Chủ Nhà Xe & Nhân viên</p>
         </div>
-        
+
         <form @submit.prevent="handleLogin" class="login-form">
-          <BaseInput v-model="form.email" type="email" label="Email doanh nghiệp" placeholder="nhaxe@example.com" />
+          <BaseInput
+            v-model="form.email"
+            type="email"
+            label="Email đăng nhập"
+            placeholder="nhaxe@example.com / nhanvien@nhaxe.vn"
+          />
           <BaseInput v-model="form.password" type="password" label="Mật khẩu" placeholder="••••••••" />
-          
+
           <div class="forgot-link">
-            <router-link :to="{ name: 'forgot-password', query: { role: 'nha_xe' } }">
+            <router-link :to="{ name: 'forgot-password' }">
               Quên mật khẩu?
             </router-link>
           </div>
-          
+
           <div v-if="operatorStore.error" class="error-msg">{{ operatorStore.error }}</div>
-          
+
           <BaseButton type="submit" block :loading="operatorStore.loading" class="mt-4 custom-btn">
-            Đăng Nhập Quản Lý
+            Đăng Nhập
           </BaseButton>
         </form>
       </BaseCard>
@@ -56,13 +63,12 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f8fafc; /* Nền xám nhạt */
+  background-color: #f8fafc;
   position: relative;
   overflow: hidden;
   padding: 1.5rem;
 }
 
-/* Các hình khối trang trí nền */
 .bg-shape {
   position: absolute;
   border-radius: 50%;
@@ -87,7 +93,7 @@ const handleLogin = async () => {
 
 .form-wrapper {
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   z-index: 10;
 }
 
@@ -103,7 +109,7 @@ const handleLogin = async () => {
 
 .card-header-custom {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .icon-box {
@@ -118,6 +124,7 @@ const handleLogin = async () => {
   font-size: 2rem;
   margin: 0 auto 1.25rem auto;
   box-shadow: 0 10px 15px -3px rgba(13, 148, 136, 0.3);
+  transition: all 0.3s ease;
 }
 
 .card-header-custom h2 {
@@ -128,9 +135,51 @@ const handleLogin = async () => {
 }
 
 .card-header-custom p {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: #64748b;
   margin: 0;
+}
+
+/* Role Tabs */
+.role-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 1rem 1.5rem 1rem;
+  background: #f1f5f9;
+  border-radius: 14px;
+  padding: 4px;
+}
+
+.role-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #64748b;
+  background: transparent;
+  transition: all 0.25s ease;
+}
+
+.role-tab.active {
+  background: white;
+  color: #0d9488;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.15);
+}
+
+.role-tab:hover:not(.active) {
+  background: rgba(255,255,255,0.6);
+  color: #334155;
+}
+
+.tab-icon {
+  font-size: 1.1rem;
 }
 
 .login-form {

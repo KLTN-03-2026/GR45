@@ -61,20 +61,20 @@ class UploadViolationImageJob implements ShouldQueue
         if ($recentAlert) {
             Log::info("Throttling: Bỏ qua upload Cloudinary cho báo động #{$this->baoDongId} vì đã có ảnh cùng loại gần đây (#{$recentAlert->id}).");
             $baoDong->update(['anh_url' => $recentAlert->anh_url]);
-            
+
             // Cập nhật cả trong JSON dữ liệu phát hiện
             $duLieu = $baoDong->du_lieu_phat_hien ?? [];
             $duLieu['anh_url_reused'] = true;
             $duLieu['anh_url'] = $recentAlert->anh_url;
             $baoDong->du_lieu_phat_hien = $duLieu;
             $baoDong->save();
-            
+
             return;
         }
 
         try {
             $timestamp = time();
-            $folder    = "SmartBus/Violations/{$this->driverId}";
+            $folder    = "BusSafe/Violations/{$this->driverId}";
             $tags      = "drowsy,driver_{$this->driverId}";
 
             // Tạo signature cho signed upload

@@ -52,16 +52,26 @@ const detailError = ref("");
 function isPastTrip(ticket) {
   const cx = ticket?.chuyen_xe;
   if (!cx?.ngay_khoi_hanh) return false;
+  const dateStr = cx.ngay_khoi_hanh.includes("T")
+    ? cx.ngay_khoi_hanh.split("T")[0]
+    : cx.ngay_khoi_hanh;
   const gio = (cx.gio_khoi_hanh || "00:00").toString().substring(0, 5);
-  const dep = new Date(`${cx.ngay_khoi_hanh}T${gio}:00`);
-  return dep.getTime() < Date.now();
+  const dep = new Date(`${dateStr}T${gio}:00`);
+
+  // Tính thời gian kết thúc dựa trên giờ dự kiến (mặc định 2h nếu ko có)
+  const duration = cx.tuyen_duong?.gio_du_kien || 2;
+  const arrival = new Date(dep.getTime() + duration * 60 * 60 * 1000);
+
+  return arrival.getTime() < Date.now();
 }
 
 function categoryOf(ticket) {
   const tt = ticket?.tinh_trang;
+  const cxtt = ticket?.chuyen_xe?.trang_thai;
   if (tt === "dang_cho") return "dang_cho";
   if (tt === "huy" || tt === "da_huy") return "huy";
-  if (tt === "da_hoan_thanh") return "hoan_thanh";
+  if (tt === "hoan_thanh" || tt === "da_hoan_thanh" || cxtt === "hoan_thanh")
+    return "hoan_thanh";
   if (tt === "da_thanh_toan") {
     return isPastTrip(ticket) ? "hoan_thanh" : "da_thanh_toan";
   }
@@ -73,8 +83,11 @@ function sortKey(ticket) {
   if (raw) return new Date(raw).getTime();
   const cx = ticket?.chuyen_xe;
   if (cx?.ngay_khoi_hanh) {
+    const dateStr = cx.ngay_khoi_hanh.includes("T")
+      ? cx.ngay_khoi_hanh.split("T")[0]
+      : cx.ngay_khoi_hanh;
     const gio = (cx.gio_khoi_hanh || "00:00").toString().substring(0, 5);
-    return new Date(`${cx.ngay_khoi_hanh}T${gio}:00`).getTime();
+    return new Date(`${dateStr}T${gio}:00`).getTime();
   }
   return 0;
 }

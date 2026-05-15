@@ -414,13 +414,13 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
         if ($driverRank === 0) {
             throw new \Exception(
                 "Tài xế #{$driver->id} chưa có hạng bằng lái hợp lệ trong hồ sơ."
-                . ' Vui lòng cập nhật trường hang_bang_lai (B1/B2/C/D/E/FB2/FC/FD/FE).'
+                    . ' Vui lòng cập nhật trường hang_bang_lai (B1/B2/C/D/E/FB2/FC/FD/FE).'
             );
         }
         if ($driverRank < $requiredRank) {
             throw new \Exception(
                 'Tài xế không đủ hạng bằng lái cho dòng xe được phân công. '
-                . "Hiện có: {$driverLicenseRaw}; yêu cầu tối thiểu: {$this->licenseLabelByRank($requiredRank)}."
+                    . "Hiện có: {$driverLicenseRaw}; yêu cầu tối thiểu: {$this->licenseLabelByRank($requiredRank)}."
             );
         }
     }
@@ -473,7 +473,7 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
     {
         if (!$driver || !$driver->email) return;
         $actionText = $action === 'new' ? 'lịch mới' : 'thay đổi lịch';
-        $subject = "SmartBus: Cập nhật {$actionText}";
+        $subject = "BusSafe: Cập nhật {$actionText}";
         $content = "Tài xế {$driver->email} có {$actionText} cho chuyến #{$trip->id} "
             . "vào {$trip->ngay_khoi_hanh} {$trip->gio_khoi_hanh}.";
 

@@ -644,13 +644,13 @@ const routeToStop = async (tram) => {
     const tramIndex = sorted.findIndex((t) => t.id === tram.id);
     if (tramIndex > 0) {
       const prevTram = sorted[tramIndex - 1];
-      originLat = prevTram.toa_do_x;
-      originLng = prevTram.toa_do_y;
+      originLat = prevTram.toa_do_y;
+      originLng = prevTram.toa_do_x;
     }
   }
 
   const originCoord = `${originLat},${originLng}`;
-  const destCoord = `${tram.toa_do_x},${tram.toa_do_y}`;
+  const destCoord = `${tram.toa_do_y},${tram.toa_do_x}`;
 
   try {
     const data = await openmapApi.direction(originCoord, destCoord);
@@ -685,7 +685,7 @@ const routeToStop = async (tram) => {
       const oLng = hasRealGps.value ? currentPosition.value.lng : originLng;
       const oLat = hasRealGps.value ? currentPosition.value.lat : originLat;
       const osrmData = await openmapApi.getDrivingRoute(
-        `${oLng},${oLat};${tram.toa_do_y},${tram.toa_do_x}`
+        `${oLng},${oLat};${tram.toa_do_x},${tram.toa_do_y}`
       );
       if (osrmData?.code === "Ok" && osrmData.routes?.length > 0) {
         const route = osrmData.routes[0];
@@ -741,8 +741,8 @@ const drawAllStops = () => {
   const waypoints = [],
     lngLats = [];
   sortedStops.value.forEach((tram) => {
-    const lat = parseFloat(tram.toa_do_x),
-      lng = parseFloat(tram.toa_do_y);
+    const lat = parseFloat(tram.toa_do_y),
+      lng = parseFloat(tram.toa_do_x);
     if (!isNaN(lat) && !isNaN(lng)) {
       waypoints.push({ lat, lng });
       lngLats.push([lng, lat]);

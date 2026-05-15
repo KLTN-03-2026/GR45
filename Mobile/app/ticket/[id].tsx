@@ -114,12 +114,35 @@ export default function TicketDetailScreen() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
-  const getStatusConfig = (status: string) => {
+  const isPastTrip = (ticket: any) => {
+    const cx = ticket?.chuyen_xe || ticket?.chuyenXe;
+    if (!cx?.ngay_khoi_hanh) return false;
+    const dateStr = cx.ngay_khoi_hanh.includes('T') ? cx.ngay_khoi_hanh.split('T')[0] : cx.ngay_khoi_hanh;
+    const timeStr = (cx.gio_khoi_hanh || "00:00").toString().substring(0, 5);
+    const dep = new Date(`${dateStr}T${timeStr}:00`);
+
+    // Tính thời gian kết thúc (mặc định 2h nếu ko có)
+    const duration = cx.tuyen_duong?.gio_du_kien || 2;
+    const arrival = new Date(dep.getTime() + duration * 60 * 60 * 1000);
+
+    return arrival.getTime() < Date.now();
+  };
+
+  const getStatusConfig = (status: string, isPast: boolean) => {
+    if (status === 'da_hoan_thanh') {
+      return { bg: '#3b82f6', text: 'HOÀN THÀNH', icon: 'flag' };
+    }
+    if (isPast && (status === 'da_thanh_toan' || status === 'hoan_thanh')) {
+      return { bg: '#3b82f6', text: 'HOÀN THÀNH', icon: 'flag' };
+    }
+
     switch (status) {
       case 'da_thanh_toan':
         return { bg: '#10b981', text: 'ĐÃ THANH TOÁN', icon: 'checkmark-circle' };
       case 'dang_cho':
         return { bg: '#f59e0b', text: 'CHỜ THANH TOÁN', icon: 'time' };
+      case 'hoan_thanh':
+        return { bg: '#3b82f6', text: 'HOÀN THÀNH', icon: 'flag' };
       case 'huy':
       case 'da_huy':
         return { bg: '#ef4444', text: 'ĐÃ HỦY', icon: 'close-circle' };
@@ -155,7 +178,9 @@ export default function TicketDetailScreen() {
   const detailList = ticket.chi_tiet_ves || ticket.chiTietVes || [];
   const listGhe = detailList.map((ct: any) => ct.ghe?.ma_ghe).join(', ') || 'Chưa xếp';
   
-  const statusInfo = getStatusConfig(ticket.tinh_trang);
+  const isPast = isPastTrip(ticket);
+  const statusInfo = getStatusConfig(ticket.tinh_trang, isPast);
+  const isCompleted = ticket.tinh_trang === 'hoan_thanh' || ticket.tinh_trang === 'da_hoan_thanh' || (isPast && ticket.tinh_trang === 'da_thanh_toan');
 
   let displayDate = '';
   try {
@@ -313,6 +338,16 @@ export default function TicketDetailScreen() {
                   disabled={cancelling}
                >
                   {cancelling ? <ActivityIndicator color="#dc2626" /> : <Text style={styles.cancelBtnText}>Yêu cầu hủy vé</Text>}
+               </TouchableOpacity>
+             )}
+
+             {isCompleted && !(ticket.danh_gia || ticket.has_rating) && (
+               <TouchableOpacity 
+                  style={[styles.actionBtn, styles.ratingBtn]}
+                  onPress={() => router.push(`/rating/${ticket.id}`)}
+               >
+                  <Ionicons name="star" size={20} color="#ffffff" />
+                  <Text style={styles.ratingBtnText}>Đánh giá ngay</Text>
                </TouchableOpacity>
              )}
              
@@ -584,6 +619,14 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontWeight: '600',
     fontSize: 15,
+  },
+  ratingBtn: {
+    backgroundColor: '#f59e0b',
+  },
+  ratingBtnText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   backBtn: {
     backgroundColor: '#0052cc',

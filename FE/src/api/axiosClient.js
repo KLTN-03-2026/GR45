@@ -27,6 +27,7 @@ function getRoleFromUrl(url) {
   const u = String(url);
   if (u.includes('/admin/')) return 'admin';
   if (u.includes('/nha-xe/')) return 'operator';
+  if (u.includes('/nhan-vien/')) return 'operator'; // Nhân viên dùng chung token key 'operator'
   if (u.includes('/tai-xe/')) return 'driver';
   return 'client';
 }

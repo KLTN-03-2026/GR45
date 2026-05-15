@@ -33,6 +33,7 @@ export default function BookingScreen() {
   const [dropoffPointId, setDropoffPointId] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
+  const [pointsToRedeem, setPointsToRedeem] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState('tien_mat'); // defaults
 
   // Booking result for Realtime & QR
@@ -128,7 +129,11 @@ export default function BookingScreen() {
      return Math.min(d, baseTotalPrice);
   }, [currentVoucher, baseTotalPrice]);
 
-  const finalTotal = baseTotalPrice - discountAmount;
+  const pointsDiscountAmount = useMemo(() => {
+     return (Number(pointsToRedeem) || 0) * 100;
+  }, [pointsToRedeem]);
+  
+  const finalTotal = Math.max(0, baseTotalPrice - discountAmount - pointsDiscountAmount);
 
   const handleToggleSeat = (seat: any) => {
      if (seat.trang_thai !== 'trong') return;
@@ -155,6 +160,7 @@ export default function BookingScreen() {
          id_tram_tra: dropoffPointId,
          ghi_chu: note,
          id_voucher: selectedVoucherId,
+         diem_quy_doi: Number(pointsToRedeem) || 0,
          phuong_thuc_thanh_toan: paymentMethod
        };
 
@@ -351,6 +357,49 @@ export default function BookingScreen() {
            </ScrollView>
         )}
 
+        {/* Loyalty Points Section */}
+        {loyaltyInfo && loyaltyInfo.diem_hien_tai > 0 && (
+           <View style={{ marginTop: 24 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                 <Text style={styles.stepLabel}>Đổi điểm thưởng</Text>
+                 <Text style={{ fontSize: 13, color: '#64748b' }}>Bạn có: <Text style={{ fontWeight: 'bold', color: '#0052cc' }}>{loyaltyInfo.diem_hien_tai}</Text> điểm</Text>
+              </View>
+              
+              <View style={styles.loyaltyBox}>
+                 <TextInput
+                    style={styles.loyaltyInput}
+                    keyboardType="numeric"
+                    placeholder="Nhập số điểm muốn dùng"
+                    value={pointsToRedeem.toString()}
+                    onChangeText={(val) => {
+                       const num = parseInt(val.replace(/[^0-9]/g, '')) || 0;
+                       
+                       // Giới hạn 1: Không vượt quá điểm hiện có
+                       let safeNum = Math.min(num, loyaltyInfo.diem_hien_tai);
+                       
+                       // Giới hạn 2: Không vượt quá số tiền cần trả
+                       const remainingPrice = baseTotalPrice - discountAmount;
+                       const maxPointsForPrice = Math.floor(remainingPrice / 100);
+                       safeNum = Math.min(safeNum, maxPointsForPrice);
+                       
+                       setPointsToRedeem(safeNum);
+                    }}
+                 />
+                 <TouchableOpacity 
+                    style={styles.maxBtn}
+                    onPress={() => {
+                       const remainingPrice = baseTotalPrice - discountAmount;
+                       const maxPointsForPrice = Math.floor(remainingPrice / 100);
+                       setPointsToRedeem(Math.min(loyaltyInfo.diem_hien_tai, maxPointsForPrice));
+                    }}
+                 >
+                    <Text style={styles.maxBtnTxt}>Dùng tối đa</Text>
+                 </TouchableOpacity>
+              </View>
+              <Text style={styles.loyaltyNote}>1 điểm = 100đ. Giảm tối đa {formatCurrency(pointsDiscountAmount)}</Text>
+           </View>
+        )}
+
         <Text style={[styles.stepLabel, { marginTop: 24 }]}>Hình thức thanh toán</Text>
         {tripData?.thanh_toan_sau !== 0 && (
            <TouchableOpacity 
@@ -376,6 +425,9 @@ export default function BookingScreen() {
            <View style={styles.summaryRow}><Text style={styles.sTxt}>Giá gốc x {selectedSeats.length} vé</Text><Text style={styles.sVal}>{formatCurrency(baseTotalPrice)}</Text></View>
            {discountAmount > 0 && (
               <View style={styles.summaryRow}><Text style={styles.sTxt}>Khuyến mãi</Text><Text style={[styles.sVal, { color: '#dc2626' }]}>-{formatCurrency(discountAmount)}</Text></View>
+           )}
+           {pointsDiscountAmount > 0 && (
+              <View style={styles.summaryRow}><Text style={styles.sTxt}>Điểm thưởng</Text><Text style={[styles.sVal, { color: '#dc2626' }]}>-{formatCurrency(pointsDiscountAmount)}</Text></View>
            )}
            <View style={styles.divider} />
            <View style={styles.summaryRow}><Text style={[styles.sTxt, { fontWeight: 'bold', color: '#0f172a' }]}>Tổng cộng</Text><Text style={styles.totalPrice}>{formatCurrency(finalTotal)}</Text></View>
@@ -602,6 +654,41 @@ const styles = StyleSheet.create({
   sVal: { fontWeight: '600', color: '#334155' },
   divider: { height: 1, backgroundColor: '#f1f5f9', marginVertical: 8 },
   totalPrice: { fontSize: 18, fontWeight: '800', color: '#0052cc' },
+
+  // Loyalty
+  loyaltyBox: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    overflow: 'hidden',
+    alignItems: 'center'
+  },
+  loyaltyInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 15,
+    color: '#1e293b'
+  },
+  maxBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#eff6ff',
+    borderLeftWidth: 1,
+    borderLeftColor: '#e2e8f0'
+  },
+  maxBtnTxt: {
+    color: '#0052cc',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  loyaltyNote: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#64748b',
+    fontStyle: 'italic'
+  },
 
   // QR Screen Styles
   qrCard: { width: '100%', backgroundColor: '#fff', borderRadius: 20, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, marginTop: 10 },

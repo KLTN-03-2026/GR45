@@ -87,8 +87,11 @@ class VeService
             $danhSachMaGhe = $data['danh_sach_ghe'];
 
             // Chuyển mã ghế (A01, A02) thành id ghế thực tế dựa trên id_xe của chuyến xe
+            // lockForUpdate() đảm bảo không có 2 transaction cùng đọc + ghi trên cùng bộ ghế
+            // → chống race condition khi 2 khách cùng đặt 1 ghế tại cùng thời điểm
             $ghes = \App\Models\Ghe::where('id_xe', $chuyenXe->id_xe)
                 ->whereIn('ma_ghe', $danhSachMaGhe)
+                ->lockForUpdate()
                 ->pluck('id', 'ma_ghe');
 
             if ($ghes->count() !== count($danhSachMaGhe)) {
@@ -104,7 +107,7 @@ class VeService
             })->whereIn('id_ghe', $danhSachIdGhe)->count();
 
             if ($gheDaDatCount > 0) {
-                throw new Exception("Có ghế trong danh sách đã được đặt. Vui lòng chọn ghế khác.");
+                throw new Exception("Một hoặc nhiều ghế bạn chọn vừa được người khác đặt. Vui lòng kiểm tra lại sơ đồ và chọn ghế khác.");
             }
 
             // Tính tiền cơ bản
@@ -250,6 +253,14 @@ class VeService
 
             // Bắn sự kiện: Có vé mới được tạo (bất kể trạng thái là chờ hay đã thanh toán)
             event(new \App\Events\VeMoiDatEvent($ve));
+
+            // Bắn sự kiện realtime để tất cả khách đang xem sơ đồ ghế biết ghế vừa bị đặt
+            // Payload: danh sách [{id_ghe, ma_ghe}] của các ghế vừa bị book
+            $gheDaDatPayload = $ve->chiTietVes->map(fn($ct) => [
+                'id_ghe' => $ct->id_ghe,
+                'ma_ghe' => optional($ct->ghe)->ma_ghe,
+            ])->values()->all();
+            event(new \App\Events\SeatMapUpdatedEvent($chuyenXe->id, $gheDaDatPayload));
 
             if ($tinhTrang === 'da_thanh_toan') {
                 event(new \App\Events\VeDaThanhToanEvent($ve));

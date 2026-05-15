@@ -59,9 +59,9 @@ class RatingController extends Controller
         $firstTicket = $ves->first();
         $effectiveTripId = $tripId ?: $firstTicket->id_chuyen_xe;
 
-        $hasPaidTicket = $ves->contains(fn ($ve) => $ve->tinh_trang === 'da_thanh_toan');
-        if (!$hasPaidTicket) {
-            return response()->json(['success' => false, 'message' => 'Chỉ có thể đánh giá cho vé đã thanh toán.'], 400);
+        $hasEligibleTicket = $ves->contains(fn ($ve) => in_array($ve->tinh_trang, ['da_thanh_toan', 'da_hoan_thanh', 'hoan_thanh']));
+        if (!$hasEligibleTicket) {
+            return response()->json(['success' => false, 'message' => 'Chỉ có thể đánh giá cho vé đã thanh toán hoặc hoàn thành.'], 400);
         }
 
         $existing = DanhGia::where('id_khach_hang', $khachHang->id)
@@ -219,9 +219,9 @@ class RatingController extends Controller
             'chuyenXe.tuyenDuong',
         ])
             ->where('id_khach_hang', $khachHang->id)
-            ->where('tinh_trang', 'da_thanh_toan')
+            ->whereIn('tinh_trang', ['da_thanh_toan', 'da_hoan_thanh', 'hoan_thanh'])
             ->whereHas('chuyenXe', function ($query) {
-                $query->where('trang_thai', 'hoan_thanh');
+                $query->whereIn('trang_thai', ['hoan_thanh', 'hoat_dong']);
             })
             ->orderByDesc('created_at')
             ->get()
@@ -303,7 +303,7 @@ class RatingController extends Controller
 
     public function getCompanyRatings(Request $request): JsonResponse
     {
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe || !($nhaXe instanceof NhaXe)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }

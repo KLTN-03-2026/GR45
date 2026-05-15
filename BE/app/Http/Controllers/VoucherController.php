@@ -22,9 +22,9 @@ class VoucherController extends Controller
 
     // ========== API CHO NHÀ XE ==========
 
-    public function indexNhaXe()
+    public function indexNhaXe(Request $request)
     {
-        $nhaXe = Auth::user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -38,7 +38,7 @@ class VoucherController extends Controller
 
     public function storeNhaXe(StoreVoucherRequest $request)
     {
-        $nhaXe = Auth::user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -57,9 +57,9 @@ class VoucherController extends Controller
             ], 500);
         }
     }
-    public function showNhaXe($id)
+    public function showNhaXe(Request $request, $id)
     {
-        $nhaXe = Auth::user();
+        $nhaXe = $request->operator_nha_xe;
         $voucher = $this->voucherService->findByIdAndNhaXe($id, $nhaXe->id);
 
         if (!$voucher) {
@@ -74,7 +74,7 @@ class VoucherController extends Controller
 
     public function updateNhaXe(UpdateVoucherRequest $request, $id)
     {
-        $nhaXe = Auth::user();
+        $nhaXe = $request->operator_nha_xe;
         try {
             $voucher = $this->voucherService->updateVoucherForNhaXe($id, $nhaXe->id, $request->validated());
             return response()->json([
@@ -90,9 +90,9 @@ class VoucherController extends Controller
         }
     }
 
-    public function destroyNhaXe($id)
+    public function destroyNhaXe(Request $request, $id)
     {
-        $nhaXe = Auth::user();
+        $nhaXe = $request->operator_nha_xe;
         try {
             $this->voucherService->deleteVoucherForNhaXe($id, $nhaXe->id);
             return response()->json([

@@ -59,6 +59,12 @@ return [
             'provider' => 'nha_xes',
         ],
 
+        // Guard cho Nhân viên nhà xe
+        'nhan_vien' => [
+            'driver' => 'sanctum',
+            'provider' => 'nhan_viens',
+        ],
+
         // Guard cho Khách hàng
         'khach_hang' => [
             'driver' => 'sanctum',
@@ -106,6 +112,12 @@ return [
         'nha_xes' => [
             'driver' => 'eloquent',
             'model' => App\Models\NhaXe::class,
+        ],
+
+        // Provider cho Nhân viên nhà xe
+        'nhan_viens' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\NhanVienNhaXe::class,
         ],
 
         // Provider cho Khách hàng
