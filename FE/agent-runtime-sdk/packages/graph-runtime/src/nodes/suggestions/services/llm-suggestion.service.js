@@ -50,9 +50,7 @@ function hasConcreteContext({ latestUserMessage, finalAnswer, transcript }) {
 
   if (!joined) return false;
 
-  return /chuyen|tuyen|ve|ghe|dat|huy|thanh toan|hoan tien|voucher|nha xe|lich|gio|diem don|diem tra|ho tro|tai khoan|dang nhap/.test(
-    joined,
-  );
+  return joined.split(/\s+/).filter(Boolean).length >= 3;
 }
 
 /**

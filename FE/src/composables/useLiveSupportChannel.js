@@ -11,6 +11,9 @@ export function useLiveSupportChannel(viewer = "admin_panel") {
   /** @type {ReturnType<typeof createEcho> | undefined} */
   let echoInstance;
 
+  /** Kênh `live-support.inbox.customer` — refetch sidebar admin khi có phiên/tin (không cần subscribe từng public_id). */
+  let customerInboxSubscribed = false;
+
   /** @type {import('vue').Ref<Map<string, string>>} */
   const subscribedChannels = ref(new Map());
 
@@ -85,6 +88,29 @@ export function useLiveSupportChannel(viewer = "admin_panel") {
     subscribedChannels.value.set(publicId, channelName);
   };
 
+  /**
+   * Ping realtime danh sách phiên khách ↔ admin — payload chỉ có ids (FE refetch API).
+   * @param {(detail: { session_id?: number, public_id?: string, preview?: string | null, updated_at?: string, kind?: string }) => void} onPing
+   */
+  const subscribeCustomerInbox = (onPing) => {
+    const echo = getEcho();
+    if (!echo || customerInboxSubscribed) return;
+
+    customerInboxSubscribed = true;
+    const channel = echo.channel("live-support.inbox.customer");
+    channel.listen(".live_support.inbox_ping", (data) => {
+      if (typeof onPing === "function") {
+        onPing(data && typeof data === "object" ? data : {});
+      }
+    });
+  };
+
+  const unsubscribeCustomerInbox = () => {
+    if (!customerInboxSubscribed || !echoInstance) return;
+    echoInstance.leave("live-support.inbox.customer");
+    customerInboxSubscribed = false;
+  };
+
   const unsubscribe = (publicId) => {
     const channelName = subscribedChannels.value.get(publicId);
     if (channelName && echoInstance) {
@@ -105,6 +131,7 @@ export function useLiveSupportChannel(viewer = "admin_panel") {
 
   onUnmounted(() => {
     unsubscribeAll();
+    unsubscribeCustomerInbox();
     if (echoInstance) {
       echoInstance.disconnect();
     }
@@ -113,6 +140,8 @@ export function useLiveSupportChannel(viewer = "admin_panel") {
 
   return {
     subscribe,
+    subscribeCustomerInbox,
+    unsubscribeCustomerInbox,
     unsubscribe,
     unsubscribeAll,
     isSubscribed,

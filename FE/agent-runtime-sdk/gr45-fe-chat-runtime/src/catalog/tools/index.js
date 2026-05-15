@@ -13,3 +13,5 @@ export function registerAllCatalogTools(registry) {
   registerPaymentRefundVoucherTools(ctx);
   registerTrackingMapTransportSupportTools(ctx);
 }
+
+export { GR45_FAST_PLANNER_PATTERNS } from "./patterns.js";

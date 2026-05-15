@@ -39,6 +39,24 @@ final class AdminLiveSupportCustomerController extends Controller
         ]);
     }
 
+    public function markRead(Request $request, int $id, LiveSupportCustomerStaffService $svc): JsonResponse
+    {
+        if (! $svc->tablesExist()) {
+            return response()->json(['success' => false, 'message' => 'Live support chưa cấu hình bảng.'], 503);
+        }
+
+        try {
+            $count = $svc->markCustomerThreadReadForAdmin($id);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'Không tìm thấy phiên.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['staff_unread_count' => $count],
+        ]);
+    }
+
     public function reply(Request $request, int $id, LiveSupportCustomerStaffService $svc): JsonResponse
     {
         if (! $svc->tablesExist()) {

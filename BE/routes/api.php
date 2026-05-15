@@ -114,6 +114,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['optional.khach-hang', 'throttle:120,1'])->prefix('support')->group(function () {
             Route::post('sessions/widget-disconnect', [AgentSupportSessionController::class, 'widgetDisconnect']);
+            Route::post('sessions/{publicId}/customer-close', [AgentSupportSessionController::class, 'customerClose']);
             Route::post('sessions', [AgentSupportSessionController::class, 'store']);
             Route::get('sessions/{publicId}', [AgentSupportSessionController::class, 'showSession']);
             Route::get('sessions/{publicId}/messages', [AgentSupportSessionController::class, 'indexMessages']);
@@ -288,6 +289,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('stats-daily', [OperatorLiveSupportCustomerController::class, 'statsDaily']);
                 Route::get('sessions', [OperatorLiveSupportCustomerController::class, 'sessions']);
                 Route::get('sessions/{id}', [OperatorLiveSupportCustomerController::class, 'show']);
+                Route::post('sessions/{id}/mark-read', [OperatorLiveSupportCustomerController::class, 'markRead']);
                 Route::post('sessions/{id}/reply', [OperatorLiveSupportCustomerController::class, 'reply']);
                 Route::post('sessions/{id}/resolve', [OperatorLiveSupportCustomerController::class, 'resolve']);
             });
@@ -465,6 +467,7 @@ Route::prefix('v1')->group(function () {
                     Route::get('stats-daily', [AdminChatSupportController::class, 'statsDailyKhachHang']);
                     Route::get('sessions', [AdminLiveSupportCustomerController::class, 'sessions']);
                     Route::get('sessions/{id}', [AdminLiveSupportCustomerController::class, 'show']);
+                    Route::post('sessions/{id}/mark-read', [AdminLiveSupportCustomerController::class, 'markRead']);
                     Route::post('sessions/{id}/reply', [AdminLiveSupportCustomerController::class, 'reply']);
                     Route::post('sessions/{id}/resolve', [AdminLiveSupportCustomerController::class, 'resolve']);
                 });

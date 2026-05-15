@@ -57,7 +57,11 @@ export function resolveBrowserAgentRuntimeConfig({
   })();
 
   const ollamaBaseUrl =
-    stripTrailingSlashes(env.VITE_OLLAMA_BASE_URL || defaults.ollamaBaseUrl) ||
+    stripTrailingSlashes(
+      env.VITE_AI_OLLAMA_URL ||
+        env.VITE_OLLAMA_BASE_URL ||
+        defaults.ollamaBaseUrl,
+    ) ||
     (locationOrigin ? `${locationOrigin}/ollama-local` : "http://127.0.0.1:11434");
 
   return {
@@ -72,9 +76,21 @@ export function resolveBrowserAgentRuntimeConfig({
       clean(env.VITE_AGENT_VECTOR_COLLECTION || defaults.collection || "gr45_pdf_kb") ||
       "gr45_pdf_kb",
     ollamaModel:
-      clean(env.VITE_OLLAMA_CHAT_MODEL || env.VITE_OLLAMA_MODEL || defaults.ollamaModel || "qwen2.5:3b"),
+      clean(
+        env.VITE_AI_OLLAMA_CHAT_MODEL ||
+          env.VITE_OLLAMA_CHAT_MODEL ||
+          env.VITE_OLLAMA_MODEL ||
+          defaults.ollamaModel ||
+          "qwen2.5:3b",
+      ),
+    /** Chiều vector phải khớp `embedding_dim` trong bảng ai_chunks khi ingest PDF (vd nomic-embed-text ≈ 768). */
     ollamaEmbedModel:
-      clean(env.VITE_OLLAMA_EMBED_MODEL || defaults.ollamaEmbedModel || "nomic-embed-text"),
+      clean(
+        env.VITE_AI_OLLAMA_EMBED_MODEL ||
+          env.VITE_OLLAMA_EMBED_MODEL ||
+          defaults.ollamaEmbedModel ||
+          "nomic-embed-text",
+      ),
     ollamaBaseUrl,
     ollamaKeepAlive: clean(env.VITE_OLLAMA_KEEP_ALIVE || defaults.ollamaKeepAlive),
     /** Mặc định `tool_labels` — không gọi thêm LLM cho chip (nhanh). `llm_from_tool_labels` = chip thông minh hơn, chậm hơn ~1 request model. */
@@ -84,27 +100,42 @@ export function resolveBrowserAgentRuntimeConfig({
     ),
     ollamaNumCtx:
       parseOptionalOllamaNumCtx(
-        env.VITE_OLLAMA_NUM_CTX ??
+        env.VITE_AI_OLLAMA_NUM_CTX ??
+          env.VITE_OLLAMA_NUM_CTX ??
           defaults.ollamaNumCtx ??
           DEFAULT_OLLAMA_NUM_CTX,
       ),
-    groqKey: clean(env.VITE_GROQ_API_KEY || defaults.groqKey),
-    groqModel: clean(env.VITE_GROQ_MODEL || defaults.groqModel),
+    groqKey: clean(
+      env.VITE_AI_GROQ_API_KEY ||
+        env.VITE_GROQ_API_KEY ||
+        defaults.groqKey,
+    ),
+    groqModel: clean(
+      env.VITE_AI_GROQ_MODEL || env.VITE_GROQ_MODEL || defaults.groqModel,
+    ),
     groqBaseUrl:
-      stripTrailingSlashes(env.VITE_GROQ_BASE_URL || defaults.groqBaseUrl) ||
-      "https://api.groq.com/openai/v1",
+      stripTrailingSlashes(
+        env.VITE_AI_GROQ_API_URL ||
+          env.VITE_GROQ_BASE_URL ||
+          defaults.groqBaseUrl,
+      ) || "https://api.groq.com/openai/v1",
     huggingFaceKey: clean(
-      env.VITE_HF_API_KEY || env.VITE_HUGGINGFACE_API_KEY || defaults.huggingFaceKey
+      env.VITE_AI_HF_TOKEN ||
+        env.VITE_HF_API_KEY ||
+        env.VITE_HUGGINGFACE_API_KEY ||
+        defaults.huggingFaceKey,
     ),
     huggingFaceModel: clean(
-      env.VITE_HF_EMBED_MODEL ||
+      env.VITE_AI_HF_EMBED_MODEL ||
+        env.VITE_HF_EMBED_MODEL ||
         env.VITE_HUGGINGFACE_EMBED_MODEL ||
-        defaults.huggingFaceModel
+        defaults.huggingFaceModel,
     ),
     huggingFaceEndpointUrl: clean(
-      env.VITE_HF_ENDPOINT_URL ||
+      env.VITE_AI_HF_EMBED_BASE_URL ||
+        env.VITE_HF_ENDPOINT_URL ||
         env.VITE_HUGGINGFACE_ENDPOINT_URL ||
-        defaults.huggingFaceEndpointUrl
+        defaults.huggingFaceEndpointUrl,
     ),
     huggingFaceProvider: clean(
       env.VITE_HF_PROVIDER ||

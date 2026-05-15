@@ -25,6 +25,11 @@ export {
 } from "./slots.js";
 
 export { registerGr45CatalogTools } from "./register-gr45-catalog-tools.js";
+export { GR45_FAST_PLANNER_PATTERNS } from "./tools/index.js";
+export {
+  collectLiveSupportPublicIdsFromToolResults,
+  GR45_LIVE_SUPPORT_SESSION_TOOL_NAME,
+} from "./tools/tracking-map-transport-support.tools.js";
 
 export {
   apiFetch,

@@ -6,6 +6,8 @@ import {
   parseAssistantUiPayload,
   notifyChatAiUserClosing,
   notifyLiveSupportWidgetDisconnect,
+  postLiveSupportCustomerClose,
+  postLiveSupportCustomerMessage,
 } from "@/api/chatAiApi.js";
 import { useLiveSupportChannel } from "@/composables/useLiveSupportChannel";
 // Force Vite HMR reload
@@ -29,18 +31,26 @@ const chatAiSessionId = ref("");
 let scrollRaf = null;
 const loginPath = String(import.meta.env.VITE_CHAT_LOGIN_PATH || "/auth/login").trim() || "/auth/login";
 
-/** Đồng bộ prefix với `@fe-agent/sdk` `createBrowserSessionProvider` — xóa khi đổi phiên widget. */
-const FE_AGENT_SESSION_STORAGE_PREFIX = "fe-agent-chat-ai:";
-
 /** Phiên chỉ khóa theo widget — không tải lịch sử DB khi mount; admin xem transcript qua message-log BE. */
 const threadLocked = ref(false);
+/** Đang trong phiên live support — tin nhắn khách gửi thẳng REST + Echo, không gọi chatbot. */
+const liveSupportActivePublicId = ref("");
+/** Tin nhận được khi khách đã đóng popup — hiện badge trên FAB. */
+const unreadWhileClosed = ref(0);
+
+const WELCOME_MESSAGE =
+  "Dạ, em có thể hỗ trợ tra cứu tuyến xe, chuyến xe, giờ khởi hành, giá vé và điểm đón/trả.";
+
+/** Chip gửi nguyên văn vào bot — planner/tool `support_create_support_session`. */
+const WELCOME_QUICK_REPLIES = [
+  "Tìm chuyến xe",
+  "Kiểm tra tuyến xe",
+  "Hỏi điểm đón/trả",
+  "Liên hệ hỗ trợ",
+];
 
 function flushUserCloseBeacon() {
-  const key =
-    chatAiSessionId.value?.trim() ||
-    (typeof localStorage !== "undefined"
-      ? localStorage.getItem("chat_session_key")
-      : "");
+  const key = chatAiSessionId.value?.trim();
   if (!key) return;
   void notifyChatAiUserClosing(key);
   void notifyLiveSupportWidgetDisconnect(key);
@@ -52,6 +62,14 @@ const {
   unsubscribeAll,
   isSubscribed,
 } = useLiveSupportChannel("customer_widget");
+
+/**
+ * Phiên đang được **chính khách** chủ động thoát qua nút "Thoát hỗ trợ".
+ * Echo `customer_disconnected` cho các pid này sẽ bị **suppress** để không
+ * trùng với bubble local "Bạn đã thoát chat trực tiếp" do `exitLiveSupportToBot`
+ * push. Phiên kết thúc bởi admin (`resolved`) vẫn được hiển thị bình thường.
+ */
+const liveSupportPidsExitingByCustomer = new Set();
 
 function liveSupportEndedAssistantText(kind) {
   if (kind === "resolved") {
@@ -67,18 +85,40 @@ function subscribeToLiveSupportPublicId(publicId) {
     pid,
     (message) => {
       if (message.role === "admin") {
+        const panelHidden = !open.value;
         messages.value.push({
           role: message.role,
           text: message.content,
           metadata: message.meta || {},
         });
-        scrollToEnd();
+        if (panelHidden) {
+          unreadWhileClosed.value += 1;
+        } else {
+          scrollToEnd();
+        }
       }
     },
     {
       onSessionEnded: (detail) => {
         if (String(detail?.public_id || "").trim() !== pid) return;
+        if (liveSupportActivePublicId.value.trim() === pid) {
+          liveSupportActivePublicId.value = "";
+        }
         unsubscribeLiveSupport(pid);
+
+        /**
+         * Khách vừa bấm nút "Thoát hỗ trợ" — `exitLiveSupportToBot` đã (hoặc đang)
+         * push bubble "Bạn đã thoát chat trực tiếp…". Bỏ qua bubble Echo để khỏi trùng.
+         */
+        const suppressBubble =
+          detail.kind === "customer_disconnected" &&
+          liveSupportPidsExitingByCustomer.has(pid);
+        liveSupportPidsExitingByCustomer.delete(pid);
+        if (suppressBubble) {
+          return;
+        }
+
+        const panelHidden = !open.value;
         messages.value.push({
           role: "assistant",
           text: liveSupportEndedAssistantText(detail.kind),
@@ -87,7 +127,11 @@ function subscribeToLiveSupportPublicId(publicId) {
             live_support_end_reason: detail.kind,
           },
         });
-        scrollToEnd();
+        if (panelHidden) {
+          unreadWhileClosed.value += 1;
+        } else {
+          scrollToEnd();
+        }
       },
     },
   );
@@ -149,54 +193,47 @@ function normalizeQuickReplies(items) {
   return out;
 }
 
+function ensureWelcomeState() {
+  if (messages.value.length === 0) {
+    messages.value.push({ role: "assistant", text: WELCOME_MESSAGE });
+  }
+  if (quickReplies.value.length === 0) {
+    quickReplies.value = normalizeQuickReplies(WELCOME_QUICK_REPLIES);
+  }
+  void scrollToEnd();
+}
+
 onMounted(() => {
   if (typeof window !== "undefined") {
     window.addEventListener("pagehide", flushUserCloseBeacon);
     window.addEventListener("beforeunload", flushUserCloseBeacon);
   }
 
-  let storedKey = localStorage.getItem("chat_session_key");
-  if (!storedKey) {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      storedKey = crypto.randomUUID();
-    } else {
-      storedKey = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    }
-    localStorage.setItem("chat_session_key", storedKey);
-  }
-  chatAiSessionId.value = storedKey;
+  chatAiSessionId.value = newChatSessionId();
 });
+
+function newChatSessionId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 function startNewChatSession() {
   if (streaming.value) return;
 
-  const prevKey = String(chatAiSessionId.value || "").trim();
-
   unsubscribeAll();
-
-  if (prevKey && typeof localStorage !== "undefined") {
-    try {
-      const sid = prevKey.slice(0, 96);
-      localStorage.removeItem(FE_AGENT_SESSION_STORAGE_PREFIX + sid);
-    } catch {
-      /* ignore */
-    }
-  }
-
-  let newKey;
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    newKey = crypto.randomUUID();
-  } else {
-    newKey = `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  }
-
-  localStorage.setItem("chat_session_key", newKey);
-  chatAiSessionId.value = newKey;
+  chatAiSessionId.value = newChatSessionId();
   messages.value = [];
   quickReplies.value = [];
   input.value = "";
   assistantBuffer.value = "";
   threadLocked.value = false;
+  liveSupportActivePublicId.value = "";
+  unreadWhileClosed.value = 0;
+  if (open.value) {
+    ensureWelcomeState();
+  }
 }
 
 function refreshGeoOnce() {
@@ -235,6 +272,23 @@ function refreshGeoOnce() {
 
 const canSend = computed(
   () => input.value.trim().length > 0 && !streaming.value && !threadLocked.value,
+);
+
+const isLiveSupportActive = computed(
+  () => liveSupportActivePublicId.value.trim().length > 0,
+);
+
+const unreadFabBadge = computed(() => {
+  const n = unreadWhileClosed.value;
+  if (n <= 0) return "";
+  if (n > 99) return "99+";
+  return String(n);
+});
+
+const fabAriaLabel = computed(() =>
+  unreadWhileClosed.value > 0
+    ? `Trợ lý BusSafe — ${unreadFabBadge.value} tin mới`
+    : "Mở trợ lý BusSafe",
 );
 
 function showAssistantBubble(m, idx) {
@@ -347,10 +401,73 @@ function parseAssistantJsonPayload(rawText) {
   return { answer, suggestions };
 }
 
+/** Gửi tin trong phiên live support — không invoke agent / LLM. */
+async function submitLiveSupportOnlyMessage(displayText) {
+  const pid = liveSupportActivePublicId.value.trim();
+  if (!pid) return;
+
+  quickReplies.value = [];
+  pushUser(displayText);
+  streaming.value = true;
+
+  try {
+    await postLiveSupportCustomerMessage(pid, displayText);
+  } catch (e) {
+    messages.value.push({
+      role: "assistant",
+      text: formatChatAiFetchError(e),
+      metadata: { live_support_send_error: true },
+    });
+  } finally {
+    streaming.value = false;
+    scrollToEnd();
+  }
+}
+
+async function exitLiveSupportToBot() {
+  const pid = liveSupportActivePublicId.value.trim();
+  if (!pid || streaming.value || threadLocked.value) return;
+
+  /** Đánh dấu trước khi BE broadcast → onSessionEnded Echo sẽ suppress bubble trùng. */
+  liveSupportPidsExitingByCustomer.add(pid);
+
+  streaming.value = true;
+  try {
+    await postLiveSupportCustomerClose(pid, chatAiSessionId.value);
+  } catch (e) {
+    liveSupportPidsExitingByCustomer.delete(pid);
+    messages.value.push({
+      role: "assistant",
+      text: formatChatAiFetchError(e),
+      metadata: { live_support_exit_error: true },
+    });
+    streaming.value = false;
+    await scrollToEnd();
+    return;
+  }
+
+  unsubscribeLiveSupport(pid);
+  liveSupportActivePublicId.value = "";
+  streaming.value = false;
+
+  messages.value.push({
+    role: "assistant",
+    text: "Bạn đã thoát chat trực tiếp — có thể tiếp tục chat với bot. Nếu cần người thật, hãy yêu cầu lại.",
+    metadata: { live_support_customer_exited: true },
+  });
+  quickReplies.value = normalizeQuickReplies(WELCOME_QUICK_REPLIES);
+  await scrollToEnd();
+}
+
 /** Gửi message + vị trí (lat/lon) + history + session_id — không gửi payload bổ sung. */
 async function submitMessage(text) {
   const displayText = String(text || "").trim();
   if (!displayText || streaming.value || threadLocked.value) return;
+
+  if (liveSupportActivePublicId.value.trim()) {
+    await submitLiveSupportOnlyMessage(displayText);
+    return;
+  }
   if (!lastGeo.value) {
     await refreshGeoOnce();
   }
@@ -382,9 +499,15 @@ async function submitMessage(text) {
       Array.isArray(body.metadata.ai.live_support_public_ids)
         ? body.metadata.ai.live_support_public_ids
         : [];
+    const liveSupportDeferredOpening = Boolean(
+      body.metadata?.ai?.live_support_deferred_opening,
+    );
     for (const pid of lsIds) {
       subscribeToLiveSupportPublicId(pid);
     }
+    const firstLivePid = lsIds
+      .map((x) => String(x ?? "").trim())
+      .find((s) => s.length > 0);
 
     waitingFirstToken.value = false;
 
@@ -393,6 +516,28 @@ async function submitMessage(text) {
       const last = messages.value[messages.value.length - 1];
       if (last && last.role === "assistant") {
         messages.value.pop();
+      }
+      return;
+    }
+
+    // Đã kết nối chat trực tiếp — không hiển thị phản hồi LLM (tránh lời chào/hướng dẫn thừa).
+    if (firstLivePid) {
+      liveSupportActivePublicId.value = firstLivePid;
+      quickReplies.value = [];
+      const lastBubble = messages.value[messages.value.length - 1];
+      if (lastBubble && lastBubble.role === "assistant") {
+        messages.value.pop();
+      }
+      if (liveSupportDeferredOpening && displayText.trim()) {
+        try {
+          await postLiveSupportCustomerMessage(firstLivePid, displayText);
+        } catch (e) {
+          messages.value.push({
+            role: "assistant",
+            text: formatChatAiFetchError(e),
+            metadata: { live_support_send_error: true },
+          });
+        }
       }
       return;
     }
@@ -443,6 +588,16 @@ async function submitMessage(text) {
           ...sugFromTool,
           ...quickReplies.value,
         ]);
+      }
+
+      const tail = messages.value[messages.value.length - 1];
+      if (
+        !open.value &&
+        tail &&
+        tail.role === "assistant" &&
+        String(tail.text || "").trim().length > 0
+      ) {
+        unreadWhileClosed.value += 1;
       }
     }
   } catch (e) {
@@ -525,6 +680,8 @@ const geoLabel = computed(() => {
 
 watch(open, (v) => {
   if (v) {
+    unreadWhileClosed.value = 0;
+    ensureWelcomeState();
     void scrollToEnd();
   }
 });
@@ -548,11 +705,17 @@ onUnmounted(() => {
     <button
       type="button"
       class="rag-chat__fab"
-      aria-label="Mở trợ lý BusSafe"
+      :aria-label="fabAriaLabel"
       data-testid="chat-ai-fab"
       @click="toggle"
     >
       <span class="material-symbols-outlined">smart_toy</span>
+      <span
+        v-if="unreadWhileClosed > 0"
+        class="rag-chat__fab-badge"
+        aria-hidden="true"
+        >{{ unreadFabBadge }}</span
+      >
     </button>
 
     <Transition name="rag-fade">
@@ -634,17 +797,27 @@ onUnmounted(() => {
         </div>
 
         <div
-          v-if="quickReplies.length > 0"
+          v-if="quickReplies.length > 0 || isLiveSupportActive"
           class="rag-chat__quick"
         >
           <div class="rag-chat__quick-scroll" role="list">
+            <button
+              v-if="isLiveSupportActive"
+              type="button"
+              class="rag-chat__quick-chip rag-chat__quick-chip--exit-support"
+              role="listitem"
+              :disabled="streaming || threadLocked"
+              @click="exitLiveSupportToBot"
+            >
+              Thoát hỗ trợ
+            </button>
             <button
               v-for="(q, i) in quickReplies"
               :key="i"
               type="button"
               class="rag-chat__quick-chip"
               role="listitem"
-              :disabled="streaming || threadLocked"
+              :disabled="streaming || threadLocked || isLiveSupportActive"
               @click="onQuickChip(q)"
             >
               {{ q.text }}
@@ -656,12 +829,19 @@ onUnmounted(() => {
           <p v-if="threadLocked" class="rag-chat__locked">
             Phiên đã kết thúc — chỉ xem lịch sử.
           </p>
+          <p v-else-if="isLiveSupportActive" class="rag-chat__locked rag-chat__live-hint">
+            Đang chat trực tiếp với hỗ trợ viên — tin gửi thẳng tới admin/nhà xe, bot tạm không trả lời.
+          </p>
           <div class="rag-chat__composer">
             <textarea
               v-model="input"
               rows="1"
               class="rag-chat__input rag-chat__input--grow"
-              placeholder="Nhập câu hỏi..."
+              :placeholder="
+                isLiveSupportActive
+                  ? 'Nhập tin nhắn cho hỗ trợ viên...'
+                  : 'Nhập câu hỏi...'
+              "
               data-testid="chat-ai-input"
               :disabled="threadLocked"
               @keydown.enter.exact.prevent="send"
@@ -705,6 +885,24 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 10px 28px rgba(37, 99, 235, 0.35);
+  position: relative;
+}
+.rag-chat__fab-badge {
+  position: absolute;
+  top: -0.15rem;
+  right: -0.15rem;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.15rem;
+  text-align: center;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
 }
 .rag-chat__fab:hover {
   filter: brightness(1.05);
@@ -806,6 +1004,17 @@ onUnmounted(() => {
 .rag-chat__quick-chip:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.rag-chat__quick-chip--exit-support {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.rag-chat__quick-chip--exit-support:hover:not(:disabled) {
+  border-color: #f87171;
+  background: #fee2e2;
 }
 
 .rag-chat__body {
@@ -929,6 +1138,12 @@ onUnmounted(() => {
   background: #fef3c7;
   border-radius: 0.35rem;
   border: 1px solid #fcd34d;
+}
+
+.rag-chat__live-hint {
+  color: #1e40af;
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .rag-chat__foot {

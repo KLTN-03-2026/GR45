@@ -16,6 +16,8 @@ export const COMMON_SLOTS = {
   diem_den: "Điểm đến",
   ngay_khoi_hanh: "Ngày khởi hành YYYY-MM-DD",
   gio_khoi_hanh: "Giờ khởi hành HH:mm",
+  gio_khoi_hanh_tu: "Giờ khởi hành từ HH:mm",
+  gio_khoi_hanh_den: "Giờ khởi hành đến HH:mm",
   nha_xe: "Tên nhà xe",
   ma_nha_xe: "Mã nhà xe",
   loai_xe: "Loại xe: limousine, giường nằm, ghế ngồi, VIP...",

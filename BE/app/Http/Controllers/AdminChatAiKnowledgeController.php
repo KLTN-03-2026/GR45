@@ -77,11 +77,10 @@ final class AdminChatAiKnowledgeController extends Controller
                     $content = (string) $m->content;
                     $dailyMap[$day]['total']++;
 
-                    if ($this->assistantHasSupport($meta, $content)) {
+                    $outcome = $this->resolveOutcome($meta, $content);
+                    if ($outcome === 'success') {
                         $dailyMap[$day]['success']++;
-                    } elseif (($meta['outcome'] ?? '') === 'failed' || ($meta['outcome'] ?? '') === 'error') {
-                        $dailyMap[$day]['failed']++;
-                    } elseif (mb_stripos($content, self::NO_KB_NEEDLE, 0, 'UTF-8') !== false) {
+                    } elseif ($outcome === 'failed') {
                         $dailyMap[$day]['failed']++;
                     } else {
                         $dailyMap[$day]['unknown']++;
@@ -176,7 +175,7 @@ final class AdminChatAiKnowledgeController extends Controller
                 'assistant_message' => $assistantMessage,
                 'assistant_display' => $this->extractAssistantDisplay($assistantMessage),
                 'ai_meta' => $meta ?? new \stdClass,
-                'outcome' => $this->assistantHasSupport($meta ?? [], $assistantMessage) ? 'success' : 'unknown',
+                'outcome' => $this->resolveOutcome($meta ?? [], $assistantMessage),
             ];
         })->values()->all();
 
@@ -306,18 +305,58 @@ final class AdminChatAiKnowledgeController extends Controller
 
     /**
      * @param  array<string, mixed>  $meta
+     * @return 'success'|'failed'|'unknown'
+     */
+    private function resolveOutcome(array $meta, string $content): string
+    {
+        $ai = is_array($meta['ai'] ?? null) ? $meta['ai'] : null;
+        $cf = is_array($ai) && isset($ai['outcome']) ? (string) $ai['outcome'] : '';
+        if ($cf === '' && isset($meta['outcome']) && is_string($meta['outcome'])) {
+            $cf = (string) $meta['outcome'];
+        }
+        if ($cf === 'success') {
+            return 'success';
+        }
+        if ($cf === 'failed' || $cf === 'error') {
+            return 'failed';
+        }
+        if ($cf === 'clarification' || $cf === 'unknown') {
+            return 'unknown';
+        }
+
+        if ($this->assistantHasSupport($meta, $content)) {
+            return 'success';
+        }
+        if (mb_stripos(trim($content), self::NO_KB_NEEDLE, 0, 'UTF-8') !== false) {
+            return 'failed';
+        }
+        return 'unknown';
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
      */
     private function assistantHasSupport(array $meta, string $content): bool
     {
-        if (($meta['outcome'] ?? '') === 'success') {
-            return true;
+        $ai = is_array($meta['ai'] ?? null) ? $meta['ai'] : null;
+        $outcome = is_array($ai) && isset($ai['outcome']) ? (string) $ai['outcome'] : '';
+
+        if ($outcome === '' && isset($meta['outcome']) && is_string($meta['outcome'])) {
+            $outcome = (string) $meta['outcome'];
         }
 
+        if ($outcome === 'success') {
+            return true;
+        }
+        if (in_array($outcome, ['failed', 'error', 'clarification', 'unknown'], true)) {
+            return false;
+        }
+
+        /** Legacy log (chat AI cũ — không có outcome cờ): chỉ rely vào nguồn tool/RAG có dữ liệu. */
         if (mb_stripos(trim($content), self::NO_KB_NEEDLE, 0, 'UTF-8') !== false) {
             return false;
         }
 
-        $ai = is_array($meta['ai'] ?? null) ? $meta['ai'] : $meta;
         if (! is_array($ai)) {
             return false;
         }
@@ -328,20 +367,16 @@ final class AdminChatAiKnowledgeController extends Controller
         if ($preview !== '') {
             return true;
         }
-
         if (isset($ai['result']) && is_array($ai['result']) && count($ai['result']) > 0) {
             return true;
         }
-
         if (isset($ai['results']) && is_array($ai['results']) && count($ai['results']) > 0) {
             return true;
         }
-
         $rt = isset($ai['result_text']) && is_string($ai['result_text']) ? trim($ai['result_text']) : '';
         if ($rt !== '') {
             return true;
         }
-
         if (isset($ai['hits']) && is_array($ai['hits']) && count($ai['hits']) > 0) {
             return true;
         }

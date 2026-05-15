@@ -2,61 +2,6 @@ import { createSuggestionResult } from "../create-suggestion-result.js";
 import { parseSuggestedReplyChipsFromToolResults } from "../parsers/tool-result-chips.parser.js";
 import { SuggestionStrategy } from "./base.strategy.js";
 
-/**
- * Map between user-intent regex (on normalized customer message + final answer)
- * and label-name regex (on normalized suggestionLabels of registered tools).
- * Score increments by 3 when both regexes hit for the same suggestion label.
- */
-const INTENT_GROUPS = [
-  // Trip/route search & schedule
-  {
-    re: /tim|kiem|chuyen|tuyen|lich|gio|nha xe|limousine|ve xe|xe khach/,
-    label: /chuyen|tuyen|ve|ghe|nha xe|lich|gio|tim|loc|seat/,
-  },
-  // Ticket management (my tickets, cancel, transfer)
-  {
-    re: /ve cua toi|lich su|booking|dat ve|huy ve|doi ve/,
-    label: /ve|huy|doi|hoan|booking|dat|lich su/,
-  },
-  // Payment
-  {
-    re: /thanh toan|payment|hoa don|chuyen khoan/,
-    label: /thanh toan|payment|hoa don|voucher/,
-  },
-  // Refund
-  { re: /hoan tien|refund|huy/, label: /hoan|refund|huy/ },
-  // Voucher / promo
-  {
-    re: /voucher|ma giam|khuyen mai|giam gia/,
-    label: /voucher|giam|khuyen mai/,
-  },
-  // Loyalty points
-  {
-    re: /diem (thuong|tich luy|hang)|loyalty/,
-    label: /diem|thuong|loyalty|hang|doi diem/,
-  },
-  // Live support / human
-  {
-    re: /ho tro|nhan vien|admin|lien he|tu van|tong dai|live support/,
-    label: /ho tro|admin|nhan vien|lien he|tu van/,
-  },
-  // Account / profile (only when user really asks about account)
-  {
-    re: /tai khoan|ho so|profile|dang nhap|dang xuat|cap nhat|email|sdt|so dien thoai|anh dai dien/,
-    label: /tai khoan|ho so|email|sdt|profile|dang nhap|dang xuat|anh dai dien|avatar|cap nhat/,
-  },
-  // Vehicle tracking / location
-  {
-    re: /vi tri|tracking|xe (dang )?o dau|theo doi|xe da toi/,
-    label: /tracking|vi tri|theo doi|toa do/,
-  },
-  // Map / pickup-dropoff
-  {
-    re: /diem don|diem tra|tram dung|gan day|nearest|nearby/,
-    label: /diem don|diem tra|tram|gan|nearby/,
-  },
-];
-
 function normalize(value) {
   return String(value ?? "")
     .normalize("NFKC")
@@ -69,7 +14,6 @@ function normalize(value) {
 }
 
 const MAX_PICKED = 5;
-const SUPPORT_LABEL = "Liên hệ hỗ trợ";
 
 /** Chips từ tool/API (free-text) trước, rồi nhãn catalog — giữ tối đa `max`. */
 function mergeChipsFirst(chipList, labelList, max) {
@@ -93,10 +37,7 @@ function mergeChipsFirst(chipList, labelList, max) {
   return out;
 }
 
-/** Luôn ưu tiên hiển thị nếu có trong catalog (tránh chỉ 5 nhãn đầu danh sách đăng ký). */
-const PINNED_ROUTE_CHIPS = ["Tìm tuyến khác", "Đặt vé", "Chọn nhà xe"];
-
-function mergePinnedRouteChips(suggestions, allLabels) {
+function mergePinnedChips(suggestions, allLabels, pinnedLabels = []) {
   const out = [];
   const seen = new Set();
 
@@ -109,7 +50,7 @@ function mergePinnedRouteChips(suggestions, allLabels) {
     out.push(found);
   };
 
-  for (const p of PINNED_ROUTE_CHIPS) {
+  for (const p of pinnedLabels) {
     push(p);
     if (out.length >= MAX_PICKED) return out;
   }
@@ -122,8 +63,10 @@ function mergePinnedRouteChips(suggestions, allLabels) {
   return out;
 }
 
-function withSupportFallback(labels, allLabels) {
-  const support = allLabels.find((label) => normalize(label) === normalize(SUPPORT_LABEL));
+function withSupportFallback(labels, allLabels, supportLabel) {
+  const support = supportLabel
+    ? allLabels.find((label) => normalize(label) === normalize(supportLabel))
+    : null;
   if (!support) return labels.slice(0, MAX_PICKED);
 
   const picked = labels.slice(0, MAX_PICKED);
@@ -169,11 +112,31 @@ export class ToolLabelsSuggestionStrategy extends SuggestionStrategy {
     const contextText = normalize(
       `${context.latestUserMessage ?? ""}\n${context.finalAnswer ?? ""}`,
     );
+    const intentGroups = Array.isArray(context.deps?.suggestionIntentGroups)
+      ? context.deps.suggestionIntentGroups
+      : [];
+
+    /** Chưa có ngữ cảnh — không ghim chip live support để khởi động nhẹ hơn. */
+    const userTurnCount = Array.isArray(context.state?.messages)
+      ? context.state.messages.filter((m) => m?.role === "user").length
+      : 0;
+    const suppressSupportAtChatStart = userTurnCount <= 1;
+
+    let pinnedLabels = Array.isArray(context.deps?.pinnedSuggestionLabels)
+      ? [...context.deps.pinnedSuggestionLabels]
+      : [];
+    let supportLabel = context.deps?.supportSuggestionLabel;
+
+    if (suppressSupportAtChatStart && supportLabel) {
+      const sn = normalize(supportLabel);
+      pinnedLabels = pinnedLabels.filter((p) => normalize(p) !== sn);
+      supportLabel = undefined;
+    }
 
     const scored = allLabels.map((label) => {
       const labelNormalized = normalize(label);
       let score = 0;
-      for (const group of INTENT_GROUPS) {
+      for (const group of intentGroups) {
         if (group.re.test(contextText) && group.label.test(labelNormalized)) {
           score += 3;
         }
@@ -187,9 +150,10 @@ export class ToolLabelsSuggestionStrategy extends SuggestionStrategy {
       .map((row) => row.label);
 
     if (relevant.length > 0) {
-      const merged = mergePinnedRouteChips(
-        withSupportFallback(relevant, allLabels),
+      const merged = mergePinnedChips(
+        withSupportFallback(relevant, allLabels, supportLabel),
         allLabels,
+        pinnedLabels,
       );
       const suggestions = fromTool.length
         ? mergeChipsFirst(fromTool, merged, MAX_PICKED)
@@ -202,9 +166,10 @@ export class ToolLabelsSuggestionStrategy extends SuggestionStrategy {
       });
     }
 
-    const merged = mergePinnedRouteChips(
-      withSupportFallback(allLabels, allLabels),
+    const merged = mergePinnedChips(
+      withSupportFallback(allLabels, allLabels, supportLabel),
       allLabels,
+      pinnedLabels,
     );
     const suggestions = fromTool.length
       ? mergeChipsFirst(fromTool, merged, MAX_PICKED)

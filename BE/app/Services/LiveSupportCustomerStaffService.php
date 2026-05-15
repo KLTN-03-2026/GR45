@@ -120,6 +120,36 @@ final class LiveSupportCustomerStaffService
         ];
     }
 
+    /**
+     * Staff đang mở phiên — đưa con trỏ đọc tới tin khách/chatbot mới nhất (tránh inbox refetch báo sai unread).
+     */
+    public function markCustomerThreadReadForAdmin(int $id): int
+    {
+        /** @var LiveSupportSession $session */
+        $session = LiveSupportSession::query()
+            ->forAdminCustomerInbox()
+            ->whereKey($id)
+            ->firstOrFail();
+        $this->markStaffReadCustomerThrough($session);
+
+        return $this->staffUnreadCustomerCount($session->fresh());
+    }
+
+    /**
+     * @see markCustomerThreadReadForAdmin — nhà xe xem phiên khách của mình.
+     */
+    public function markCustomerThreadReadForNhaXe(int $id, NhaXe $nhaXe): int
+    {
+        /** @var LiveSupportSession $session */
+        $session = LiveSupportSession::query()
+            ->forOperatorCustomerChat($nhaXe->ma_nha_xe)
+            ->whereKey($id)
+            ->firstOrFail();
+        $this->markStaffReadCustomerThrough($session);
+
+        return $this->staffUnreadCustomerCount($session->fresh());
+    }
+
     public function replyAsAdmin(LiveSupportSession $session, Admin $admin, string $content): LiveSupportMessage
     {
         if ($session->target !== 'admin' || $session->thread_type !== LiveSupportSession::THREAD_KHACH_HANG) {
@@ -323,14 +353,27 @@ final class LiveSupportCustomerStaffService
 
     private function mapSenderToFeRole(string $senderType, string $viewer): string
     {
-        return match ([$senderType, $viewer]) {
-            ['customer', _], ['system', _] => 'user',
-            ['chatbot', _] => 'assistant',
-            ['admin', self::VIEW_ADMIN_PANEL], ['nha_xe', self::VIEW_ADMIN_PANEL] => 'admin',
-            ['admin', self::VIEW_NHA_XE_PANEL] => 'assistant',
-            ['nha_xe', self::VIEW_NHA_XE_PANEL] => 'admin',
-            default => 'user',
-        };
+        if ($senderType === 'customer' || $senderType === 'system') {
+            return 'user';
+        }
+
+        if ($senderType === 'chatbot') {
+            return 'assistant';
+        }
+
+        if ($viewer === self::VIEW_ADMIN_PANEL) {
+            return $senderType === 'admin' || $senderType === 'nha_xe' ? 'admin' : 'user';
+        }
+
+        if ($viewer === self::VIEW_NHA_XE_PANEL) {
+            return match ($senderType) {
+                'admin' => 'assistant',
+                'nha_xe' => 'admin',
+                default => 'user',
+            };
+        }
+
+        return 'user';
     }
 
     /** @return array<string, mixed> */

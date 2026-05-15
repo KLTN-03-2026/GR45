@@ -49,52 +49,8 @@ export function collectRegisteredSuggestionLabelsInOrder(toolDefinitionList) {
   );
 }
 
-function fallbackPickLabels(labels, contextText) {
-  const text = normalize(contextText);
-
-  const groups = [
-    {
-      re: /ve|dat|ghe|chuyen|tuyen|lich|gio|nha xe|limousine/,
-      label: /ve|dat|ghe|chuyen|tuyen|lich|gio|nha xe|limousine/,
-    },
-    {
-      re: /thanh toan|payment|hoa don/,
-      label: /thanh toan|payment|hoa don/,
-    },
-    {
-      re: /huy|hoan tien|refund/,
-      label: /huy|hoan|refund/,
-    },
-    {
-      re: /voucher|ma giam/,
-      label: /voucher|giam/,
-    },
-    {
-      re: /dang nhap|dang xuat|tai khoan|ho so/,
-      label: /dang nhap|dang xuat|tai khoan|ho so/,
-    },
-    {
-      re: /ho tro|nhan vien|admin|lien he/,
-      label: /ho tro|nhan vien|admin|lien he/,
-    },
-  ];
-
-  const scored = labels.map((label) => {
-    const key = normalize(label);
-    let score = 0;
-
-    for (const group of groups) {
-      if (group.re.test(text) && group.label.test(key)) score += 3;
-    }
-
-    return { label, score };
-  });
-
-  return scored
-    .sort((a, b) => b.score - a.score)
-    .filter((x) => x.score > 0)
-    .map((x) => x.label)
-    .slice(0, MAX_PICKED_SUGGESTIONS);
+function fallbackPickLabels() {
+  return [];
 }
 
 export async function narrowRegisteredSuggestionLabelsWithLanguageModel({

@@ -8,6 +8,7 @@ import {
   finalizeOutgoingReply,
   mergeEchoLiveSupportMessage,
   removeOptimisticMessage,
+  sameLiveSupportSessionId,
 } from "@/utils/liveSupportReplyMerge.js";
 import { useLiveSupportChannel } from "@/composables/useLiveSupportChannel";
 import { useAdminStore } from "@/stores/adminStore.js";
@@ -40,7 +41,7 @@ const messagesContainer = ref(null);
 const currentMessagePage = ref(1);
 const hasMoreMessages = ref(true);
 
-const { subscribe, unsubscribeAll, isSubscribed } =
+const { subscribe, unsubscribeAll, isSubscribed, subscribeCustomerInbox } =
   useLiveSupportChannel("admin_panel");
 
 const adminStore = useAdminStore();
@@ -129,7 +130,24 @@ async function loadMoreSessions() {
 }
 
 const selectSession = async (session) => {
-  if (currentSessionId.value === session.id) return;
+  if (sameLiveSupportSessionId(currentSessionId.value, session.id)) {
+    try {
+      const envelope = await axiosClient.get(
+        `/v1/admin/ho-tro/khach-hang/sessions/${session.id}`,
+      );
+      const payload = envelope?.data ?? {};
+      currentSessionDetails.value = payload.session || currentSessionDetails.value;
+      const idx = sessions.value.findIndex((x) =>
+        sameLiveSupportSessionId(x.id, session.id),
+      );
+      if (idx !== -1) {
+        sessions.value[idx].staff_unread_count = 0;
+      }
+    } catch (error) {
+      console.error("Failed to sync session read state", error);
+    }
+    return;
+  }
 
   currentSessionId.value = session.id;
   currentSessionDetails.value = session;
@@ -151,7 +169,9 @@ const selectSession = async (session) => {
       (payload.messages?.current_page || 1) < (payload.messages?.last_page || 1);
     currentSessionDetails.value = payload.session || session;
 
-    const idx = sessions.value.findIndex((x) => x.id === session.id);
+    const idx = sessions.value.findIndex((x) =>
+      sameLiveSupportSessionId(x.id, session.id),
+    );
     if (idx !== -1) {
       sessions.value[idx].staff_unread_count = 0;
     }
@@ -160,20 +180,64 @@ const selectSession = async (session) => {
 
     if (session.public_id) {
       subscribe(session.public_id, (message) => {
-        if (currentSessionId.value === session.id) {
+        const isActive = sameLiveSupportSessionId(
+          currentSessionId.value,
+          session.id,
+        );
+
+        if (isActive) {
           mergeEchoLiveSupportMessage(messages, message);
           scrollToBottom();
         }
 
-        const s = sessions.value.find((x) => x.id === session.id);
+        const s = sessions.value.find((x) =>
+          sameLiveSupportSessionId(x.id, session.id),
+        );
         if (s) {
           if (!s.messages) s.messages = [];
           s.messages[0] = message;
-          sessions.value = [s, ...sessions.value.filter((x) => x.id !== session.id)];
-          if (message.role === "user" && currentSessionId.value !== session.id) {
+          sessions.value = [
+            s,
+            ...sessions.value.filter(
+              (x) => !sameLiveSupportSessionId(x.id, session.id),
+            ),
+          ];
+          const inboundCustomerSide =
+            message.role === "user" || message.role === "assistant";
+          if (isActive && inboundCustomerSide) {
+            s.staff_unread_count = 0;
+            scheduleMarkCustomerThreadRead(session.id);
+          } else if (
+            message.role === "user" &&
+            !isActive
+          ) {
             s.staff_unread_count = (Number(s.staff_unread_count) || 0) + 1;
           }
         }
+      }, {
+        onSessionEnded: (detail) => {
+          const pid = String(detail?.public_id || "").trim();
+          if (pid !== String(session.public_id || "").trim()) return;
+
+          if (sameLiveSupportSessionId(currentSessionId.value, session.id)) {
+            currentSessionDetails.value = {
+              ...(currentSessionDetails.value || {}),
+              staff_can_reply: false,
+              thread_archived: true,
+            };
+          }
+
+          const idx = sessions.value.findIndex((x) =>
+            sameLiveSupportSessionId(x.id, session.id),
+          );
+          if (idx !== -1) {
+            sessions.value[idx] = {
+              ...sessions.value[idx],
+              staff_can_reply: false,
+              thread_archived: true,
+            };
+          }
+        },
       });
     }
   } catch (error) {
@@ -312,6 +376,46 @@ const scrollToBottom = async () => {
 };
 
 let searchTimeout = null;
+let inboxRefreshTimer = null;
+
+/** Debounce POST mark-read khi đang mở phiên — refetch inbox không ghi đè unread sai. */
+const markReadDebounceTimers = new Map();
+
+function scheduleMarkCustomerThreadRead(sessionNumericId) {
+  const sid = Number(sessionNumericId);
+  if (!Number.isFinite(sid)) return;
+  const prev = markReadDebounceTimers.get(sid);
+  if (prev != null) clearTimeout(prev);
+  markReadDebounceTimers.set(
+    sid,
+    setTimeout(() => {
+      markReadDebounceTimers.delete(sid);
+      if (!sameLiveSupportSessionId(currentSessionId.value, sid)) return;
+      void axiosClient
+        .post(`/v1/admin/ho-tro/khach-hang/sessions/${sid}/mark-read`)
+        .then((envelope) => {
+          const n = envelope?.data?.staff_unread_count;
+          const idx = sessions.value.findIndex((x) =>
+            sameLiveSupportSessionId(x.id, sid),
+          );
+          if (idx !== -1) {
+            sessions.value[idx].staff_unread_count =
+              typeof n === "number" ? n : 0;
+          }
+        })
+        .catch(() => {});
+    }, 120),
+  );
+}
+
+function scheduleInboxRefresh() {
+  if (inboxRefreshTimer) clearTimeout(inboxRefreshTimer);
+  inboxRefreshTimer = setTimeout(() => {
+    inboxRefreshTimer = null;
+    void fetchSessions(1, false);
+  }, 400);
+}
+
 const onSearch = () => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
@@ -321,10 +425,16 @@ const onSearch = () => {
 };
 
 onMounted(() => {
+  subscribeCustomerInbox(() => scheduleInboxRefresh());
   fetchSessions(1, false);
 });
 
 onUnmounted(() => {
+  if (inboxRefreshTimer) clearTimeout(inboxRefreshTimer);
+  for (const tid of markReadDebounceTimers.values()) {
+    clearTimeout(tid);
+  }
+  markReadDebounceTimers.clear();
   unsubscribeAll();
 });
 

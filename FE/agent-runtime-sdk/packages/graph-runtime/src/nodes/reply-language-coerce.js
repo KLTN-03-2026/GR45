@@ -4,7 +4,7 @@ const VI_DIACRITIC_RE =
 const CJK_RE = /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/;
 
 const VI_HINT_RE =
-  /\b(co|khong|không|hong|ko|toi|tôi|tuyen|tuyến|hom nay|hôm nay|nha xe|nhà xe|hang xe|ve xe|vé|bao nhieu|bao nhiêu|xin|chao|chào|cam on|cảm ơn|gi|gì|sao|the nao|thế nào)\b/i;
+  /\b(co|khong|không|hong|ko|toi|tôi|hom nay|hôm nay|bao nhieu|bao nhiêu|xin|chao|chào|cam on|cảm ơn|gi|gì|sao|the nao|thế nào)\b/i;
 
 export function userPrefersVietnamese(latestUserQuestion) {
   const text = String(latestUserQuestion ?? "");

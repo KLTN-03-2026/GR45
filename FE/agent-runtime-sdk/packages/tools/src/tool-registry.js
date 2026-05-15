@@ -166,7 +166,13 @@ export class ToolRegistry {
         startedAt,
         ok: false,
       });
-      return toolFailureResult(callId, call.toolName, startedAt, result.error);
+      return toolFailureResult(
+        callId,
+        call.toolName,
+        startedAt,
+        result.error,
+        result.data,
+      );
     } catch (e) {
       breaker?.onFailure();
       emitToolEnd(ctx, {

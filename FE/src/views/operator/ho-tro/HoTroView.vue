@@ -8,6 +8,7 @@ import {
   finalizeOutgoingReply,
   mergeEchoLiveSupportMessage,
   removeOptimisticMessage,
+  sameLiveSupportSessionId,
 } from "@/utils/liveSupportReplyMerge.js";
 import { useLiveSupportChannel } from "@/composables/useLiveSupportChannel";
 import SupportChatStatsChart from "@/components/ho-tro/SupportChatStatsChart.vue";
@@ -71,16 +72,26 @@ const { subscribe, unsubscribeAll, isSubscribed } =
 
 /** Realtime nhận được mọi phiên trong list — không chỉ phiên đang mở. */
 function handleEchoInboundForSession(sessionNumericId, message) {
-  if (currentSessionId.value === sessionNumericId) {
+  if (sameLiveSupportSessionId(currentSessionId.value, sessionNumericId)) {
     mergeEchoLiveSupportMessage(messages, message);
     scrollToBottom();
   }
-  const s = sessions.value.find((x) => x.id === sessionNumericId);
+  const s = sessions.value.find((x) =>
+    sameLiveSupportSessionId(x.id, sessionNumericId),
+  );
   if (s) {
     if (!s.messages) s.messages = [];
     s.messages[0] = message;
-    sessions.value = [s, ...sessions.value.filter((x) => x.id !== sessionNumericId)];
-    if (message.role === "admin" && currentSessionId.value !== sessionNumericId) {
+    sessions.value = [
+      s,
+      ...sessions.value.filter(
+        (x) => !sameLiveSupportSessionId(x.id, sessionNumericId),
+      ),
+    ];
+    if (
+      message.role === "admin" &&
+      !sameLiveSupportSessionId(currentSessionId.value, sessionNumericId)
+    ) {
       s.staff_unread_count = (Number(s.staff_unread_count) || 0) + 1;
     }
   }
@@ -195,7 +206,22 @@ async function loadMoreSessions() {
 }
 
 const selectSession = async (session) => {
-  if (currentSessionId.value === session.id) return;
+  if (sameLiveSupportSessionId(currentSessionId.value, session.id)) {
+    try {
+      const envelope = await axiosClient.get(`/v1/nha-xe/ho-tro/sessions/${session.id}`);
+      const payload = envelope?.data ?? {};
+      currentSessionDetails.value = payload.session || currentSessionDetails.value;
+      const idx = sessions.value.findIndex((x) =>
+        sameLiveSupportSessionId(x.id, session.id),
+      );
+      if (idx !== -1) {
+        sessions.value[idx].staff_unread_count = 0;
+      }
+    } catch (error) {
+      console.error("Failed to sync session read state", error);
+    }
+    return;
+  }
 
   currentSessionId.value = session.id;
   currentSessionDetails.value = session;
@@ -213,7 +239,9 @@ const selectSession = async (session) => {
       (payload.messages?.current_page || 1) < (payload.messages?.last_page || 1);
     currentSessionDetails.value = payload.session || session;
 
-    const idx = sessions.value.findIndex((x) => x.id === session.id);
+    const idx = sessions.value.findIndex((x) =>
+      sameLiveSupportSessionId(x.id, session.id),
+    );
     if (idx !== -1) {
       sessions.value[idx].staff_unread_count = 0;
       const pid = payload.session?.public_id ?? session.public_id;

@@ -1,4 +1,9 @@
 import {
+  extractMaVe,
+  extractPaymentCode,
+  extractVoucherCode,
+} from "../../fast-planner/text-utils.js";
+import {
   PAYMENT_TOOL_SLOTS,
   REFUND_TOOL_SLOTS,
   VOUCHER_TOOL_SLOTS,
@@ -204,3 +209,95 @@ export function registerPaymentRefundVoucherTools(ctx) {
     (args) => stub("voucher_get_voucher_usage_history", args),
   );
 }
+
+/**
+ * Rule-base triggers for payment / refund / voucher.
+ * Voucher apply/validate must come BEFORE voucher list.
+ */
+export const PAYMENT_REFUND_VOUCHER_TOOL_PATTERNS = [
+  // payment_get_payment_status
+  {
+    test: (n) =>
+      /\b(trang thai thanh toan|payment status|kiem tra thanh toan|da thanh toan chua)\b/.test(
+        n,
+      ),
+    build: (n) => {
+      const args = {};
+      const code = extractPaymentCode(n);
+      if (code) args.ma_thanh_toan = code;
+      return {
+        toolName: "payment_get_payment_status",
+        rationale: "Khách xem trạng thái thanh toán.",
+        arguments: args,
+      };
+    },
+  },
+  // refund_estimate_refund
+  {
+    test: (n) =>
+      /\b(hoan tien|uoc tinh hoan|refund estimate|tinh tien hoan)\b/.test(n),
+    build: (n) => {
+      const args = {};
+      const ma = extractMaVe(n);
+      if (ma) args.ma_ve = ma;
+      return {
+        toolName: "refund_estimate_refund",
+        rationale: "Khách ước tính tiền hoàn.",
+        arguments: args,
+      };
+    },
+  },
+  // voucher_apply_voucher
+  {
+    test: (n) =>
+      /\b(ap dung voucher|dung voucher|ap ma giam|ap ma|nhap voucher)\b/.test(
+        n,
+      ),
+    build: (_n, _t, rawText) => {
+      const args = {};
+      const code = extractVoucherCode(rawText);
+      if (code) args.voucher_code = code;
+      return {
+        toolName: "voucher_apply_voucher",
+        rationale: "Khách áp voucher.",
+        arguments: args,
+      };
+    },
+  },
+  // voucher_validate_voucher
+  {
+    test: (n) =>
+      /\b(kiem tra voucher|voucher.*hop le|validate voucher)\b/.test(n),
+    build: (_n, _t, rawText) => {
+      const args = {};
+      const code = extractVoucherCode(rawText);
+      if (code) args.voucher_code = code;
+      return {
+        toolName: "voucher_validate_voucher",
+        rationale: "Khách kiểm tra voucher.",
+        arguments: args,
+      };
+    },
+  },
+  // voucher_get_voucher_usage_history
+  {
+    test: (n) =>
+      /\b(lich su voucher|voucher da dung|voucher su dung)\b/.test(n),
+    build: () => ({
+      toolName: "voucher_get_voucher_usage_history",
+      rationale: "Khách xem lịch sử dùng voucher.",
+      arguments: {},
+    }),
+  },
+  // voucher_list_available_vouchers
+  {
+    test: (n) =>
+      /\b(voucher|ma giam gia|khuyen mai)\b/.test(n) &&
+      !/\b(ap dung|ap ma|nhap)\b/.test(n),
+    build: () => ({
+      toolName: "voucher_list_available_vouchers",
+      rationale: "Khách xem voucher khả dụng.",
+      arguments: {},
+    }),
+  },
+];
