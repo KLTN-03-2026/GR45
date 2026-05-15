@@ -1,6 +1,7 @@
 <script setup>
 import { inject, ref, computed } from "vue";
 import { useRoute } from "vue-router";
+import { useOperatorStore } from "@/stores/operatorStore";
 import {
   LayoutDashboard,
   Ticket,
@@ -28,6 +29,7 @@ import {
 const isSidebarOpen = inject("isSidebarOpen");
 const closeSidebar = inject("closeSidebar");
 const route = useRoute();
+const operatorStore = useOperatorStore();
 
 // State mở dropdown menu
 const activeDropdown = ref(null);
@@ -42,12 +44,15 @@ const isChildActive = (paths) => {
 };
 
 // Danh sách menu đầy đủ cho Nhà Xe
+// permission: slug cần có để hiển thị mục menu này
+// Nếu không có permission → luôn hiển thị (dashboard, ...)
 const menuList = [
   {
     id: "dashboard",
     name: "Tổng quan",
     path: "/nha-xe/dashboard",
     icon: LayoutDashboard,
+    // Không có permission → luôn hiển thị
   },
 
   // --- Vận hành ---
@@ -56,17 +61,20 @@ const menuList = [
     name: "Tuyến đường",
     path: "/nha-xe/tuyen-duong",
     icon: Map,
+    permission: "op-xem-tuyen-duong",
   },
   {
     id: "chuyen-xe",
     name: "Chuyến xe",
     path: "/nha-xe/chuyen-xe",
     icon: BusFront,
+    permission: "op-xem-chuyen-xe",
   },
   {
     id: "tracking",
     name: "Giám sát xe",
     icon: Map,
+    permission: "op-xem-tracking",
     children: [
       { name: "📡 Live Tracking", path: "/nha-xe/live-tracking", icon: Map },
       {
@@ -82,18 +90,21 @@ const menuList = [
     name: "Quản lý vé",
     path: "/nha-xe/ve",
     icon: Ticket,
+    permission: "op-xem-ve",
   },
   {
     id: "voucher",
     name: "Voucher",
     path: "/nha-xe/voucher",
     icon: Gift,
+    permission: "op-xem-voucher",
   },
   {
     id: "danh-gia",
     name: "Đánh giá chuyến xe",
     path: "/nha-xe/danh-gia",
     icon: Star,
+    // Nhà xe luôn thấy; nhân viên nếu chưa có quyền riêng thì không hiển
   },
 
   // --- Nhân sự ---
@@ -101,6 +112,7 @@ const menuList = [
     id: "nhan-su",
     name: "Nhân sự",
     icon: Users,
+    permission: "op-xem-nhan-vien", // Chỉ hiển khi có quyền
     children: [
       { name: "Nhân viên nhà xe", path: "/nha-xe/nhan-vien", icon: Users },
       { name: "Tài xế", path: "/nha-xe/tai-xe", icon: Car },
@@ -115,6 +127,7 @@ const menuList = [
     name: "Cảnh báo AI",
     path: "/nha-xe/canh-bao",
     icon: AlertTriangle,
+    permission: "op-xem-bao-dong",
   },
 
   // --- Dịch vụ ---
@@ -122,15 +135,7 @@ const menuList = [
     id: "ho-tro",
     name: "Hỗ trợ",
     icon: LifeBuoy,
-    children: [
-      { name: "Yêu cầu BusSafe", path: "/nha-xe/ho-tro", icon: LifeBuoy },
-      {
-        name: "Khách (live chat)",
-        path: "/nha-xe/ho-tro-khach-hang",
-        icon: LifeBuoy,
-      },
-    ],
-    paths: ["/nha-xe/ho-tro", "/nha-xe/ho-tro-khach-hang"],
+    // Nhà xe luôn thấy
   },
 
   // --- Báo cáo ---
@@ -139,13 +144,15 @@ const menuList = [
     name: "Thống kê & Báo cáo",
     path: "/nha-xe/thong-ke",
     icon: TrendingUp,
+    permission: "op-xem-thong-ke",
   },
 
-  // --- Quản trị ---
+  // --- Quản trị (chỉ chủ nhà xe) ---
   {
     id: "he-thong",
     name: "Hệ thống",
     icon: Settings,
+    ownerOnly: true, // Chỉ chủ nhà xe mới thấy
     children: [
       { name: "Phân quyền", path: "/nha-xe/phan-quyen", icon: ShieldCheck },
       { name: "Cài đặt hệ thống", path: "/nha-xe/cai-dat", icon: Settings },
@@ -154,6 +161,38 @@ const menuList = [
     paths: ["/nha-xe/phan-quyen", "/nha-xe/cai-dat", "/nha-xe/vi-nha-xe"],
   },
 ];
+
+/**
+ * Menu hiển thị sau khi lọc theo quyền.
+ * - Nếu mục có ownerOnly: chỉ chủ nhà xe mới thấy.
+ * - Nếu mục có permission: kiểm tra hasPermission.
+ * - Không có cả hai: luôn hiển thị.
+ */
+const visibleMenu = computed(() =>
+  menuList.filter((item) => {
+    if (item.ownerOnly) return operatorStore.isOwner;
+    if (item.permission) return operatorStore.hasPermission(item.permission);
+    return true;
+  })
+);
+
+// Thông tin hiển thị ở header sidebar
+const sidebarUser = computed(() => {
+  const u = operatorStore.user;
+  if (!u) return { name: '--', sub: '', badge: '' };
+  if (operatorStore.isEmployee) {
+    return {
+      name: u.ho_va_ten || u.email,
+      sub: u.chuc_vu?.ten_chuc_vu || 'Nhân viên',
+      badge: u.ten_nha_xe || u.ma_nha_xe,
+    };
+  }
+  return {
+    name: u.ten_nha_xe || u.email,
+    sub: 'Chủ nhà xe',
+    badge: u.ma_nha_xe,
+  };
+});
 </script>
 
 <template>
@@ -161,15 +200,17 @@ const menuList = [
     class="operator-sidebar scrollable-custom"
     :class="{ 'mobile-open': isSidebarOpen }"
   >
-    <!-- Logo & Brand -->
     <div class="sidebar-header">
       <div class="brand-logo">
         <div class="logo-icon">
           <Bus class="logo-svg" />
         </div>
         <div class="brand-text-group">
-          <span class="brand-text">Nhà Xe</span>
-          <span class="brand-sub">Smart Bus System</span>
+          <span class="brand-text">{{ sidebarUser.name }}</span>
+          <span class="brand-sub">
+            {{ sidebarUser.sub }}
+            <span v-if="sidebarUser.badge" class="role-badge">{{ sidebarUser.badge }}</span>
+          </span>
         </div>
       </div>
     </div>
@@ -179,7 +220,7 @@ const menuList = [
 
     <!-- Menu List -->
     <nav class="sidebar-menu">
-      <template v-for="item in menuList" :key="item.id">
+      <template v-for="item in visibleMenu" :key="item.id">
         <!-- Phân nhóm label theo vị trí -->
         <div v-if="item.id === 'nhan-su'" class="menu-section-divider">
           <span>NHÂN SỰ</span>
@@ -327,6 +368,22 @@ const menuList = [
   color: rgba(255, 255, 255, 0.5);
   font-weight: 400;
   letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.role-badge {
+  display: inline-block;
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  letter-spacing: 0;
 }
 
 /* Label phân nhóm */

@@ -5,6 +5,7 @@ import { PopularRouteCard } from "@/src/components/home/popular-route-card";
 import { QuickActionGrid } from "@/src/components/home/quick-action-grid";
 import { SafetyBanner } from "@/src/components/home/safety-banner";
 import { SearchTripCard } from "@/src/components/home/search-trip-card";
+import { VoucherSection } from "@/src/components/home/voucher-section";
 import { popularRoutes, quickActions } from "@/src/constants/home-data";
 
 
@@ -34,7 +35,7 @@ export function HomeScreen() {
         <HeroSection />
 
         <SearchTripCard
-          from="Thành phố Hà Nội"
+          from="Hà Nội"
           to="Hải Phòng"
           onPressSearch={handleSearch}
         />
@@ -57,6 +58,8 @@ export function HomeScreen() {
             <PopularRouteCard key={route.id} route={route} />
           ))}
         </ScrollView>
+
+        <VoucherSection />
 
         <View style={styles.sectionBottom}>
           <SafetyBanner />

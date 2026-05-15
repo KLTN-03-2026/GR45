@@ -107,7 +107,7 @@ class XeController extends Controller
     {
         try {
             $xe = $this->xeService->create($request->validated());
-            $isNhaXe = auth()->user() instanceof NhaXe;
+            $isNhaXe = $request->operator_user instanceof NhaXe;
             $seatPayload = $this->seatMapPayloadForResponse($xe->id);
 
             return response()->json([
@@ -135,7 +135,7 @@ class XeController extends Controller
     {
         try {
             $xe = $this->xeService->update($id, $request->validated());
-            $isNhaXe = auth()->user() instanceof NhaXe;
+            $isNhaXe = $request->operator_user instanceof NhaXe;
 
             return response()->json([
                 'success' => true,

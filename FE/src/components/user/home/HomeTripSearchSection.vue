@@ -53,9 +53,7 @@ const validateSearch = () => {
   formErrors.tinh_thanh_di_id = !searchForm.tinh_thanh_di_id ? 'Vui lòng chọn điểm đi' : '';
   formErrors.tinh_thanh_den_id = !searchForm.tinh_thanh_den_id ? 'Vui lòng chọn điểm đến' : '';
 
-  if (searchForm.tinh_thanh_di_id && searchForm.tinh_thanh_den_id && searchForm.tinh_thanh_di_id === searchForm.tinh_thanh_den_id) {
-    formErrors.tinh_thanh_den_id = 'Điểm đến không được trùng điểm đi';
-  }
+
 
   return !formErrors.ngay_di && !formErrors.tinh_thanh_di_id && !formErrors.tinh_thanh_den_id;
 };
@@ -79,9 +77,7 @@ const toInputText = ref('');
 const filteredFromProvinces = computed(() => {
   const q = searchFromQuery.value.toLowerCase().trim();
   let list = provinces.value;
-  if (searchForm.tinh_thanh_den_id) {
-    list = list.filter((p) => p.id !== searchForm.tinh_thanh_den_id);
-  }
+
   if (!q) return list;
   return list.filter(p =>
     p.ten_tinh_thanh && p.ten_tinh_thanh.toLowerCase().includes(q)
@@ -91,9 +87,7 @@ const filteredFromProvinces = computed(() => {
 const filteredToProvinces = computed(() => {
   const q = searchToQuery.value.toLowerCase().trim();
   let list = provinces.value;
-  if (searchForm.tinh_thanh_di_id) {
-    list = list.filter((p) => p.id !== searchForm.tinh_thanh_di_id);
-  }
+
   if (!q) return list;
   return list.filter(p =>
     p.ten_tinh_thanh && p.ten_tinh_thanh.toLowerCase().includes(q)
@@ -116,18 +110,12 @@ watch(isOpenTo, (isOpen) => {
 
 watch(() => searchForm.tinh_thanh_di_id, (newId) => {
   fromInputText.value = newId ? getProvinceName(newId) : '';
-  if (newId && searchForm.tinh_thanh_den_id === newId) {
-    searchForm.tinh_thanh_den_id = '';
-    toInputText.value = '';
-  }
+
 });
 
 watch(() => searchForm.tinh_thanh_den_id, (newId) => {
   toInputText.value = newId ? getProvinceName(newId) : '';
-  if (newId && searchForm.tinh_thanh_di_id === newId) {
-    searchForm.tinh_thanh_di_id = '';
-    fromInputText.value = '';
-  }
+
 });
 
 watch(provinces, () => {

@@ -203,6 +203,40 @@ const clampRatingScore = (score) => {
               <span class="material-symbols-outlined">info</span>
               <span>{{ selectedTrip.tuyen_duong?.ghi_chu }}</span>
             </div>
+
+            <!-- Danh sách trạm dừng -->
+            <div class="trip-modal__section mt-4">
+              <div class="trip-modal__section-icon">
+                <span class="material-symbols-outlined">location_on</span>
+              </div>
+              <div class="flex-1">
+                <h3 class="trip-modal__section-title">Lịch trình trạm dừng</h3>
+                <div class="trip-modal__stops-list mt-3">
+                  <div 
+                    v-for="(stop, index) in selectedTrip.tuyen_duong?.tram_dungs" 
+                    :key="stop.id"
+                    class="trip-modal__stop-item"
+                  >
+                    <div class="trip-modal__stop-marker">
+                      <div class="trip-modal__stop-dot" :class="{'trip-modal__stop-dot--main': index === 0 || index === (selectedTrip.tuyen_duong?.tram_dungs?.length - 1)}"></div>
+                      <div v-if="index < (selectedTrip.tuyen_duong?.tram_dungs?.length - 1)" class="trip-modal__stop-line"></div>
+                    </div>
+                    <div class="trip-modal__stop-info">
+                      <div class="flex justify-between items-start">
+                        <div class="trip-modal__stop-name">{{ stop.ten_tram }}</div>
+                        <span class="trip-modal__stop-type" :class="'trip-modal__stop-type--' + stop.loai_tram">
+                          {{ stop.loai_tram === 'don' ? 'Đón' : (stop.loai_tram === 'tra' ? 'Trả' : 'Đón/Trả') }}
+                        </span>
+                      </div>
+                      <div class="trip-modal__stop-address">{{ stop.dia_chi }}</div>
+                    </div>
+                  </div>
+                  <div v-if="!selectedTrip.tuyen_duong?.tram_dungs?.length" class="trip-modal__stops-empty">
+                    Dữ liệu trạm dừng chi tiết đang được cập nhật...
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Footer Modal -->
@@ -613,4 +647,100 @@ const clampRatingScore = (score) => {
 .modal-fade-leave-to {
   opacity: 0;
 }
+
+/* Stops List Styles */
+.trip-modal__stops-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.trip-modal__stop-item {
+  display: flex;
+  gap: 1rem;
+}
+
+.trip-modal__stop-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 20px;
+}
+
+.trip-modal__stop-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  border: 2px solid #fff;
+  z-index: 1;
+  margin-top: 4px;
+}
+
+.trip-modal__stop-dot--main {
+  background: #3b82f6;
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+}
+
+.trip-modal__stop-line {
+  width: 2px;
+  flex: 1;
+  background: #e2e8f0;
+  margin: 2px 0;
+}
+
+.trip-modal__stop-info {
+  flex: 1;
+  padding-bottom: 1.5rem;
+}
+
+.trip-modal__stop-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.trip-modal__stop-address {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.trip-modal__stop-type {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.trip-modal__stop-type--don {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.trip-modal__stop-type--tra {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.trip-modal__stop-type--ca_hai {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.trip-modal__stops-empty {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 1rem 0;
+}
+
+.flex-1 { flex: 1; }
+.mt-4 { margin-top: 1rem; }
+.mt-3 { margin-top: 0.75rem; }
+.flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.items-start { align-items: flex-start; }
 </style>

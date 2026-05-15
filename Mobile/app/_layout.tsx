@@ -47,6 +47,9 @@ function RootLayoutNav() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="tracking" options={{ headerShown: false }} />
+        <Stack.Screen name="vouchers/hunt" options={{ presentation: 'card' }} />
+        <Stack.Screen name="vouchers/my-vouchers" options={{ presentation: 'card' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

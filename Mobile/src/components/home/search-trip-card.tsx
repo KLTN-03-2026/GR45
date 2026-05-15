@@ -35,7 +35,7 @@ type SearchTripCardProps = {
 };
 
 export function SearchTripCard({
-  from = "Thành phố Hà Nội",
+  from = "Hà Nội",
   to = "Hải Phòng",
   date = new Date(),
   onPressSearch,

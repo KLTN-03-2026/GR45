@@ -23,3 +23,10 @@ Broadcast::channel('nha-xe.{maNhaXe}', function ($user, $maNhaXe) {
 Broadcast::channel('tai-xe.{id}', function ($user, $id) {
     return $user instanceof \App\Models\TaiXe && (int) $user->id === (int) $id;
 }, ['guards' => ['tai-xe']]);
+
+// Kênh công khai cho sơ đồ ghế theo từng chuyến xe.
+// Public channel — không cần auth, bất kỳ ai đang xem trang đặt vé đều nhận được.
+// Dữ liệu chỉ gồm thông tin ghế (id_ghe, ma_ghe) — không lộ thông tin khách hàng.
+Broadcast::channel('chuyen-xe.{idChuyenXe}', function () {
+    return true; // Public: luôn cho phép
+});

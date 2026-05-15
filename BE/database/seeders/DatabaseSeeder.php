@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
 
                 // --- Tang 4: Nha xe (phu thuoc Admin + ChucVu) ---
             NhaXeSeeder::class,
+            NhanVienNhaXeSeeder::class,
             HoSoNhaXeSeeder::class,
             DiaChiNhaXeSeeder::class,
 

@@ -8,7 +8,7 @@ import { TicketCard } from "@/src/components/ticket/TicketCard";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeOut, LinearTransition } from "react-native-reanimated";
 
-type FilterType = 'all' | 'da_thanh_toan' | 'dang_cho' | 'history';
+type FilterType = 'all' | 'da_thanh_toan' | 'dang_cho' | 'huy' | 'history';
 
 export default function TicketsScreen() {
   const { user } = useContext(AuthContext);
@@ -18,6 +18,17 @@ export default function TicketsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
 
+  const isPastTrip = (ticket: any) => {
+    const cx = ticket?.chuyen_xe || ticket?.chuyenXe;
+    if (!cx?.ngay_khoi_hanh) return false;
+    const dateStr = cx.ngay_khoi_hanh.includes('T') ? cx.ngay_khoi_hanh.split('T')[0] : cx.ngay_khoi_hanh;
+    const timeStr = (cx.gio_khoi_hanh || "00:00").toString().substring(0, 5);
+    const dep = new Date(`${dateStr}T${timeStr}:00`);
+    const duration = cx.tuyen_duong?.gio_du_kien || 2;
+    const arrival = new Date(dep.getTime() + duration * 60 * 60 * 1000);
+    return arrival.getTime() < Date.now();
+  };
+
   const fetchTickets = async (isRefresh = false) => {
     if (!user) return;
     
@@ -25,19 +36,29 @@ export default function TicketsScreen() {
     else setLoading(true);
 
     try {
-      // Map filter values to Backend query expectations if needed
-      const params: any = {};
-      if (filter === 'history') {
-         params.tinh_trang = 'hoan_thanh'; // will be intercepted by logic in Service we read earlier
-      } else if (filter !== 'all') {
-         params.tinh_trang = filter;
-      }
-
-      const response = await clientApi.getTickets(params);
+      // Always fetch all tickets and filter client-side for accuracy
+      const response = await clientApi.getTickets({ per_page: 50 });
       if (response.data.success) {
-        // backend might return direct data array or standard paginated object with 'data' field inside it
         const resultData = response.data.data;
-        const dataArray = Array.isArray(resultData) ? resultData : (resultData.data || []);
+        let dataArray = Array.isArray(resultData) ? resultData : (resultData.data || []);
+
+        // Client-side filtering
+        if (filter === 'history') {
+          dataArray = dataArray.filter((t: any) => {
+            const tt = t.tinh_trang;
+            return tt === 'da_hoan_thanh' || tt === 'hoan_thanh' || (tt === 'da_thanh_toan' && isPastTrip(t));
+          });
+        } else if (filter === 'da_thanh_toan') {
+          dataArray = dataArray.filter((t: any) => {
+            return t.tinh_trang === 'da_thanh_toan' && !isPastTrip(t);
+          });
+        } else if (filter === 'dang_cho') {
+          dataArray = dataArray.filter((t: any) => t.tinh_trang === 'dang_cho');
+        } else if (filter === 'huy') {
+          dataArray = dataArray.filter((t: any) => t.tinh_trang === 'huy' || t.tinh_trang === 'da_huy');
+        }
+        // 'all' -> no filter
+
         setTickets(dataArray);
       }
     } catch (error) {
@@ -81,7 +102,8 @@ export default function TicketsScreen() {
           { id: 'all', label: 'Tất cả' },
           { id: 'da_thanh_toan', label: 'Đã mua' },
           { id: 'dang_cho', label: 'Chờ t.toán' },
-          { id: 'history', label: 'Lịch sử' }
+          { id: 'history', label: 'Hoàn thành' },
+          { id: 'huy', label: 'Đã hủy' }
         ].map((item) => (
           <TouchableOpacity
             key={item.id}
@@ -138,6 +160,7 @@ export default function TicketsScreen() {
                 ticket={item} 
                 index={index}
                 onPress={() => router.push(`/ticket/${item.id}`)}
+                onRatingPress={() => router.push(`/rating/${item.id}`)}
               />
             )}
             contentContainerStyle={styles.listContent}

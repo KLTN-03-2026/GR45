@@ -7,6 +7,7 @@ use App\Models\ChucVu;
 use App\Models\NhanVienNhaXe;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -16,9 +17,179 @@ use Illuminate\Validation\ValidationException;
  */
 class NhanVienNhaXeController extends Controller
 {
+    // ── Auth helpers ─────────────────────────────────────────────────────────
+
+    /** Lấy nhân viên đang đăng nhập qua guard nhan_vien */
+    private function getMe(Request $request): ?NhanVienNhaXe
+    {
+        return Auth::guard('nhan_vien')->user();
+    }
+
+    /**
+     * Kiểm tra nhân viên có quyền thực hiện hành động không.
+     * Trả về JsonResponse 403 nếu thiếu quyền, null nếu có đủ quyền.
+     */
+    private function checkOpPermission(Request $request, string $permSlug): ?JsonResponse
+    {
+        $nv = $this->getMe($request);
+        if ($nv && !$nv->hasPermission($permSlug)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Bạn không có quyền thực hiện hành động này. (Yêu cầu: {$permSlug})",
+            ], 403);
+        }
+        return null;
+    }
+
+    // ── AUTH ─────────────────────────────────────────────────────────────────
+
+    /**
+     * POST /api/v1/nhan-vien/dang-nhap
+     * Đăng nhập nhân viên nhà xe — trả về token Sanctum qua guard nhan_vien.
+     */
+    public function login(Request $request): JsonResponse
+    {
+        try {
+            $request->validate([
+                'email'    => 'required|email',
+                'password' => 'required|string',
+            ], [
+                'email.required'    => 'Email không được để trống.',
+                'email.email'       => 'Email không đúng định dạng.',
+                'password.required' => 'Mật khẩu không được để trống.',
+            ]);
+
+            $nv = NhanVienNhaXe::with(['chucVu', 'nhaXe'])
+                ->where('email', $request->email)
+                ->first();
+
+            if (!$nv || !Hash::check($request->password, $nv->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email hoặc mật khẩu không chính xác.',
+                ], 401);
+            }
+
+            if ($nv->tinh_trang !== 'hoat_dong') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản lý nhà xe.',
+                ], 403);
+            }
+
+            // Xóa token cũ, tạo token mới qua guard nhan_vien
+            $nv->tokens()->delete();
+            $token = $nv->createToken('nhan-vien-token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Đăng nhập thành công.',
+                'data'    => [
+                    'nhan_vien' => [
+                        'id'            => $nv->id,
+                        'ho_va_ten'     => $nv->ho_va_ten,
+                        'email'         => $nv->email,
+                        'so_dien_thoai' => $nv->so_dien_thoai,
+                        'avatar'        => $nv->avatar,
+                        'tinh_trang'    => $nv->tinh_trang,
+                        'ma_nha_xe'     => $nv->ma_nha_xe,
+                        'ten_nha_xe'    => $nv->nhaXe?->ten_nha_xe,
+                        'chuc_vu'       => $nv->chucVu,
+                        'permissions'   => $nv->getDanhSachQuyen(),
+                    ],
+                    'token'      => $token,
+                    'token_type' => 'Bearer',
+                ],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dữ liệu không hợp lệ.',
+                'errors'  => $e->errors(),
+            ], 422);
+        }
+    }
+
+    /**
+     * POST /api/v1/nhan-vien/dang-xuat  [auth.nhan-vien]
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $nv = $this->getMe($request);
+        $nv?->currentAccessToken()?->delete();
+        return response()->json(['success' => true, 'message' => 'Đăng xuất thành công.']);
+    }
+
+    /**
+     * GET /api/v1/nhan-vien/me  [auth.nhan-vien]
+     * Thông tin cá nhân + quyền của nhân viên đang đăng nhập.
+     */
+    public function me(Request $request): JsonResponse
+    {
+        $nv = $this->getMe($request);
+        if (!$nv) {
+            return response()->json(['success' => false, 'message' => 'Chưa xác thực.'], 401);
+        }
+
+        $nv->load(['chucVu', 'nhaXe']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'id'            => $nv->id,
+                'ho_va_ten'     => $nv->ho_va_ten,
+                'email'         => $nv->email,
+                'so_dien_thoai' => $nv->so_dien_thoai,
+                'avatar'        => $nv->avatar,
+                'tinh_trang'    => $nv->tinh_trang,
+                'ma_nha_xe'     => $nv->ma_nha_xe,
+                'ten_nha_xe'    => $nv->nhaXe?->ten_nha_xe,
+                'chuc_vu'       => $nv->chucVu,
+                'permissions'   => $nv->getDanhSachQuyen(),
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/v1/nhan-vien/doi-mat-khau  [auth.nhan-vien]
+     */
+    public function doiMatKhau(Request $request): JsonResponse
+    {
+        try {
+            $nv = $this->getMe($request);
+            if (!$nv) {
+                return response()->json(['success' => false, 'message' => 'Chưa xác thực.'], 401);
+            }
+
+            $request->validate([
+                'mat_khau_cu'              => 'required|string',
+                'mat_khau_moi'             => 'required|string|min:6|confirmed',
+                'mat_khau_moi_confirmation' => 'required|string',
+            ], [
+                'mat_khau_cu.required'  => 'Vui lòng nhập mật khẩu hiện tại.',
+                'mat_khau_moi.min'      => 'Mật khẩu mới phải có ít nhất 6 ký tự.',
+                'mat_khau_moi.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
+            ]);
+
+            if (!Hash::check($request->mat_khau_cu, $nv->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Mật khẩu hiện tại không chính xác.',
+                ], 422);
+            }
+
+            $nv->update(['password' => Hash::make($request->mat_khau_moi)]);
+            $nv->tokens()->delete(); // Buộc đăng nhập lại
+
+            return response()->json(['success' => true, 'message' => 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.']);
+        } catch (ValidationException $e) {
+            return response()->json(['success' => false, 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $e->errors()], 422);
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Lấy nhà xe đang đăng nhập */
+    /** Lấy nhà xe đang đăng nhập (dùng cho routes nha-xe) */
     private function getNhaXe(Request $request)
     {
         return $request->user('nha_xe') ?? auth('nha_xe')->user();

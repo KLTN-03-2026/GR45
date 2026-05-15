@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\VeService;
 use App\Http\Requests\Ve\DatVeRequest;
 use App\Http\Requests\Ve\UpdateTrangThaiVeRequest;
+use App\Http\Resources\VeResource;
 use Illuminate\Http\Request;
 
 class VeController extends Controller
@@ -23,6 +24,8 @@ class VeController extends Controller
     public function indexKhachHang(Request $request)
     {
         $data = $this->veService->getDanhSachVe($request->all(), 'khach_hang');
+        // Bọc data bằng VeResource để lọc thông tin nhạy cảm
+        $data->getCollection()->transform(fn ($ve) => new VeResource($ve));
         return response()->json(['success' => true, 'data' => $data]);
     }
 
@@ -30,7 +33,7 @@ class VeController extends Controller
     {
         try {
             $data = $this->veService->getChiTietVe($id, 'khach_hang');
-            return response()->json(['success' => true, 'data' => $data]);
+            return response()->json(['success' => true, 'data' => new VeResource($data)]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
         }

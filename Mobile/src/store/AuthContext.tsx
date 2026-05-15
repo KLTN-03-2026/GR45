@@ -7,6 +7,7 @@ type AuthContextType = {
   isLoading: boolean;
   signIn: (data: any) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -78,8 +79,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    try {
+      const res = await clientApi.getProfile();
+      if (res.data.success) {
+        setUser(res.data.data);
+      }
+    } catch (error) {
+      console.error("Lỗi refreshUser:", error);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -46,9 +46,11 @@ const showToast = (message, type = "success") => {
 let echoInstance = null;
 
 onMounted(() => {
-  if (operatorStore.user && operatorStore.token) {
-    const transport = buildLaravelEchoTransportOptions();
-    if (!transport) return;
+  // Chỉ subscribe Pusher khi là chủ nhà xe (guard nha_xe).
+  // Nhân viên dùng token guard nhan_vien — endpoint /nha-xe/broadcasting/auth sẽ từ chối.
+  if (operatorStore.user && operatorStore.token && operatorStore.isOwner) {
+    // Gán biến global để Echo dùng
+    window.Pusher = Pusher;
 
     let apiUrl =
       import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/";
@@ -162,7 +164,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  if (echoInstance && operatorStore.user) {
+  if (echoInstance && operatorStore.user && operatorStore.isOwner) {
     echoInstance.leave(`nha-xe.${operatorStore.user.ma_nha_xe}`);
   }
 });

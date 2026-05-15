@@ -149,7 +149,7 @@ class BaoDongController extends Controller
      */
     public function indexNhaXe(Request $request): JsonResponse
     {
-        $nhaXe = auth()->user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -240,7 +240,7 @@ class BaoDongController extends Controller
 
     public function toggleStatusNhaXe(Request $request, $id): JsonResponse
     {
-        $nhaXe = Auth::guard('nha_xe')->user();
+        $nhaXe = $request->operator_nha_xe;
         if (!$nhaXe instanceof NhaXe) {
             return response()->json(['success' => false, 'message' => 'Bạn không có quyền thực hiện hành động này.'], 401);
         }

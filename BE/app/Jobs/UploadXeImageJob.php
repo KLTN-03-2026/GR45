@@ -62,7 +62,7 @@ class UploadXeImageJob implements ShouldQueue
 
         try {
             $timestamp = time();
-            $folder    = "SmartBus/Xe/{$this->xeId}/{$this->fieldName}";
+            $folder    = "BusSafe/Xe/{$this->xeId}/{$this->fieldName}";
 
             // Tạo signature cho signed upload
             $paramsToSign = [
@@ -112,7 +112,6 @@ class UploadXeImageJob implements ShouldQueue
             } else {
                 Log::warning("UploadXeImageJob: Không tìm thấy HoSoXe #{$this->hoSoXeId}");
             }
-
         } catch (\Exception $e) {
             Log::error("❌ UploadXeImageJob failed (HoSoXe #{$this->hoSoXeId} / {$this->fieldName}): " . $e->getMessage());
             throw $e; // Re-throw để queue retry

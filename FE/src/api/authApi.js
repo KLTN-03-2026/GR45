@@ -12,6 +12,12 @@ const authApi = {
   // --- NHÀ XE ---
   operatorLogin: (data) => axiosClient.post('/v1/nha-xe/dang-nhap', data),
   operatorLogout: () => axiosClient.post('/v1/nha-xe/dang-xuat'),
+  operatorMe: () => axiosClient.get('/v1/nha-xe/phan-quyen'),
+
+  // --- NHÂN VIÊN NHÀ XE ---
+  employeeLogin: (data) => axiosClient.post('/v1/nhan-vien/dang-nhap', data),
+  employeeLogout: () => axiosClient.post('/v1/nhan-vien/dang-xuat'),
+  employeeMe: () => axiosClient.get('/v1/nhan-vien/me'),
 
   // --- TÀI XẾ ---
   driverLogin: (data) => axiosClient.post('/v1/tai-xe/dang-nhap', data),

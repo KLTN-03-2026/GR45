@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import clientApi from "@/api/clientApi";
 import { createEcho } from "@/utils/echo.js";
@@ -30,6 +30,14 @@ const paymentMethod = ref("tien_mat");
 
 const bookingResult = ref(null);
 const errorMessage = ref("");
+
+// --- REALTIME STATE ---
+// Instance Echo dùng để subscribe kênh sơ đồ ghế
+const echoInstance = ref(null);
+// Toast cảnh báo khi ghế đang chọn bị người khác đặt
+const seatConflictAlert = ref(null); // { message: string, seats: [] }
+// Đếm số người đang xem cùng chuyến (tuỳ chọn, sẽ dấu sau)
+const isRealtimeConnected = ref(false);
 
 // Loyalty State
 const loyaltyInfo = ref(null);
@@ -247,6 +255,8 @@ const fetchInitialData = async () => {
     errorMessage.value = error.response?.data?.message || "Lỗi tải dữ liệu";
   } finally {
     isLoading.value = false;
+    // Subscribe vào kênh realtime sơ đồ ghế sau khi load xong
+    subscribeToSeatUpdates();
   }
 };
 
@@ -355,6 +365,72 @@ onMounted(() => {
   }
   fetchInitialData();
 });
+
+onUnmounted(() => {
+  // Dọn dẹp: rời kênh Pusher khi rời khỏi trang đặt vé
+  if (echoInstance.value && tripId) {
+    try {
+      echoInstance.value.leaveChannel(`chuyen-xe.${tripId}`);
+    } catch (e) {
+      // bỏ qua lỗi cleanup
+    }
+  }
+});
+
+/**
+ * Subscribe vào kênh Pusher công khai `chuyen-xe.{id}`.
+ * Gọi sau khi fetchInitialData() hoàn tất và tripId có giá trị.
+ */
+const subscribeToSeatUpdates = () => {
+  if (!tripId) return;
+  try {
+    const echo = createEcho();
+    echoInstance.value = echo;
+    echo
+      .channel(`chuyen-xe.${tripId}`)
+      .listen(".seat.updated", (e) => {
+        isRealtimeConnected.value = true;
+        if (!Array.isArray(e.danh_sach_ghe_da_dat)) return;
+
+        // 1. Cập nhật sơ đồ ghế: đánh dấu các ghế vừa bị đặt là da_dat
+        e.danh_sach_ghe_da_dat.forEach(({ id_ghe }) => {
+          const seat = seatMapRaw.value.find((s) => s.id_ghe === id_ghe);
+          if (seat && seat.trang_thai === "trong") {
+            seat.trang_thai = "da_dat";
+          }
+        });
+
+        // 2. Kiểm tra có ghế nào đang chọn bị người khác đặt không
+        const conflictSeats = selectedSeats.value.filter((s) =>
+          e.danh_sach_ghe_da_dat.some((d) => d.id_ghe === s.id_ghe),
+        );
+
+        if (conflictSeats.length > 0) {
+          // Xoá các ghế bị conflict khỏi danh sách đang chọn
+          selectedSeats.value = selectedSeats.value.filter(
+            (s) => !conflictSeats.some((c) => c.id_ghe === s.id_ghe),
+          );
+
+          const conflictNames = conflictSeats
+            .map((s) => s.ma_ghe)
+            .join(", ");
+          seatConflictAlert.value = {
+            message: `⚠️ Ghế ${conflictNames} vừa được người khác đặt! Đã tự động bỏ chọn, vui lòng chọn ghế khác.`,
+            seats: conflictSeats,
+          };
+
+          // Tự ẩn sau 6 giây
+          setTimeout(() => {
+            seatConflictAlert.value = null;
+          }, 6000);
+        }
+      });
+    isRealtimeConnected.value = true;
+  } catch (err) {
+    // Pusher không khả dụng — không ảnh hưởng luồng đặt vé
+    console.warn("[SeatMap] Không thể kết nối realtime:", err.message);
+  }
+};
 </script>
 
 <template>
@@ -445,7 +521,40 @@ onMounted(() => {
                 >airline_seat_recline_normal</span
               >
               Sơ đồ ghế
+              <!-- Badge Live Realtime -->
+              <span
+                class="ml-auto flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                :class="isRealtimeConnected
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-slate-100 text-slate-400'"
+              >
+                <span
+                  class="w-1.5 h-1.5 rounded-full"
+                  :class="isRealtimeConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'"
+                ></span>
+                {{ isRealtimeConnected ? 'Cập nhật tự động' : 'Đang kết nối...' }}
+              </span>
             </h2>
+
+            <!-- Alert khi ghế đang chọn bị người khác đặt (realtime conflict) -->
+            <transition name="fade-slide">
+              <div
+                v-if="seatConflictAlert"
+                class="mb-4 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-sm font-medium"
+              >
+                <span class="material-symbols-outlined text-amber-500 shrink-0 text-xl">warning</span>
+                <div>
+                  <div class="font-bold mb-0.5">Ghế vừa được đặt bởi khách khác!</div>
+                  <div>{{ seatConflictAlert.message }}</div>
+                </div>
+                <button
+                  @click="seatConflictAlert = null"
+                  class="ml-auto shrink-0 text-amber-400 hover:text-amber-600 transition-colors"
+                >
+                  <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+              </div>
+            </transition>
 
             <div class="seat-map-wrap">
               <div class="seat-legend-row">
@@ -515,6 +624,7 @@ onMounted(() => {
               </button>
             </div>
           </div>
+
 
           <!-- STEP 2: ĐIỂM ĐÓN / TRẢ -->
           <div
@@ -1565,5 +1675,16 @@ onMounted(() => {
   background: #fef3c7;
   color: #92400e;
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+}
+
+/* Transition cho conflict alert */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s ease;
+}
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

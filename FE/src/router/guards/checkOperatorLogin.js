@@ -2,29 +2,31 @@ import { useOperatorStore } from '@/stores/operatorStore.js';
 
 const TOKEN_KEY = 'auth.operator.token';
 const USER_KEY  = 'auth.operator.user';
+const ROLE_KEY  = 'auth.operator.role';
 
 export async function checkOperatorLogin(to, from) {
   const token = localStorage.getItem(TOKEN_KEY);
 
-  // Nếu không có token -> Về trang đăng nhập nhà xe
+  // Không có token → về trang đăng nhập
   if (!token) return { name: 'operator-login' };
 
   const operatorStore = useOperatorStore();
 
-  // Load lại user từ localStorage nếu store chưa có
+  // Khôi phục state từ localStorage nếu store chưa có
   if (!operatorStore.user) {
     try {
       const savedUser = localStorage.getItem(USER_KEY);
+      const savedRole = localStorage.getItem(ROLE_KEY) || 'nha_xe';
       if (savedUser) {
-        operatorStore.user = JSON.parse(savedUser);
+        operatorStore.user  = JSON.parse(savedUser);
+        operatorStore.role  = savedRole;
+        operatorStore.token = token;
       }
     } catch (e) {
       console.error('Lỗi parse user từ localStorage:', e);
     }
   }
 
-  // Đánh dấu đã xác thực, cho phép truy cập
   operatorStore.isTokenVerified = true;
-
   return true;
 }

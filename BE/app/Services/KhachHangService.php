@@ -320,57 +320,63 @@ class KhachHangService
     public function searchChuyenXe(array $filters)
     {
         $query = \App\Models\ChuyenXe::query()
-            ->with(['tuyenDuong', 'xe', 'tuyenDuong.nhaXe'])
-            ->whereIn('trang_thai', ['ChoChay', 'hoat_dong', '1']); // hoat_dong, ChoChay, 1 = sẵn sàng
+            ->with(['tuyenDuong.tramDungs', 'xe', 'tuyenDuong.nhaXe'])
+            ->whereIn('trang_thai', ['ChoChay', 'hoat_dong', '1']);
 
+        // 1. Lọc theo ngày khởi hành (Bắt buộc nếu có)
         if (!empty($filters['ngay_khoi_hanh'])) {
             $query->whereDate('ngay_khoi_hanh', $filters['ngay_khoi_hanh']);
+        } elseif (!empty($filters['ngay_di'])) {
+            $query->whereDate('ngay_khoi_hanh', $filters['ngay_di']);
         }
 
+        // 2. Lọc theo điểm đi (Nếu có)
         if (!empty($filters['diem_di'])) {
-            $diemDiPatterns = $this->buildLocationLikePatterns((string) $filters['diem_di']);
-            $query->whereHas('tuyenDuong', function ($qTuyen) use ($diemDiPatterns) {
-                $qTuyen->where(function ($q) use ($diemDiPatterns) {
-                    foreach ($diemDiPatterns as $pattern) {
-                        $q->orWhere('diem_bat_dau', 'LIKE', '%' . $pattern . '%');
+            $patterns = $this->buildLocationLikePatterns($filters['diem_di']);
+            $query->whereHas('tuyenDuong', function ($q) use ($patterns) {
+                $q->where(function ($sub) use ($patterns) {
+                    foreach ($patterns as $p) {
+                        $sub->orWhere('diem_bat_dau', 'LIKE', '%' . $p . '%');
                     }
-                })->orWhereHas('tramDons', function ($qTram) use ($diemDiPatterns) {
-                    $qTram->where(function ($q) use ($diemDiPatterns) {
-                        foreach ($diemDiPatterns as $pattern) {
-                            $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
-                                ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
+                })->orWhereHas('tramDons', function ($qTram) use ($patterns) {
+                    $qTram->where(function ($sub) use ($patterns) {
+                        foreach ($patterns as $p) {
+                            $sub->orWhere('ten_tram', 'LIKE', '%' . $p . '%')
+                                ->orWhere('dia_chi', 'LIKE', '%' . $p . '%');
                         }
                     });
                 });
             });
         }
 
+        // 3. Lọc theo điểm đến (Nếu có)
         if (!empty($filters['diem_den'])) {
-            $diemDenPatterns = $this->buildLocationLikePatterns((string) $filters['diem_den']);
-            $query->whereHas('tuyenDuong', function ($qTuyen) use ($diemDenPatterns) {
-                $qTuyen->where(function ($q) use ($diemDenPatterns) {
-                    foreach ($diemDenPatterns as $pattern) {
-                        $q->orWhere('diem_ket_thuc', 'LIKE', '%' . $pattern . '%');
+            $patterns = $this->buildLocationLikePatterns($filters['diem_den']);
+            $query->whereHas('tuyenDuong', function ($q) use ($patterns) {
+                $q->where(function ($sub) use ($patterns) {
+                    foreach ($patterns as $p) {
+                        $sub->orWhere('diem_ket_thuc', 'LIKE', '%' . $p . '%');
                     }
-                })->orWhereHas('tramTras', function ($qTram) use ($diemDenPatterns) {
-                    $qTram->where(function ($q) use ($diemDenPatterns) {
-                        foreach ($diemDenPatterns as $pattern) {
-                            $q->orWhere('ten_tram', 'LIKE', '%' . $pattern . '%')
-                                ->orWhere('dia_chi', 'LIKE', '%' . $pattern . '%');
+                })->orWhereHas('tramTras', function ($qTram) use ($patterns) {
+                    $qTram->where(function ($sub) use ($patterns) {
+                        foreach ($patterns as $p) {
+                            $sub->orWhere('ten_tram', 'LIKE', '%' . $p . '%')
+                                ->orWhere('dia_chi', 'LIKE', '%' . $p . '%');
                         }
                     });
                 });
             });
         }
 
+        // 4. Các bộ lọc khác
         if (!empty($filters['gia_ve_tu'])) {
-            $query->whereHas('tuyenDuong', function ($qTuyen) use ($filters) {
-                $qTuyen->where('gia_ve_co_ban', '>=', $filters['gia_ve_tu']);
+            $query->whereHas('tuyenDuong', function ($q) {
+                $q->where('gia_ve_co_ban', '>=', request('gia_ve_tu'));
             });
         }
         if (!empty($filters['gia_ve_den'])) {
-            $query->whereHas('tuyenDuong', function ($qTuyen) use ($filters) {
-                $qTuyen->where('gia_ve_co_ban', '<=', $filters['gia_ve_den']);
+            $query->whereHas('tuyenDuong', function ($q) {
+                $q->where('gia_ve_co_ban', '<=', request('gia_ve_den'));
             });
         }
         if (!empty($filters['gio_khoi_hanh_tu'])) {
@@ -393,10 +399,14 @@ class KhachHangService
             return [];
         }
 
+        // Loại bỏ tiền tố Thành phố/Tỉnh/TP/T để tìm kiếm rộng hơn
+        $cleaned = preg_replace('/^(Thành phố |Tỉnh |TP\. |T\. )/iu', '', $base);
+
         $patterns = [
             $base,
-            str_replace(['Đ', 'đ'], ['D', 'd'], $base),
-            str_replace(['D', 'd'], ['Đ', 'đ'], $base),
+            $cleaned,
+            str_replace(['Đ', 'đ'], ['D', 'd'], $cleaned),
+            str_replace(['D', 'd'], ['Đ', 'đ'], $cleaned),
         ];
 
         return array_values(array_unique(array_filter($patterns)));
@@ -450,7 +460,7 @@ class KhachHangService
     }
 
     /**
-     * Lay danh sach tram don/tra cua chuyen xe
+     * Lay danh sach tram dung chuyen xe
      */
     public function getTramDungChuyenXe(int $idChuyenXe)
     {
