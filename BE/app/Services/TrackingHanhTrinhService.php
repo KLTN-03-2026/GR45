@@ -203,13 +203,25 @@ class TrackingHanhTrinhService
                 continue;
             }
 
+            $isUnsafe = isset($point->trang_thai_tai_xe)
+                && $point->trang_thai_tai_xe !== 'binh_thuong';
+
             $secondsBetween = $lastKeptAt === null
                 ? null
                 : $point->thoi_diem_ghi->diffInSeconds($lastKeptAt, true);
 
-            if ($lastKeptAt === null || $secondsBetween >= $sampleSeconds) {
+            // Luôn giữ điểm unsafe (cảnh báo mất an toàn) bất kể khoảng cách thời gian
+            $shouldKeep = $isUnsafe
+                || $lastKeptAt === null
+                || $secondsBetween >= $sampleSeconds;
+
+            if ($shouldKeep) {
                 $result->push($point);
-                $lastKeptAt = $point->thoi_diem_ghi;
+                // Chỉ reset lastKeptAt với điểm thường để tránh unsafe point
+                // làm "ăn" mất slot của điểm thường kế tiếp
+                if (!$isUnsafe) {
+                    $lastKeptAt = $point->thoi_diem_ghi;
+                }
 
                 if ($result->count() >= $limit) {
                     break;
