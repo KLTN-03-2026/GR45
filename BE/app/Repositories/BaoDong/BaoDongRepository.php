@@ -84,12 +84,17 @@ class BaoDongRepository implements BaoDongRepositoryInterface
             $query->where('id_xe', $filters['id_xe']);
         }
 
-        if (!empty($filters['tu_ngay'])) {
-            $query->whereDate('created_at', '>=', $filters['tu_ngay']);
-        }
-
-        if (!empty($filters['den_ngay'])) {
-            $query->whereDate('created_at', '<=', $filters['den_ngay']);
+        if (!empty($filters['tu_ngay']) && !empty($filters['den_ngay'])) {
+            // Dùng whereBetween với Carbon để lọc chính xác theo giờ phút (kể cả timezone VN)
+            $tu  = \Carbon\Carbon::parse($filters['tu_ngay'])->setTimezone(config('app.timezone'));
+            $den = \Carbon\Carbon::parse($filters['den_ngay'])->setTimezone(config('app.timezone'));
+            $query->whereBetween('created_at', [$tu, $den]);
+        } elseif (!empty($filters['tu_ngay'])) {
+            $tu = \Carbon\Carbon::parse($filters['tu_ngay'])->setTimezone(config('app.timezone'));
+            $query->where('created_at', '>=', $tu);
+        } elseif (!empty($filters['den_ngay'])) {
+            $den = \Carbon\Carbon::parse($filters['den_ngay'])->setTimezone(config('app.timezone'));
+            $query->where('created_at', '<=', $den);
         }
     }
 
