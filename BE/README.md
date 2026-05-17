@@ -100,13 +100,15 @@ Backend của hệ thống BusSafe được xây dựng trên nền tảng **Lar
 
 ### Vận hành hàng đợi (Queue Worker)
 
-Hệ thống sử dụng hàng đợi để xử lý bất đồng bộ các tác vụ nặng như định vị thời gian thực, lưu trữ ảnh vi phạm AI lên đám mây:
+Hệ thống sử dụng hàng đợi bất đồng bộ để xử lý các tác vụ nặng, tránh nghẽn luồng và lỗi HTTP Timeout (30s) của PHP:
+- **`tracking` queue**: Lưu trữ tọa độ hành trình thời gian thực (`StoreTrackingPointJob`).
+- **`default` queue**: Upload ảnh vi phạm tài xế lên Cloudinary (`UploadViolationImageJob`), nén ảnh hồ sơ xe (`UploadXeImageJob`), kiểm tra hạn thanh toán vé (`CheckPaymentStatusJob`), và **gửi email thông báo phân công lịch trình tài xế** (`SendDriverScheduleEmailJob`).
 
 ```bash
-# Chạy xử lý Queue (Tracking và mặc định)
+# Chạy xử lý Queue (Xử lý đồng thời cả hàng đợi tracking và default)
 php artisan queue:work --queue=tracking,default
 
-# Khởi động lại hàng đợi sau khi cập nhật code
+# Khởi động lại hàng đợi sau khi cập nhật code (Bắt buộc chạy khi cập nhật code Job/Mailable)
 php artisan queue:restart
 ```
 

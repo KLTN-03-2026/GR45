@@ -20,6 +20,7 @@ return new class extends Migration
             $table->date('ngay_khoi_hanh');
             $table->time('gio_khoi_hanh');
             $table->integer('thanh_toan_sau')->default(0); // 0=không thanh toán sau khi khởi hành, 1=thanh toán sau khi khởi hành
+            $table->integer('so_ngay')->default(1);
             $table->decimal('tong_tien', 10, 2)->default(0)->nullable();
             $table->enum('trang_thai', ['huy', 'hoat_dong', 'dang_di_chuyen', 'hoan_thanh'])->default('hoat_dong'); // 1=hoạt động, 0=hủy, 2=đang di chuyển, 3= hoàn thành
             $table->timestamps();

@@ -23,11 +23,12 @@ class StoreChuyenXeRequest extends FormRequest
     {
         return [
             'id_tuyen_duong' => 'required|integer|exists:tuyen_duongs,id',
-            'id_xe' => 'required|integer|exists:xes,id',
-            'id_tai_xe' => 'required|integer|exists:tai_xes,id',
+            'id_xe' => 'nullable|integer|exists:xes,id',
+            'id_tai_xe' => 'nullable|integer|exists:tai_xes,id',
             'ngay_khoi_hanh' => 'required|date',
             'gio_khoi_hanh' => 'required|date_format:H:i',
             'thanh_toan_sau' => 'nullable|integer|in:0,1',
+            'so_ngay' => 'nullable|integer|min:1|max:2',
             'tong_tien' => 'nullable|numeric|min:0',
             'trang_thai' => 'nullable|string|in:ChoChay,DangChay,HoanThanh,DaHuy,hoat_dong,dang_di_chuyen,hoan_thanh,huy',
         ];

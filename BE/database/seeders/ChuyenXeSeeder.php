@@ -34,6 +34,7 @@ class ChuyenXeSeeder extends Seeder
                     'ngay_khoi_hanh' => $date,
                     'gio_khoi_hanh'  => $tuyen->gio_khoi_hanh,
                     'thanh_toan_sau' => rand(0, 1),
+                    'so_ngay'        => $tuyen->so_ngay,
                     'tong_tien'      => $tuyen->gia_ve_co_ban,
                     'trang_thai'     => 'hoat_dong',
                     'created_at'     => Carbon::now(),

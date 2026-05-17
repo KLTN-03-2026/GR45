@@ -151,16 +151,27 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
 
         DB::beginTransaction();
         try {
-            $existingTuyenDuong = $this->model->where('ma_nha_xe', $ma_nha_xe)
-                ->where('ten_tuyen_duong', $data['ten_tuyen_duong'])
+            // Trùng lặp = cùng nhà xe + cùng điểm đi/đến + cùng giờ khởi hành + có ngày chạy chồng nhau
+            $newDays = $this->normalizeWeekdays($data['cac_ngay_trong_tuan']);
+            $existingTuyenDuong = $this->model
+                ->where('ma_nha_xe', $ma_nha_xe)
                 ->where('diem_bat_dau', $data['diem_bat_dau'])
                 ->where('diem_ket_thuc', $data['diem_ket_thuc'])
-                ->first();
+                ->where('gio_khoi_hanh', $data['gio_khoi_hanh'])
+                ->get()
+                ->first(function ($route) use ($newDays) {
+                    $existingDays = $this->normalizeWeekdays(
+                        is_array($route->cac_ngay_trong_tuan)
+                            ? $route->cac_ngay_trong_tuan
+                            : json_decode($route->cac_ngay_trong_tuan, true) ?? []
+                    );
+                    return count(array_intersect($newDays, $existingDays)) > 0;
+                });
 
             if ($existingTuyenDuong) {
                 return [
                     'success' => false,
-                    'message' => 'Tuyến đường đã tồn tại! Vui lòng kiểm tra lại.',
+                    'message' => 'Tuyến đường đã tồn tại với cùng điểm đi/đến, giờ khởi hành và ngày chạy. Vui lòng kiểm tra lại.',
                 ];
             }
 
@@ -174,6 +185,7 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
                 'gio_khoi_hanh' => $data['gio_khoi_hanh'],
                 'gio_ket_thuc' => $data['gio_ket_thuc'],
                 'gio_du_kien' => $data['gio_du_kien'] ?? null,
+                'so_ngay' => $data['so_ngay'] ?? 1,
                 'gia_ve_co_ban' => $data['gia_ve_co_ban'],
                 'id_xe' => $data['xe'] ?? null,
                 'ghi_chu' => $data['mo_ta'] ?? null,
@@ -229,17 +241,35 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
                 $ma_nha_xe = $data['ma_nha_xe'];
             }
 
-            // Kiểm tra trùng lặp (trừ tuyến hiện tại)
-            if (isset($data['ten_tuyen_duong']) && isset($data['diem_bat_dau']) && isset($data['diem_ket_thuc'])) {
-                $existingTuyenDuong = $this->model->where('ma_nha_xe', $ma_nha_xe)
-                    ->where('ten_tuyen_duong', $data['ten_tuyen_duong'])
+            // Trùng lặp = cùng điểm đi/đến + cùng giờ khởi hành + có ngày chạy chồng nhau (trừ chính tuyến đang sửa)
+            if (isset($data['diem_bat_dau']) && isset($data['diem_ket_thuc'])) {
+                $gioKhoiHanh = $data['gio_khoi_hanh'] ?? $tuyenDuong->gio_khoi_hanh;
+                $newDays = isset($data['cac_ngay_trong_tuan'])
+                    ? $this->normalizeWeekdays($data['cac_ngay_trong_tuan'])
+                    : $this->normalizeWeekdays(
+                        is_array($tuyenDuong->cac_ngay_trong_tuan)
+                            ? $tuyenDuong->cac_ngay_trong_tuan
+                            : json_decode($tuyenDuong->cac_ngay_trong_tuan, true) ?? []
+                    );
+
+                $existingTuyenDuong = $this->model
+                    ->where('ma_nha_xe', $ma_nha_xe)
                     ->where('diem_bat_dau', $data['diem_bat_dau'])
                     ->where('diem_ket_thuc', $data['diem_ket_thuc'])
+                    ->where('gio_khoi_hanh', $gioKhoiHanh)
                     ->where('id', '!=', $id)
-                    ->first();
+                    ->get()
+                    ->first(function ($route) use ($newDays) {
+                        $existingDays = $this->normalizeWeekdays(
+                            is_array($route->cac_ngay_trong_tuan)
+                                ? $route->cac_ngay_trong_tuan
+                                : json_decode($route->cac_ngay_trong_tuan, true) ?? []
+                        );
+                        return count(array_intersect($newDays, $existingDays)) > 0;
+                    });
 
                 if ($existingTuyenDuong) {
-                    throw new \Exception('Tuyến đường bị trùng lặp với một tuyến khác của nhà xe. Vui lòng kiểm tra lại.');
+                    throw new \Exception('Tuyến đường bị trùng lặp: cùng điểm đi/đến, giờ khởi hành và có ngày chạy trùng nhau. Vui lòng thay đổi giờ hoặc ngày chạy.');
                 }
             }
 
@@ -255,6 +285,7 @@ class TuyenDuongRepository implements TuyenDuongRepositoryInterface
             if (isset($data['gio_khoi_hanh'])) $updateData['gio_khoi_hanh'] = $data['gio_khoi_hanh'];
             if (isset($data['gio_ket_thuc'])) $updateData['gio_ket_thuc'] = $data['gio_ket_thuc'];
             if (isset($data['gio_du_kien'])) $updateData['gio_du_kien'] = $data['gio_du_kien'];
+            if (isset($data['so_ngay'])) $updateData['so_ngay'] = $data['so_ngay'];
             if (isset($data['gia_ve_co_ban'])) $updateData['gia_ve_co_ban'] = $data['gia_ve_co_ban'];
             if (isset($data['xe'])) $updateData['id_xe'] = $data['xe'];
             if (isset($data['mo_ta'])) $updateData['ghi_chu'] = $data['mo_ta'];

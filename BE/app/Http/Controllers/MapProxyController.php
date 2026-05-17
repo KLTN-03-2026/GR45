@@ -52,4 +52,32 @@ class MapProxyController extends Controller
             return response()->json(['error' => 'OSRM proxy error: ' . $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Proxy geocoding (search coordinates by address) from Nominatim
+     * Tránh lỗi CORS và rate-limit (OSM block IP client) khi gọi từ browser
+     */
+    public function geocode(Request $request)
+    {
+        $query = $request->query('q');
+        if (!$query) {
+            return response()->json(['error' => 'Missing query parameter q'], 400);
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'thainht177@gmail.com'
+            ])->timeout(10)->get('https://nominatim.openstreetmap.org/search', [
+                'q' => $query,
+                'format' => 'jsonv2',
+                'limit' => 1,
+                'addressdetails' => 1,
+                'countrycodes' => 'vn'
+            ]);
+
+            return response()->json($response->json(), $response->status());
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Geocode proxy error: ' . $e->getMessage()], 500);
+        }
+    }
 }

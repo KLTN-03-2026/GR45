@@ -141,6 +141,42 @@ class ChuyenXeController extends Controller
         }
     }
 
+    public function notifyMissingDrivers()
+    {
+        try {
+            $count = $this->chuyenXeService->notifyMissingDrivers();
+            return response()->json([
+                'success' => true,
+                'message' => "Đã gửi thông báo nhắc nhở thành công đến $count nhà xe."
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
+    }
+
+    public function autoAssignDrivers()
+    {
+        $user = auth('sanctum')->user();
+        if (!$user || !isset($user->ma_nha_xe)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bạn không có quyền thực hiện thao tác này hoặc không thuộc nhà xe nào.'
+            ], 403);
+        }
+
+        try {
+            $result = $this->chuyenXeService->autoAssignDrivers($user->ma_nha_xe);
+            return response()->json([
+                'success' => true,
+                'message' => 'Lên lịch tự động thành công!',
+                'data' => $result
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('AutoAssignError: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            return response()->json(['success' => false, 'message' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
+        }
+    }
+
     public function getLichTrinh($id)
     {
         try {
@@ -404,6 +440,54 @@ class ChuyenXeController extends Controller
                 'success' => true,
                 'message' => 'Đã hoàn thành chuyến xe và tích điểm cho khách hàng.',
                 'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    public function thongKeGioLam(Request $request)
+    {
+        try {
+            $user = auth('sanctum')->user();
+            if (!$user || !($user instanceof \App\Models\TaiXe)) {
+                return response()->json(['success' => false, 'message' => 'Bạn không có quyền truy cập.'], 403);
+            }
+
+            $id_tai_xe = $user->id;
+
+            // Tính số giờ trong tuần hiện tại
+            $startOfWeek = now()->startOfWeek()->format('Y-m-d');
+            $endOfWeek = now()->endOfWeek()->format('Y-m-d');
+
+            $chuyenXes = \App\Models\ChuyenXe::where('id_tai_xe', $id_tai_xe)
+                ->whereBetween('ngay_khoi_hanh', [$startOfWeek, $endOfWeek])
+                ->with('tuyenDuong')
+                ->get();
+
+            $gioDuKien = 0;
+            $gioThucTe = 0; // Giả sử tính dựa trên trạng thái đã hoàn thành và giờ dự kiến (nếu không có DB log giờ thực tế)
+
+            foreach ($chuyenXes as $chuyen) {
+                if ($chuyen->tuyenDuong) {
+                    $gioDuKien += (float) $chuyen->tuyenDuong->gio_du_kien;
+                    if ($chuyen->trang_thai === 'hoan_thanh') {
+                        // Hiện tại hệ thống chưa lưu chính xác giờ hoàn thành thực tế trong chuyến xe,
+                        // có thể lấy từ updated_at hoặc tạm mặc định = giờ dự kiến (hoặc tuỳ chỉnh tuỳ logic thực tế)
+                        $gioThucTe += (float) $chuyen->tuyenDuong->gio_du_kien;
+                    } else if ($chuyen->trang_thai === 'dang_di_chuyen') {
+                        // Tính một phần hoặc cộng thêm nếu cần
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'tuan_hien_tai' => "$startOfWeek đến $endOfWeek",
+                    'gio_du_kien' => $gioDuKien,
+                    'gio_thuc_te' => $gioThucTe
+                ]
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);

@@ -23,11 +23,12 @@ class UpdateChuyenXeRequest extends FormRequest
     {
         return [
             'id_tuyen_duong' => 'sometimes|required|integer|exists:tuyen_duongs,id',
-            'id_xe' => 'sometimes|required|integer|exists:xes,id',
-            'id_tai_xe' => 'sometimes|exists:tai_xes,id',
+            'id_xe' => 'sometimes|nullable|integer|exists:xes,id',
+            'id_tai_xe' => 'sometimes|nullable|exists:tai_xes,id',
             'ngay_khoi_hanh' => 'sometimes|required|date',
             'gio_khoi_hanh' => 'sometimes|required|date_format:H:i',
             'thanh_toan_sau' => 'nullable|integer|in:0,1',
+            'so_ngay' => 'sometimes|nullable|integer|min:1|max:2',
             'tong_tien' => 'nullable|numeric|min:0',
             'trang_thai' => 'nullable|string|in:huy,hoat_dong,dang_di_chuyen,hoan_thanh',
         ];

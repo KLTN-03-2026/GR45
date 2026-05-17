@@ -21,6 +21,7 @@ class TuyenDuong extends Model
         'gio_khoi_hanh',
         'gio_ket_thuc',
         'gio_du_kien',
+        'so_ngay',
         'gia_ve_co_ban',
         'id_xe',
         'ghi_chu',

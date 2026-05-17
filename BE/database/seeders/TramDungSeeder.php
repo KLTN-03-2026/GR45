@@ -1,108 +1,146 @@
 <?php
-
 namespace Database\Seeders;
-
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class TramDungSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $now = Carbon::now();
 
-        $data = [
-            ['ten_tram' => 'Bến Xe Miền Đông (Bến Thanh)', 'dia_chi' => 'Hẻm 153 Quốc lộ 13, Khu phố 48, Phường Bình Thạnh, Thủ Đức, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 4, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.814875, 'toa_do_y' => 106.711471, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Ngã Tư Dầu Giây', 'dia_chi' => 'Trần Cao Vân, Dầu Giây, Xã Dầu Giây, Tỉnh Đồng Nai', 'id_phuong_xa' => null, 'id_tuyen_duong' => 4, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 10.942482, 'toa_do_y' => 107.140053, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Liên Tỉnh Đà Lạt', 'dia_chi' => '01 Tô Hiến Thành, Phường 3, TP. Đà Lạt, Lâm Đồng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 4, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 11.927500, 'toa_do_y' => 108.444900, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Cao Sơn Pháo, Hòa Minh, Liên Chiểu, Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 5, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.055010, 'toa_do_y' => 108.173358, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Trạm dừng nghỉ (Hệ thống test)', 'dia_chi' => 'Đường cao tốc Hà Nội - Lào Cai, Xã Xuân Lũng, Tỉnh Phú Thọ', 'id_phuong_xa' => null, 'id_tuyen_duong' => 5, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 21.392438, 'toa_do_y' => 105.302228, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe phía Nam Huế', 'dia_chi' => 'An Dương Vương, An Đông, Phường An Cựu, Thành phố Huế', 'id_phuong_xa' => null, 'id_tuyen_duong' => 5, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 16.450763, 'toa_do_y' => 107.606019, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Nước Ngầm', 'dia_chi' => '1 Đường Ngọc Hồi, Phường Yên Sở, Quận Hoàng Mai, Hà Nội', 'id_phuong_xa' => null, 'id_tuyen_duong' => 6, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 20.965103, 'toa_do_y' => 105.843176, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe phía Bắc Thanh Hóa', 'dia_chi' => 'Đường Dương Đình Nghệ, Đông Thọ, Hàm Rồng, Tỉnh Thanh Hóa', 'id_phuong_xa' => null, 'id_tuyen_duong' => 6, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 19.820239, 'toa_do_y' => 105.773789, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Trạm dừng Sông Sa Lung', 'dia_chi' => 'Phan Xá, Xã Vĩnh Linh, Tỉnh Quảng Trị', 'id_phuong_xa' => null, 'id_tuyen_duong' => 6, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 17.044997, 'toa_do_y' => 107.010735, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Đông Mới', 'dia_chi' => 'Xa lộ Hà Nội, Tân Lập, Phường Long Bình, Dĩ An, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 7, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.879596, 'toa_do_y' => 106.815964, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Trung tâm mua vé bến xe Phan Thiết', 'dia_chi' => 'Phan Thiết, Phường Phan Thiết, Tỉnh Bình Thuận', 'id_phuong_xa' => null, 'id_tuyen_duong' => 7, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 10.939769, 'toa_do_y' => 108.102867, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Phía Nam Nha Trang', 'dia_chi' => 'Võ Nguyên Giáp, Tây Nha Trang, Diên Khánh, Tỉnh Khánh Hòa', 'id_phuong_xa' => null, 'id_tuyen_duong' => 7, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 12.243844, 'toa_do_y' => 109.097981, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Tây', 'dia_chi' => 'Đường Kinh Dương Vương, Phường An Lạc, Quận Bình Tân, TP. HCM', 'id_phuong_xa' => null, 'id_tuyen_duong' => 8, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.740127, 'toa_do_y' => 106.619401, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Minh Tâm Quán (Trạm dừng chân)', 'dia_chi' => 'Tân Hiệp, Xã Long Hưng, Tỉnh Tiền Giang', 'id_phuong_xa' => null, 'id_tuyen_duong' => 8, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 10.429504, 'toa_do_y' => 106.316814, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Trung tâm tp. Cần Thơ', 'dia_chi' => 'Đường Trần Hoàng Na, Phường Cái Răng, Thành phố Cần Thơ', 'id_phuong_xa' => null, 'id_tuyen_duong' => 8, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 10.005344, 'toa_do_y' => 105.771312, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Nước Ngầm', 'dia_chi' => 'Số 1 Ngọc Hồi, Hoàng Liệt, Hoàng Mai', 'id_phuong_xa' => null, 'id_tuyen_duong' => 10, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 20.963400, 'toa_do_y' => 105.842700, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Cầu Rào', 'dia_chi' => 'Số 1 Thiên Lôi, Đằng Giang, Ngô Quyền', 'id_phuong_xa' => null, 'id_tuyen_duong' => 10, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 20.835900, 'toa_do_y' => 106.697500, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Mỹ Đình', 'dia_chi' => '20 Đường Phạm Hùng, Phường Mỹ Đình, Nam Từ Liêm, Hà Nội', 'id_phuong_xa' => null, 'id_tuyen_duong' => 11, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 21.028405, 'toa_do_y' => 105.778314, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Trạm dừng Duy Tân', 'dia_chi' => 'Duy Tân, Phường Quảng Phú, Thành phố Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 11, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 15.580249, 'toa_do_y' => 108.513653, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Phường Phú Thọ (Điểm tập kết)', 'dia_chi' => 'Phường Phú Thọ, Thành phố Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 11, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 10.765870, 'toa_do_y' => 106.654623, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Nguyễn Quyền, Hòa An, An Khê, Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 15, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.055010, 'toa_do_y' => 108.173358, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Liên tỉnh Phú Yên', 'dia_chi' => 'Nguyễn Tất Thành, Tuy Hòa, Phú Yên', 'id_phuong_xa' => null, 'id_tuyen_duong' => 15, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 13.092588, 'toa_do_y' => 109.294210, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Bắc Nha Trang', 'dia_chi' => '01 Đường 2 Tháng 4, Vĩnh Hòa, Nha Trang, Khánh Hòa', 'id_phuong_xa' => null, 'id_tuyen_duong' => 15, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 12.288685, 'toa_do_y' => 109.190585, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Nguyễn Quyền, Hòa An, Cẩm Lệ, Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 17, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.055010, 'toa_do_y' => 108.173358, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Kon Tum', 'dia_chi' => '281 Phan Đình Phùng, Phường Quang Trung, TP. Kon Tum', 'id_phuong_xa' => null, 'id_tuyen_duong' => 17, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 14.349753, 'toa_do_y' => 108.001242, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe phía Nam (Huế)', 'dia_chi' => 'An Dương Vương, An Đông, Phường An Cựu, Thành phố Huế', 'id_phuong_xa' => null, 'id_tuyen_duong' => 18, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.450763, 'toa_do_y' => 107.606019, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Hội An', 'dia_chi' => '02 Nguyễn Tất Thành, Tân An, Hội An, Quảng Nam', 'id_phuong_xa' => null, 'id_tuyen_duong' => 18, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 15.885600, 'toa_do_y' => 108.327400, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe phía Nam (Huế)', 'dia_chi' => 'An Dương Vương, An Đông, Phường An Cựu, Thành phố Huế', 'id_phuong_xa' => null, 'id_tuyen_duong' => 19, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.450763, 'toa_do_y' => 107.606019, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Nam Lý', 'dia_chi' => 'Đường Tố Hữu, Phường Đồng Hới, Tỉnh Quảng Bình', 'id_phuong_xa' => null, 'id_tuyen_duong' => 19, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 17.468155, 'toa_do_y' => 106.604314, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Bắc Nha Trang', 'dia_chi' => 'Đường 2 Tháng 4, Phường Vĩnh Hòa, Nha Trang, Khánh Hòa', 'id_phuong_xa' => null, 'id_tuyen_duong' => 19, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 12.288685, 'toa_do_y' => 109.190585, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Nam Lý', 'dia_chi' => 'Đường Tố Hữu, Phường Đồng Hới, Tỉnh Quảng Bình', 'id_phuong_xa' => null, 'id_tuyen_duong' => 20, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 17.468155, 'toa_do_y' => 106.604314, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe KonTum', 'dia_chi' => 'Đường Phan Đình Phùng, Trung Tín, Phường Kon Tum', 'id_phuong_xa' => null, 'id_tuyen_duong' => 20, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 14.367456, 'toa_do_y' => 107.994140, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Liên tỉnh Phú Yên (Đắk Lắk)', 'dia_chi' => 'Đại lộ Nguyễn Tất Thành, Phú Vang, Phường Tuy Hòa, Đắk Lắk', 'id_phuong_xa' => null, 'id_tuyen_duong' => 20, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 13.092588, 'toa_do_y' => 109.294210, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Nước Ngầm', 'dia_chi' => 'Số 1 Ngọc Hồi, Hoàng Liệt, Hoàng Mai', 'id_phuong_xa' => null, 'id_tuyen_duong' => 21, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 20.963400, 'toa_do_y' => 105.842700, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Cầu Rào', 'dia_chi' => 'Số 1 Thiên Lôi, Đằng Giang, Ngô Quyền', 'id_phuong_xa' => null, 'id_tuyen_duong' => 21, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 20.835900, 'toa_do_y' => 106.697500, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Mỹ Đình', 'dia_chi' => '20 Đường Phạm Hùng, Phường Mỹ Đình, Nam Từ Liêm, Hà Nội', 'id_phuong_xa' => null, 'id_tuyen_duong' => 22, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 21.028405, 'toa_do_y' => 105.778314, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Trạm dừng Duy Tân', 'dia_chi' => 'Duy Tân, Phường Quảng Phú, Thành phố Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 22, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 15.580249, 'toa_do_y' => 108.513653, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Phường Phú Thọ (Điểm tập kết)', 'dia_chi' => 'Phường Phú Thọ, Thành phố Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 22, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 10.765870, 'toa_do_y' => 106.654623, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Đông Mới', 'dia_chi' => 'Xa lộ Hà Nội, Hiệp Thắng, Phường Đông Hòa, Thành phố Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 23, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.879596, 'toa_do_y' => 106.815964, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Đồng Xoài', 'dia_chi' => 'Phường Tân Đồng, Thành phố Đồng Xoài, Bình Phước', 'id_phuong_xa' => null, 'id_tuyen_duong' => 23, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 11.530300, 'toa_do_y' => 106.903800, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Phước Long', 'dia_chi' => 'Đường Nguyễn Xí, Phường Phước Long, Bình Phước', 'id_phuong_xa' => null, 'id_tuyen_duong' => 23, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 11.840768, 'toa_do_y' => 106.993245, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Tây', 'dia_chi' => 'Kinh Dương Vương, Phường An Lac, Bình Tân, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 24, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.740127, 'toa_do_y' => 106.619401, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Bến Tre', 'dia_chi' => 'Quốc lộ 60, Phường Sơn Đông, Tỉnh Bến Tre', 'id_phuong_xa' => null, 'id_tuyen_duong' => 24, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 10.266472, 'toa_do_y' => 106.359759, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Đông Mới', 'dia_chi' => 'Xa lộ Hà Nội, Tân Lập, Phường Long Bình, TP. Thủ Đức, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 25, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.879596, 'toa_do_y' => 106.815964, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Nội Thành (Tuy Hòa)', 'dia_chi' => 'Đường Nguyễn Trãi, Tuy Hòa, Tỉnh Phú Yên', 'id_phuong_xa' => null, 'id_tuyen_duong' => 25, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 13.087705, 'toa_do_y' => 109.306893, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Đông Mới', 'dia_chi' => 'Xa lộ Hà Nội, Tân Lập, Phường Long Bình, TP. Thủ Đức, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 26, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.879596, 'toa_do_y' => 106.815964, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe KonTum', 'dia_chi' => 'Đường Phan Đình Phùng, Phường Kon Tum, Tỉnh Kon Tum', 'id_phuong_xa' => null, 'id_tuyen_duong' => 26, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 14.367456, 'toa_do_y' => 107.994140, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Đông Mới', 'dia_chi' => 'Xa lộ Hà Nội, Phường Long Bình, TP. Thủ Đức, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 27, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.879596, 'toa_do_y' => 106.815964, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Cao Sơn Pháo, Hòa Minh, Liên Chiểu, Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 27, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 16.055010, 'toa_do_y' => 108.173358, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Tây', 'dia_chi' => 'Đường Kinh Dương Vương, Phường An Lạc, Quận Bình Tân, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 28, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.740127, 'toa_do_y' => 106.619401, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Trung tâm tp.Cần Thơ', 'dia_chi' => 'Trần Hoàng Na, Phường Cái Răng, Thành phố Cần Thơ', 'id_phuong_xa' => null, 'id_tuyen_duong' => 28, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 10.005344, 'toa_do_y' => 105.771312, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Trạm dừng chân Minh Khải', 'dia_chi' => 'Quốc lộ 1, Xã Nhu Gia, Mỹ Xuyên, Tỉnh Sóc Trăng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 28, 'loai_tram' => 'ca_hai', 'thu_tu' => 3, 'toa_do_x' => 9.512648, 'toa_do_y' => 105.873061, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Cà Mau', 'dia_chi' => 'Lý Thường Kiệt, Phường Tân Thành, Tỉnh Cà Mau', 'id_phuong_xa' => null, 'id_tuyen_duong' => 28, 'loai_tram' => 'tra', 'thu_tu' => 4, 'toa_do_x' => 9.175770, 'toa_do_y' => 105.170944, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Miền Tây', 'dia_chi' => 'Đường Kinh Dương Vương, Phường An Lạc, Quận Bình Tân, TP. Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 28, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 10.740127, 'toa_do_y' => 106.619401, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Trung tâm tp.Cần Thơ', 'dia_chi' => 'Đường Trần Hoàng Na, Phường Cái Răng, Thành phố Cần Thơ', 'id_phuong_xa' => null, 'id_tuyen_duong' => 28, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 10.005344, 'toa_do_y' => 105.771312, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Nguyễn Quyền, Hòa An, An Khê, Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 16, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.055010, 'toa_do_y' => 108.173358, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe khách Quy Nhơn', 'dia_chi' => '71 Tây Sơn, Ghềnh Ráng, Quy Nhơn, Bình Định', 'id_phuong_xa' => null, 'id_tuyen_duong' => 16, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 13.753340, 'toa_do_y' => 109.208907, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Liên tỉnh Phú Yên', 'dia_chi' => 'Nguyễn Tất Thành, Phường Tuy Hòa, Tỉnh Phú Yên', 'id_phuong_xa' => null, 'id_tuyen_duong' => 16, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 13.092588, 'toa_do_y' => 109.294210, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe khách Quy Nhơn', 'dia_chi' => 'Quốc lộ 1D, Ghềnh Ráng, Thành phố Quy Nhơn, Bình Định', 'id_phuong_xa' => null, 'id_tuyen_duong' => 9, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 13.753340, 'toa_do_y' => 109.208907, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Thị xã An Khê', 'dia_chi' => 'Phường An Khê, Thị xã An Khê, Tỉnh Gia Lai', 'id_phuong_xa' => null, 'id_tuyen_duong' => 9, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 14.022384, 'toa_do_y' => 108.695029, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Quảng trường Đại Đoàn Kết', 'dia_chi' => 'Trần Hưng Đạo, Phường Pleiku, Thành phố Pleiku, Gia Lai', 'id_phuong_xa' => null, 'id_tuyen_duong' => 9, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 13.982935, 'toa_do_y' => 108.005989, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Nguyễn Quyền, Hòa An, Phường An Khê, Thành phố Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 14, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.055010, 'toa_do_y' => 108.173358, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Quảng Ngãi', 'dia_chi' => 'Đinh Tiên Hoàng, Nghĩa Chánh, Quảng Ngãi, Tỉnh Quảng Ngãi', 'id_phuong_xa' => null, 'id_tuyen_duong' => 14, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 15.107484, 'toa_do_y' => 108.819131, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe khách Quy Nhơn', 'dia_chi' => 'Quốc lộ 1D, Ghềnh Ráng, Phường Quy Nhơn Nam, Quy Nhơn', 'id_phuong_xa' => null, 'id_tuyen_duong' => 14, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 13.753340, 'toa_do_y' => 109.208907, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Nguyễn Văn Tạo, Hòa An, An Khê, Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 12, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.055010, 'toa_do_y' => 105.778314, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe phía Nam Nha Trang', 'dia_chi' => '23 Tháng 10, Tây Nha Trang, Khánh Hòa', 'id_phuong_xa' => null, 'id_tuyen_duong' => 12, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 12.258395, 'toa_do_y' => 109.134856, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Phan Thiết', 'dia_chi' => 'Trung tâm mua vé bến xe, TP. Phan Thiết, Bình Thuận', 'id_phuong_xa' => null, 'id_tuyen_duong' => 12, 'loai_tram' => 'ca_hai', 'thu_tu' => 3, 'toa_do_x' => 10.939769, 'toa_do_y' => 108.102867, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Vũng Tàu', 'dia_chi' => '192 Nam Kỳ Khởi Nghĩa, Vũng Tàu', 'id_phuong_xa' => null, 'id_tuyen_duong' => 12, 'loai_tram' => 'tra', 'thu_tu' => 4, 'toa_do_x' => 10.350447, 'toa_do_y' => 107.087048, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Trung Tâm Đà Nẵng', 'dia_chi' => 'Đường Nguyễn Quyền, Hòa An, Phường An Khê, Thành phố Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 13, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 16.055010, 'toa_do_y' => 108.173358, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Tam Kỳ - 1 Phan Bội Châu', 'dia_chi' => 'Quốc lộ 1, Phường Bàn Thạch, Thành phố Tam Kỳ', 'id_phuong_xa' => null, 'id_tuyen_duong' => 13, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 15.586615, 'toa_do_y' => 108.465371, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến Xe Quảng Ngãi', 'dia_chi' => 'Đinh Tiên Hoàng, Nghĩa Chánh, Phường Cẩm Thành, Tỉnh Quảng Ngãi', 'id_phuong_xa' => null, 'id_tuyen_duong' => 13, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 15.107484, 'toa_do_y' => 108.819131, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Mỹ Đình', 'dia_chi' => '20 Đường Phạm Hùng, Phường Mỹ Đình, Nam Từ Liêm, Hà Nội', 'id_phuong_xa' => null, 'id_tuyen_duong' => 2, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 21.028405, 'toa_do_y' => 105.778314, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Trạm dừng Duy Tân', 'dia_chi' => 'Duy Tân, Phường Quảng Phú, Thành phố Đà Nẵng', 'id_phuong_xa' => null, 'id_tuyen_duong' => 2, 'loai_tram' => 'ca_hai', 'thu_tu' => 2, 'toa_do_x' => 15.580249, 'toa_do_y' => 108.513653, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Phường Phú Thọ (Điểm tập kết)', 'dia_chi' => 'Phường Phú Thọ, Thành phố Hồ Chí Minh', 'id_phuong_xa' => null, 'id_tuyen_duong' => 2, 'loai_tram' => 'tra', 'thu_tu' => 3, 'toa_do_x' => 10.765870, 'toa_do_y' => 106.654623, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Nước Ngầm', 'dia_chi' => 'Số 1 Ngọc Hồi, Hoàng Liệt, Hoàng Mai', 'id_phuong_xa' => null, 'id_tuyen_duong' => 1, 'loai_tram' => 'don', 'thu_tu' => 1, 'toa_do_x' => 20.963400, 'toa_do_y' => 105.842700, 'tinh_trang' => 'hoat_dong'],
-            ['ten_tram' => 'Bến xe Cầu Rào', 'dia_chi' => 'Số 1 Thiên Lôi, Đằng Giang, Ngô Quyền', 'id_phuong_xa' => null, 'id_tuyen_duong' => 1, 'loai_tram' => 'tra', 'thu_tu' => 2, 'toa_do_x' => 20.835900, 'toa_do_y' => 106.697500, 'tinh_trang' => 'hoat_dong'],
+        // Các tuyến cùng lộ trình dùng chung mẫu trạm
+        // Route IDs: 1,2=HN-HP | 3,4=HN-ĐN | 5=HN-HCM
+        //            6=HN-HP NX002 | 7=HN-ĐN NX002
+        //            8=HCM-ĐL NX002 | 9=HCM-NT NX002 | 10=HCM-CT NX002
+        //            11=HCM-ĐL NX003 | 12=HCM-NT NX003 | 13=HCM-CT NX003
+        //            14=ĐN-QN NX003 | 15=ĐN-Huế NX003 | 16=HN-SaPa NX003
+        //            17=HCM-CàMau NX003
 
+        $templates = [
+            'ha_noi_hai_phong' => [
+                ['ten_tram'=>'Bến xe Nước Ngầm','dia_chi'=>'Số 1 Ngọc Hồi, Hoàng Mai, Hà Nội','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>20.9634,'toa_do_y'=>105.8427],
+                ['ten_tram'=>'Trạm dừng Phố Nối','dia_chi'=>'QL5A, Phố Nối, Mỹ Hào, Hưng Yên','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>20.9427,'toa_do_y'=>106.1012],
+                ['ten_tram'=>'Bến xe Hải Dương','dia_chi'=>'Nguyễn Lương Bằng, Trần Phú, TP. Hải Dương','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>20.9389,'toa_do_y'=>106.3314],
+                ['ten_tram'=>'Nút giao An Dương','dia_chi'=>'An Dương, Hải Phòng','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>20.8632,'toa_do_y'=>106.6108],
+                ['ten_tram'=>'Bến xe Cầu Rào','dia_chi'=>'Số 1 Thiên Lôi, Ngô Quyền, Hải Phòng','loai_tram'=>'tra','thu_tu'=>5,'toa_do_x'=>20.8359,'toa_do_y'=>106.6975],
+            ],
+            'ha_noi_da_nang' => [
+                ['ten_tram'=>'Bến xe Giáp Bát','dia_chi'=>'Số 9 Giáp Bát, Hoàng Mai, Hà Nội','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>20.9858,'toa_do_y'=>105.8418],
+                ['ten_tram'=>'Bến xe Thanh Hóa','dia_chi'=>'Bà Triệu, Tân Sơn, TP. Thanh Hóa','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>19.8062,'toa_do_y'=>105.7834],
+                ['ten_tram'=>'Bến xe Vinh','dia_chi'=>'Lê Duẩn, Vinh Tân, TP. Vinh, Nghệ An','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>18.6773,'toa_do_y'=>105.6878],
+                ['ten_tram'=>'Bến xe Nam Lý','dia_chi'=>'Tố Hữu, Đồng Phú, TP. Đồng Hới, Quảng Bình','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>17.4682,'toa_do_y'=>106.6043],
+                ['ten_tram'=>'Bến xe Phía Nam Huế','dia_chi'=>'An Dương Vương, An Cựu, TP. Huế','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>16.4508,'toa_do_y'=>107.6060],
+                ['ten_tram'=>'Bến xe Trung Tâm Đà Nẵng','dia_chi'=>'Điện Biên Phủ, Hải Châu, Đà Nẵng','loai_tram'=>'tra','thu_tu'=>6,'toa_do_x'=>16.0550,'toa_do_y'=>108.1734],
+            ],
+            'ha_noi_hcm' => [
+                ['ten_tram'=>'Bến xe Giáp Bát','dia_chi'=>'Số 9 Giáp Bát, Hoàng Mai, Hà Nội','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>20.9858,'toa_do_y'=>105.8418],
+                ['ten_tram'=>'Bến xe Vinh','dia_chi'=>'Lê Duẩn, Vinh Tân, TP. Vinh, Nghệ An','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>18.6773,'toa_do_y'=>105.6878],
+                ['ten_tram'=>'Bến xe Phía Nam Huế','dia_chi'=>'An Dương Vương, An Cựu, TP. Huế','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>16.4508,'toa_do_y'=>107.6060],
+                ['ten_tram'=>'Bến xe Trung Tâm Đà Nẵng','dia_chi'=>'Điện Biên Phủ, Hải Châu, Đà Nẵng','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>16.0550,'toa_do_y'=>108.1734],
+                ['ten_tram'=>'Bến xe Quy Nhơn','dia_chi'=>'71 Tây Sơn, Ghềnh Ráng, TP. Quy Nhơn, Bình Định','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>13.7533,'toa_do_y'=>109.2089],
+                ['ten_tram'=>'Bến xe Phía Nam Nha Trang','dia_chi'=>'Võ Nguyên Giáp, Tây Nha Trang, Khánh Hòa','loai_tram'=>'ca_hai','thu_tu'=>6,'toa_do_x'=>12.2438,'toa_do_y'=>109.0980],
+                ['ten_tram'=>'Bến xe Miền Đông Mới','dia_chi'=>'Xa lộ Hà Nội, Long Bình, TP. Thủ Đức, TP. HCM','loai_tram'=>'tra','thu_tu'=>7,'toa_do_x'=>10.8796,'toa_do_y'=>106.8160],
+            ],
+            'hcm_dalat' => [
+                ['ten_tram'=>'Bến xe Miền Đông Mới','dia_chi'=>'Xa lộ Hà Nội, Long Bình, TP. Thủ Đức, TP. HCM','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>10.8796,'toa_do_y'=>106.8160],
+                ['ten_tram'=>'Ngã Tư Dầu Giây','dia_chi'=>'QL1A, Dầu Giây, Thống Nhất, Đồng Nai','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>10.9425,'toa_do_y'=>107.1401],
+                ['ten_tram'=>'Trạm dừng Định Quán','dia_chi'=>'QL20, TT. Định Quán, Đồng Nai','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>11.3427,'toa_do_y'=>107.3824],
+                ['ten_tram'=>'Bến xe Bảo Lộc','dia_chi'=>'Lý Tự Trọng, Lộc Tiến, TP. Bảo Lộc, Lâm Đồng','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>11.5413,'toa_do_y'=>107.8071],
+                ['ten_tram'=>'Trạm dừng Liên Khương','dia_chi'=>'QL20, TT. Liên Nghĩa, Đức Trọng, Lâm Đồng','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>11.7490,'toa_do_y'=>108.3690],
+                ['ten_tram'=>'Bến xe Liên Tỉnh Đà Lạt','dia_chi'=>'01 Tô Hiến Thành, Phường 3, TP. Đà Lạt','loai_tram'=>'tra','thu_tu'=>6,'toa_do_x'=>11.9275,'toa_do_y'=>108.4449],
+            ],
+            'hcm_nhatrang' => [
+                ['ten_tram'=>'Bến xe Miền Đông Mới','dia_chi'=>'Xa lộ Hà Nội, Long Bình, TP. Thủ Đức, TP. HCM','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>10.8796,'toa_do_y'=>106.8160],
+                ['ten_tram'=>'Bến xe Phan Thiết','dia_chi'=>'Lương Văn Chánh, Phú Thủy, TP. Phan Thiết, Bình Thuận','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>10.9286,'toa_do_y'=>108.1021],
+                ['ten_tram'=>'Trạm dừng Mũi Né','dia_chi'=>'Nguyễn Đình Chiểu, Mũi Né, TP. Phan Thiết','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>10.9432,'toa_do_y'=>108.2878],
+                ['ten_tram'=>'Bến xe Phan Rang – Tháp Chàm','dia_chi'=>'Thống Nhất, Phan Rang – Tháp Chàm, Ninh Thuận','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>11.5675,'toa_do_y'=>108.9882],
+                ['ten_tram'=>'Trạm dừng Cam Ranh','dia_chi'=>'QL1A, Ba Ngòi, TP. Cam Ranh, Khánh Hòa','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>11.9234,'toa_do_y'=>109.1492],
+                ['ten_tram'=>'Bến xe Phía Nam Nha Trang','dia_chi'=>'Võ Nguyên Giáp, Tây Nha Trang, Khánh Hòa','loai_tram'=>'tra','thu_tu'=>6,'toa_do_x'=>12.2438,'toa_do_y'=>109.0980],
+            ],
+            'hcm_cantho' => [
+                ['ten_tram'=>'Bến xe Miền Tây','dia_chi'=>'Kinh Dương Vương, An Lạc, Bình Tân, TP. HCM','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>10.7401,'toa_do_y'=>106.6194],
+                ['ten_tram'=>'Bến xe Tân An','dia_chi'=>'QL1A, Phường 6, TP. Tân An, Long An','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>10.5337,'toa_do_y'=>106.4117],
+                ['ten_tram'=>'Bến xe Mỹ Tho','dia_chi'=>'Ấp Mỹ Đức B, Đạo Thạnh, TP. Mỹ Tho, Tiền Giang','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>10.3620,'toa_do_y'=>106.3488],
+                ['ten_tram'=>'Trạm dừng Vĩnh Long','dia_chi'=>'QL1A, Phường 8, TP. Vĩnh Long','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>10.2393,'toa_do_y'=>105.9572],
+                ['ten_tram'=>'Trạm dừng Ô Môn','dia_chi'=>'QL91, Châu Văn Liêm, Ô Môn, Cần Thơ','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>10.1512,'toa_do_y'=>105.8131],
+                ['ten_tram'=>'Bến xe Trung Tâm Cần Thơ','dia_chi'=>'Trần Hoàng Na, Cái Răng, TP. Cần Thơ','loai_tram'=>'tra','thu_tu'=>6,'toa_do_x'=>10.0053,'toa_do_y'=>105.7713],
+            ],
+            'da_nang_quy_nhon' => [
+                ['ten_tram'=>'Bến xe Trung Tâm Đà Nẵng','dia_chi'=>'Điện Biên Phủ, Hải Châu, Đà Nẵng','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>16.0550,'toa_do_y'=>108.1734],
+                ['ten_tram'=>'Bến xe Tam Kỳ','dia_chi'=>'01 Phan Bội Châu, Tân Thạnh, TP. Tam Kỳ, Quảng Nam','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>15.5693,'toa_do_y'=>108.4742],
+                ['ten_tram'=>'Bến xe Quảng Ngãi','dia_chi'=>'Đinh Tiên Hoàng, Nghĩa Chánh, TP. Quảng Ngãi','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>15.1075,'toa_do_y'=>108.8191],
+                ['ten_tram'=>'Trạm dừng Sa Huỳnh','dia_chi'=>'QL1A, TT. Sa Huỳnh, Đức Phổ, Quảng Ngãi','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>14.5832,'toa_do_y'=>109.0327],
+                ['ten_tram'=>'Trạm dừng Bồng Sơn','dia_chi'=>'QL1A, TT. Bồng Sơn, Hoài Nhơn, Bình Định','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>14.4486,'toa_do_y'=>109.0061],
+                ['ten_tram'=>'Bến xe khách Quy Nhơn','dia_chi'=>'71 Tây Sơn, Ghềnh Ráng, TP. Quy Nhơn, Bình Định','loai_tram'=>'tra','thu_tu'=>6,'toa_do_x'=>13.7533,'toa_do_y'=>109.2089],
+            ],
+            'da_nang_hue' => [
+                ['ten_tram'=>'Bến xe Trung Tâm Đà Nẵng','dia_chi'=>'Điện Biên Phủ, Hải Châu, Đà Nẵng','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>16.0550,'toa_do_y'=>108.1734],
+                ['ten_tram'=>'Cổng hầm Hải Vân phía Nam','dia_chi'=>'QL1A, Hòa Hiệp Bắc, Liên Chiểu, Đà Nẵng','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>16.1736,'toa_do_y'=>108.1099],
+                ['ten_tram'=>'Trạm dừng Lăng Cô','dia_chi'=>'QL1A, TT. Lăng Cô, Phú Lộc, Thừa Thiên Huế','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>16.2195,'toa_do_y'=>108.0709],
+                ['ten_tram'=>'Trạm dừng Phú Bài','dia_chi'=>'QL1A, TT. Phú Bài, Hương Thủy, Thừa Thiên Huế','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>16.3739,'toa_do_y'=>107.7086],
+                ['ten_tram'=>'Bến xe Phía Nam Huế','dia_chi'=>'An Dương Vương, An Cựu, TP. Huế','loai_tram'=>'tra','thu_tu'=>5,'toa_do_x'=>16.4508,'toa_do_y'=>107.6060],
+            ],
+            'ha_noi_sapa' => [
+                ['ten_tram'=>'Bến xe Mỹ Đình','dia_chi'=>'20 Phạm Hùng, Mỹ Đình, Nam Từ Liêm, Hà Nội','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>21.0284,'toa_do_y'=>105.7783],
+                ['ten_tram'=>'Trạm dừng Đoan Hùng','dia_chi'=>'Cao tốc Nội Bài – Lào Cai, Đoan Hùng, Phú Thọ','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>21.6078,'toa_do_y'=>105.1721],
+                ['ten_tram'=>'Bến xe Yên Bái','dia_chi'=>'Đường Yên Ninh, Yên Thịnh, TP. Yên Bái','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>21.7222,'toa_do_y'=>104.9112],
+                ['ten_tram'=>'Trạm dừng Nghĩa Lộ','dia_chi'=>'QL37, Nghĩa Lộ, Văn Chấn, Yên Bái','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>21.5961,'toa_do_y'=>104.5122],
+                ['ten_tram'=>'Bến xe TP. Lào Cai','dia_chi'=>'Nhạc Sơn, Phường Lào Cai, TP. Lào Cai','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>22.4806,'toa_do_y'=>103.9754],
+                ['ten_tram'=>'Bến xe Sa Pa','dia_chi'=>'TT. Sa Pa, Huyện Sa Pa, Lào Cai','loai_tram'=>'tra','thu_tu'=>6,'toa_do_x'=>22.3363,'toa_do_y'=>103.8440],
+            ],
+            'hcm_camau' => [
+                ['ten_tram'=>'Bến xe Miền Tây','dia_chi'=>'Kinh Dương Vương, An Lạc, Bình Tân, TP. HCM','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>10.7401,'toa_do_y'=>106.6194],
+                ['ten_tram'=>'Bến xe Mỹ Tho','dia_chi'=>'Ấp Mỹ Đức B, Đạo Thạnh, TP. Mỹ Tho, Tiền Giang','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>10.3620,'toa_do_y'=>106.3488],
+                ['ten_tram'=>'Bến xe Trung Tâm Cần Thơ','dia_chi'=>'Trần Hoàng Na, Cái Răng, TP. Cần Thơ','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>10.0053,'toa_do_y'=>105.7713],
+                ['ten_tram'=>'Trạm dừng Sóc Trăng','dia_chi'=>'QL1A, Phường 7, TP. Sóc Trăng','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>9.6025,'toa_do_y'=>105.9736],
+                ['ten_tram'=>'Bến xe Bạc Liêu','dia_chi'=>'Cao Văn Lầu, Phường 1, TP. Bạc Liêu','loai_tram'=>'ca_hai','thu_tu'=>5,'toa_do_x'=>9.2940,'toa_do_y'=>105.7244],
+                ['ten_tram'=>'Bến xe Cà Mau','dia_chi'=>'Lý Thường Kiệt, Tân Thành, TP. Cà Mau','loai_tram'=>'tra','thu_tu'=>6,'toa_do_x'=>9.1758,'toa_do_y'=>105.1709],
+            ],
+            'ha_noi_hp_mydinh' => [
+                ['ten_tram'=>'Bến xe Mỹ Đình','dia_chi'=>'20 Phạm Hùng, Mỹ Đình, Nam Từ Liêm, Hà Nội','loai_tram'=>'don','thu_tu'=>1,'toa_do_x'=>21.0284,'toa_do_y'=>105.7783],
+                ['ten_tram'=>'Trạm dừng Phố Nối','dia_chi'=>'QL5A, Phố Nối, Mỹ Hào, Hưng Yên','loai_tram'=>'ca_hai','thu_tu'=>2,'toa_do_x'=>20.9427,'toa_do_y'=>106.1012],
+                ['ten_tram'=>'Bến xe Hải Dương','dia_chi'=>'Nguyễn Lương Bằng, Trần Phú, TP. Hải Dương','loai_tram'=>'ca_hai','thu_tu'=>3,'toa_do_x'=>20.9389,'toa_do_y'=>106.3314],
+                ['ten_tram'=>'Nút giao An Dương','dia_chi'=>'An Dương, Hải Phòng','loai_tram'=>'ca_hai','thu_tu'=>4,'toa_do_x'=>20.8632,'toa_do_y'=>106.6108],
+                ['ten_tram'=>'Bến xe Cầu Rào','dia_chi'=>'Số 1 Thiên Lôi, Ngô Quyền, Hải Phòng','loai_tram'=>'tra','thu_tu'=>5,'toa_do_x'=>20.8359,'toa_do_y'=>106.6975],
+            ],
         ];
 
-        // Tự động gắn thêm created_at và updated_at cho từng dòng
-        $data = array_map(function ($item) use ($now) {
-            $item['created_at'] = $now;
-            $item['updated_at'] = $now;
-            return $item;
-        }, $data);
+        // Map route_id => template key
+        $routeMap = [
+            1  => 'ha_noi_hai_phong',
+            2  => 'ha_noi_hai_phong',
+            3  => 'ha_noi_da_nang',
+            4  => 'ha_noi_da_nang',
+            5  => 'ha_noi_hcm',
+            6  => 'ha_noi_hp_mydinh',
+            7  => 'ha_noi_da_nang',
+            8  => 'hcm_dalat',
+            9  => 'hcm_nhatrang',
+            10 => 'hcm_cantho',
+            11 => 'hcm_dalat',
+            12 => 'hcm_nhatrang',
+            13 => 'hcm_cantho',
+            14 => 'da_nang_quy_nhon',
+            15 => 'da_nang_hue',
+            16 => 'ha_noi_sapa',
+            17 => 'hcm_camau',
+        ];
 
-        // Chèn vào database bằng DB::table để tối ưu hiệu suất (Insert hàng loạt)
-        DB::table('tram_dungs')->insert($data);
+        $rows = [];
+        foreach ($routeMap as $routeId => $tpl) {
+            foreach ($templates[$tpl] as $stop) {
+                $rows[] = array_merge($stop, [
+                    'id_tuyen_duong' => $routeId,
+                    'id_phuong_xa'   => null,
+                    'tinh_trang'     => 'hoat_dong',
+                    'created_at'     => $now,
+                    'updated_at'     => $now,
+                ]);
+            }
+        }
+
+        DB::table('tram_dungs')->insert($rows);
     }
 }

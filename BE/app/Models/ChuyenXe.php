@@ -18,6 +18,7 @@ class ChuyenXe extends Model
         'ngay_khoi_hanh',
         'gio_khoi_hanh',
         'thanh_toan_sau',
+        'so_ngay',
         'tong_tien',
         'trang_thai',
     ];

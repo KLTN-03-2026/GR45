@@ -25,6 +25,7 @@ return new class extends Migration
             $table->time('gio_khoi_hanh');
             $table->time('gio_ket_thuc')->nullable();
             $table->integer('gio_du_kien')->nullable();
+            $table->integer('so_ngay')->default(1);
             $table->decimal('gia_ve_co_ban', 10, 2)->default(0);
             $table->text('ghi_chu')->nullable();
             $table->text('ghi_chu_admin')->nullable();

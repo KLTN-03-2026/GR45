@@ -83,4 +83,14 @@ class ChuyenXeService
     {
         return $this->chuyenXeRepo->hoanThanh($id);
     }
+
+    public function notifyMissingDrivers()
+    {
+        return $this->chuyenXeRepo->notifyMissingDrivers();
+    }
+
+    public function autoAssignDrivers(string $maNhaXe)
+    {
+        return $this->chuyenXeRepo->autoAssignDrivers($maNhaXe);
+    }
 }
