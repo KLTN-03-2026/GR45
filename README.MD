@@ -81,7 +81,14 @@
 ### Bước 1: Cài đặt Backend (Laravel)
 
 ```bash
+# Cài đặt các thư viện lõi
 composer require laravel/sanctum spatie/laravel-permission cloudinary-labs/cloudinary-laravel intervention/image pusher/pusher-php-server maatwebsite/excel
+
+# Cài đặt máy chủ WebSockets tốc độ cao Laravel Reverb (Mới)
+composer require laravel/reverb
+php artisan reverb:install
+
+# Publish cấu hình Cloudinary và chạy CSDL
 php artisan vendor:publish --provider="CloudinaryLabs\\CloudinaryLaravel\\CloudinaryServiceProvider"
 php artisan migrate --seed
 ```
@@ -89,7 +96,81 @@ php artisan migrate --seed
 ### Bước 2: Cài đặt Frontend (Vue.js)
 
 ```bash
+# Cài đặt thư viện AI, Bản đồ và Laravel Echo (Realtime)
 npm install @mediapipe/tasks-vision onnxruntime-web @openmapvn/openmapvn-gl leaflet pinia chart.js vue-chartjs pusher-js laravel-echo
 ```
 
-**Lưu ý:** Tìm đầy đủ các key trong file `.env.example` và thay thế bằng key của bạn
+**Lưu ý:** Tìm đầy đủ các key trong file `.env.example` và thay thế bằng key của bạn.
+
+---
+
+## 📡 5. Cấu hình Real-time (Laravel Reverb), Cloudflare Tunnel & VietQR
+
+### 5.1. Quy trình chạy Real-time & Giám sát hệ thống ở Local
+
+Để hệ thống hoạt động đầy đủ tính năng realtime (Cảnh báo vi phạm AI, Cập nhật trạng thái vé, Rút tiền ví doanh thu), bạn cần chạy song song 4 tiến trình sau:
+
+1. **Khởi chạy Web Server Backend:**
+   ```bash
+   php artisan serve
+   ```
+2. **Khởi chạy Máy chủ WebSocket (Laravel Reverb):**
+   ```bash
+   php artisan reverb:start
+   ```
+3. **Khởi chạy Hàng đợi Queue (Xử lý tác vụ ngầm cho realtime & tracking):**
+   ```bash
+   php artisan queue:work --queue=tracking,default
+   ```
+4. **Khởi chạy Máy chủ Frontend (Vue.js):**
+   ```bash
+   npm run dev -- --force
+   ```
+
+### 5.2. Cấu hình Môi trường (.env) cho Hệ thống Real-time
+
+#### 💻 Phía Backend (`BE/.env`)
+
+Cấu hình để Laravel và máy chủ Reverb liên kết thống nhất thông qua đường truyền Cloudflare Tunnel:
+
+```env
+BROADCAST_CONNECTION=reverb
+
+REVERB_APP_ID=2041227
+REVERB_APP_KEY=
+REVERB_APP_SECRET=
+REVERB_HOST=socket.bussafe.io.vn
+REVERB_PORT=443
+REVERB_SCHEME=https
+
+REVERB_SERVER_HOST=127.0.0.1
+REVERB_SERVER_PORT=8090
+```
+
+#### 🌐 Phía Frontend (`FE/.env`)
+
+Cấu hình kết nối an toàn WSS đến domain Socket biên của Cloudflare:
+
+```env
+VITE_REVERB_APP_KEY=
+VITE_REVERB_HOST=socket.bussafe.io.vn
+VITE_REVERB_PORT=443
+VITE_REVERB_SCHEME=https
+```
+
+#### 🛡 Thiết lập trên Cloudflare Tunnel (Zero Trust Dashboard)
+
+- Định tuyến Public Hostname: `socket.bussafe.io.vn` ➔ `http://127.0.0.1:8090`.
+- **Rất quan trọng:** Trong **Cloudflare Dashboard** -> **Network** -> Bật chế độ **WebSockets** sang **ON (Enabled)** để thông suốt các yêu cầu bắt tay `101 Switching Protocols`.
+
+### 5.3. Cấu hình Cổng thanh toán VietQR tự động (`FE/.env`)
+
+Hệ thống tích hợp thư viện tạo mã VietQR động để khách hàng quét thanh toán đặt vé và xem hóa đơn tức thời. Cấu hình tài khoản thụ hưởng tại file cấu hình:
+
+```env
+VITE_BANK_ID=MB                  # Mã ngân hàng (Ví dụ: MB, VCB, BIDV,...)
+VITE_BANK_ACCOUNT=0377417720     # Số tài khoản ngân hàng nhận tiền
+VITE_ACCOUNT_NAME=NGUYEN HUU THAI # Tên chủ tài khoản viết hoa không dấu
+```
+
+_Giao diện Vue sẽ tự động sử dụng định dạng `compact2.png` của VietQR để sinh mã QR thanh toán kèm đầy đủ thông tin số tiền và mã vé làm nội dung chuyển khoản._

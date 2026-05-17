@@ -42,43 +42,45 @@ export function buildLaravelEchoTransportOptions() {
   }
 
   const reverbKey = String(import.meta.env.VITE_REVERB_APP_KEY ?? '').trim();
+  if (reverbKey.length === 0) return null;
 
-  const scheme = (import.meta.env.VITE_REVERB_SCHEME || 'http').toLowerCase();
-  const portRaw = import.meta.env.VITE_REVERB_PORT;
-  const port =
-    portRaw !== undefined && portRaw !== ''
-      ? Number(portRaw)
-      : scheme === 'https'
-        ? 443
-        : 80;
+  const isHttps = typeof window !== 'undefined' && window.location?.protocol === 'https:';
+  const pagePort = typeof window !== 'undefined' && window.location?.port ? Number(window.location.port) : null;
+  const pageHost = typeof window !== 'undefined' && window.location?.hostname ? window.location.hostname : '';
 
-  const host = resolveReverbWsHost(import.meta.env.VITE_REVERB_HOST);
+  // 1. Lấy cấu hình từ .env làm mặc định
+  let host = String(import.meta.env.VITE_REVERB_HOST || '127.0.0.1').trim();
+  let port = import.meta.env.VITE_REVERB_PORT ? Number(import.meta.env.VITE_REVERB_PORT) : 80;
+  let scheme = String(import.meta.env.VITE_REVERB_SCHEME || 'http').toLowerCase();
 
-  if (reverbKey.length > 0) {
-    if (
-      import.meta.env.DEV &&
-      port === 8000 &&
-      /:8000\b/.test(String(import.meta.env.VITE_API_URL || ''))
-    ) {
-      console.warn(
-        '[Echo/Reverb] VITE_REVERB_PORT=8000 gần như luôn sai: :8000 là HTTP của `php artisan serve`. ' +
-          'Đặt VITE_REVERB_PORT = cổng Reverb (khớp BE `REVERB_SERVER_PORT`, thường 8080), restart `npm run dev`.',
-      );
+  // 2. Bảo vệ Mixed Content: Nếu trang đang chạy HTTPS, kết nối WebSocket BẮT BUỘC dùng HTTPS/WSS
+  if (isHttps) {
+    scheme = 'https';
+    // Nếu host cấu hình mặc định là localhost/loopback nhưng page chạy ở domain thật, tự động định tuyến qua proxy Vite
+    if ((host === '127.0.0.1' || host === 'localhost') && pageHost && pageHost !== 'localhost' && pageHost !== '127.0.0.1') {
+      host = pageHost;
+      port = pagePort || 443;
     }
-    return {
-      broadcaster: 'reverb',
-      key: reverbKey,
-      wsHost: host,
-      wsPort: port,
-      wssPort: port,
-      forceTLS: scheme === 'https',
-      /** Dev http: chỉ ws — tránh spam lỗi wss://127.0.0.1:8080 */
-      enabledTransports: scheme === 'https' ? ['wss', 'ws'] : ['ws'],
-      disableStats: true,
-    };
+  } else {
+    // Nếu chạy HTTP thường (local dev)
+    if ((host === '127.0.0.1' || host === 'localhost') && pageHost) {
+      host = pageHost;
+      port = pagePort || 80;
+    }
   }
 
-  return null;
+  console.log(`[Echo] Đang kết nối Reverb: ${scheme === 'https' ? 'wss' : 'ws'}://${host}:${port}`);
+
+  return {
+    broadcaster: 'reverb',
+    key: reverbKey,
+    wsHost: host,
+    wsPort: port,
+    wssPort: port,
+    forceTLS: scheme === 'https',
+    enabledTransports: scheme === 'https' ? ['wss', 'ws'] : ['ws'],
+    disableStats: true,
+  };
 }
 
 export function isEchoRealtimeConfigured() {
@@ -108,7 +110,8 @@ export function createEcho(token = null) {
   const options = { ...transport };
 
   if (token) {
-    options.authEndpoint = `${apiUrl}v1/nha-xe/broadcasting/auth`;
+    const endpointPath = apiUrl.endsWith('v1/') ? 'nha-xe/broadcasting/auth' : 'v1/nha-xe/broadcasting/auth';
+    options.authEndpoint = `${apiUrl}${endpointPath}`;
     options.auth = {
       headers: {
         Authorization: `Bearer ${token}`,

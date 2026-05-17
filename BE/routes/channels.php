@@ -13,11 +13,10 @@ use Illuminate\Support\Facades\Broadcast;
 |
 */
 
-// Kênh riêng cho từng Nhà xe
+// Kênh riêng cho từng Nhà xe (hỗ trợ cả chủ nhà xe và nhân viên)
 Broadcast::channel('nha-xe.{maNhaXe}', function ($user, $maNhaXe) {
-    // Chỉ cho phép nếu user là Nhà xe và mã nhà xe khớp
-    return $user instanceof \App\Models\NhaXe && $user->ma_nha_xe === $maNhaXe;
-}, ['guards' => ['nha_xe']]);
+    return $user->ma_nha_xe === $maNhaXe;
+}, ['guards' => ['nha_xe', 'nhan_vien']]);
 
 // Kênh riêng cho Tài xế (nếu cần dùng sau này)
 Broadcast::channel('tai-xe.{id}', function ($user, $id) {

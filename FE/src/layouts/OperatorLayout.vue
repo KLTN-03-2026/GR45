@@ -1,5 +1,5 @@
 <script setup>
-import { ref, provide, onMounted, onUnmounted } from "vue";
+import { ref, provide, onMounted, onUnmounted, watch } from "vue";
 import OperatorHeader from "@/components/layout/OperatorHeader.vue";
 import OperatorSidebar from "@/components/layout/OperatorSidebar.vue";
 import BaseToast from "@/components/common/BaseToast.vue";
@@ -44,15 +44,23 @@ const showToast = (message, type = "success") => {
 // ─── Lắng nghe sự kiện Reverb (WebSocket) ──────────────────────────────────
 let echoInstance = null;
 
-onMounted(() => {
-  // Chỉ subscribe Reverb khi là chủ nhà xe (guard nha_xe).
-  // Nhân viên dùng token guard nhan_vien — endpoint /nha-xe/broadcasting/auth sẽ từ chối.
-  if (operatorStore.user && operatorStore.token && operatorStore.isOwner) {
+const initEchoConnection = () => {
+  if (echoInstance) {
+    const oldMaNhaXe = operatorStore.user?.ma_nha_xe || operatorStore.user?.nhaXe?.ma_nha_xe;
+    if (oldMaNhaXe) {
+      echoInstance.leave(`nha-xe.${oldMaNhaXe}`);
+    }
+  }
+
+  if (operatorStore.user && operatorStore.token) {
     echoInstance = createEcho(operatorStore.token);
     if (!echoInstance) return;
 
-    const channelName = `nha-xe.${operatorStore.user.ma_nha_xe}`;
-    console.log(`Đang subscribe kênh: ${channelName}`);
+    const maNhaXe = operatorStore.user.ma_nha_xe || operatorStore.user.nhaXe?.ma_nha_xe;
+    if (!maNhaXe) return;
+
+    const channelName = `nha-xe.${maNhaXe}`;
+    console.log(`[Reverb] Đang subscribe kênh: ${channelName}`);
 
     echoInstance
       .private(channelName)
@@ -144,11 +152,28 @@ onMounted(() => {
         });
       });
   }
+};
+
+watch(
+  () => [operatorStore.token, operatorStore.user],
+  ([newToken, newUser]) => {
+    if (newToken && newUser) {
+      initEchoConnection();
+    }
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  initEchoConnection();
 });
 
 onUnmounted(() => {
-  if (echoInstance && operatorStore.user && operatorStore.isOwner) {
-    echoInstance.leave(`nha-xe.${operatorStore.user.ma_nha_xe}`);
+  if (echoInstance && operatorStore.user) {
+    const maNhaXe = operatorStore.user.ma_nha_xe || operatorStore.user.nhaXe?.ma_nha_xe;
+    if (maNhaXe) {
+      echoInstance.leave(`nha-xe.${maNhaXe}`);
+    }
   }
 });
 </script>

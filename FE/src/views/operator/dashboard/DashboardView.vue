@@ -329,7 +329,7 @@ onUnmounted(() => {
   clearTimeout(aiBlinkTimer);
   if (echoInst) {
     const m = store.user?.nhaXe?.ma_nha_xe || "global";
-    echoInst.leave(`private-nha-xe.${m}`);
+    echoInst.leave(`nha-xe.${m}`);
   }
 });
 </script>
