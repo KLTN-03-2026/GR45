@@ -65,8 +65,7 @@ export default defineConfig(({ mode }) => {
     (unified ? 'http://127.0.0.1:8000' : 'https://api.bussafe.io.vn')
 
   const reverbProxyTarget =
-    String(env.DEV_PROXY_REVERB_TARGET ?? '').trim() ||
-    (unified ? 'http://127.0.0.1:8080' : '')
+    String(env.DEV_PROXY_REVERB_TARGET ?? '').trim() || 'http://127.0.0.1:8090'
 
   const ollamaProxyTarget =
     String(env.DEV_PROXY_OLLAMA_TARGET ?? '').trim() || 'http://127.0.0.1:11434'
@@ -135,6 +134,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      host: '0.0.0.0',
       allowedHosts: true,
       fs: {
         allow: [feDir, ...sdkRoots],

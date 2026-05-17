@@ -31,7 +31,10 @@ class BaoDongViPhamEvent implements ShouldBroadcastNow
     public function broadcastOn()
     {
         Log::info('nha-xe.' . $this->maNhaXe);
-        return new PrivateChannel('nha-xe.' . $this->maNhaXe);
+        return [
+            new PrivateChannel('nha-xe.' . $this->maNhaXe),
+            new Channel('he-thong.giam-sat'),
+        ];
     }
 
     public function broadcastAs()
