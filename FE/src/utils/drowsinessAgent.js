@@ -27,7 +27,7 @@ const RIGHT_EYE = {
 // ===== Defaults =====
 const DEFAULT_CONFIG = {
   earThreshold: 0.22,
-  consecutiveFrames: 72,   // ~3s ở 24fps
+  violationDurationMs: 3000, // ~3s thay vì đếm frame
   snapshotWidth: 640,
   snapshotHeight: 480,
   cooldownMs: 10000,       // 10s giữa các lần chụp
@@ -98,9 +98,11 @@ export class DrowsinessAgent {
     this.ctx = null;
     this.running = false;
     this.animFrameId = null;
+    this.isExternalStream = false;
 
     // Counters
     this.closedFrameCount = 0;
+    this.closedStartTime = null;
     this.violationActive = false;
     this.lastViolationTime = 0;
 
@@ -160,8 +162,8 @@ export class DrowsinessAgent {
         this.config.earThreshold = Number(data.ear_threshold);
       }
       if (data?.nguong_ms) {
-        // Convert ms → frames (giả sử 24fps)
-        this.config.consecutiveFrames = Math.round(Number(data.nguong_ms) / 1000 * 24);
+        // Sử dụng trực tiếp ms thay vì quy đổi ra frame
+        this.config.violationDurationMs = Number(data.nguong_ms);
       }
     } catch (e) {
       console.warn('Không lấy được cấu hình AI, dùng mặc định:', e.message);
@@ -180,16 +182,21 @@ export class DrowsinessAgent {
   /**
    * Bắt đầu camera + vòng lặp giám sát
    */
-  async start() {
+  async start(externalStream = null) {
     if (!this.faceLandmarker || !this.video) {
       throw new Error('Agent chưa init hoặc chưa attach video element');
     }
 
-    // Xin quyền camera
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-      audio: false,
-    });
+    this.isExternalStream = !!externalStream;
+    let stream = externalStream;
+
+    if (!stream) {
+      // Xin quyền camera
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+    }
 
     this.video.srcObject = stream;
     await this.video.play();
@@ -200,6 +207,7 @@ export class DrowsinessAgent {
 
     this.running = true;
     this.closedFrameCount = 0;
+    this.closedStartTime = null;
     this.violationActive = false;
 
     this._processFrame();
@@ -215,7 +223,9 @@ export class DrowsinessAgent {
       this.animFrameId = null;
     }
     if (this.video?.srcObject) {
-      this.video.srcObject.getTracks().forEach((t) => t.stop());
+      if (!this.isExternalStream) {
+        this.video.srcObject.getTracks().forEach((t) => t.stop());
+      }
       this.video.srcObject = null;
     }
   }
@@ -268,19 +278,26 @@ export class DrowsinessAgent {
     // Vẽ landmarks mắt overlay
     this._drawEyeLandmarks(landmarks);
 
-    // Logic phát hiện
+    // Logic phát hiện dựa trên thời gian thực tế (chống FPS drop khi chạy cùng YOLO)
     if (earAvg < this.config.earThreshold) {
       this.closedFrameCount++;
-      if (this.closedFrameCount >= this.config.consecutiveFrames) {
+      if (this.closedStartTime === null) {
+        this.closedStartTime = timestamp;
+      }
+      
+      const closedDuration = timestamp - this.closedStartTime;
+
+      if (closedDuration >= this.config.violationDurationMs) {
         // VI PHẠM
         this.onStatusChange?.('danger', earAvg);
         this._handleViolation(earAvg, timestamp);
-      } else if (this.closedFrameCount >= this.config.consecutiveFrames * 0.5) {
+      } else if (closedDuration >= this.config.violationDurationMs * 0.5) {
         this.onStatusChange?.('warning', earAvg);
       }
     } else {
       // Mắt mở → reset
-      if (this.closedFrameCount > 0) {
+      if (this.closedStartTime !== null) {
+        this.closedStartTime = null;
         this.closedFrameCount = 0;
         this.violationActive = false;
       }

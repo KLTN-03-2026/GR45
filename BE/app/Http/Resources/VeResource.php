@@ -32,6 +32,7 @@ class VeResource extends JsonResource
 
             // Khách hàng — chỉ tên và SĐT
             'khach_hang' => $this->whenLoaded('khachHang', function () {
+                if (!$this->khachHang) return null;
                 return [
                     'id'            => $this->khachHang->id,
                     'ho_va_ten'     => $this->khachHang->ho_va_ten,
@@ -50,7 +51,7 @@ class VeResource extends JsonResource
                     'trang_thai'      => $cx->trang_thai,
 
                     // Tuyến đường — chỉ thông tin hành trình
-                    'tuyen_duong' => $cx->relationLoaded('tuyenDuong') ? [
+                    'tuyen_duong' => ($cx->relationLoaded('tuyenDuong') && $cx->tuyenDuong) ? [
                         'id'               => $cx->tuyenDuong->id,
                         'ten_tuyen_duong'  => $cx->tuyenDuong->ten_tuyen_duong,
                         'diem_bat_dau'     => $cx->tuyenDuong->diem_bat_dau,
@@ -62,7 +63,7 @@ class VeResource extends JsonResource
                         'gia_ve_co_ban'    => $cx->tuyenDuong->gia_ve_co_ban,
                         'ghi_chu'          => $cx->tuyenDuong->ghi_chu,
                         // Nhà xe — chỉ tên
-                        'nha_xe' => $cx->tuyenDuong->relationLoaded('nhaXe') ? [
+                        'nha_xe' => ($cx->tuyenDuong->relationLoaded('nhaXe') && $cx->tuyenDuong->nhaXe) ? [
                             'id'           => $cx->tuyenDuong->nhaXe->id,
                             'ten_nha_xe'   => $cx->tuyenDuong->nhaXe->ten_nha_xe,
                             'hinh_anh'     => $cx->tuyenDuong->nhaXe->hinh_anh,
@@ -70,13 +71,13 @@ class VeResource extends JsonResource
                     ] : null,
 
                     // Xe — chỉ thông tin cơ bản
-                    'xe' => $cx->relationLoaded('xe') ? [
+                    'xe' => ($cx->relationLoaded('xe') && $cx->xe) ? [
                         'id'              => $cx->xe->id,
                         'bien_so'         => $cx->xe->bien_so,
                         'ten_xe'          => $cx->xe->ten_xe,
                         'hinh_anh'        => $cx->xe->hinh_anh,
                         'so_ghe_thuc_te'  => $cx->xe->so_ghe_thuc_te,
-                        'loai_xe'         => $cx->xe->relationLoaded('loaiXe') ? [
+                        'loai_xe'         => ($cx->xe->relationLoaded('loaiXe') && $cx->xe->loaiXe) ? [
                             'id'                => $cx->xe->loaiXe->id,
                             'ten_loai_xe'       => $cx->xe->loaiXe->ten_loai_xe,
                             'so_ghe_mac_dinh'   => $cx->xe->loaiXe->so_ghe_mac_dinh,
@@ -86,7 +87,7 @@ class VeResource extends JsonResource
                     ] : null,
 
                     // Tài xế — chỉ tên và SĐT (không CCCD, ảnh GPLX)
-                    'tai_xe' => $cx->relationLoaded('taiXe') ? [
+                    'tai_xe' => ($cx->relationLoaded('taiXe') && $cx->taiXe) ? [
                         'id'            => $cx->taiXe->id,
                         'ho_va_ten'     => $cx->taiXe->ho_va_ten,
                         'so_dien_thoai' => $cx->taiXe->so_dien_thoai,
@@ -105,17 +106,17 @@ class VeResource extends JsonResource
                         'ghi_chu'       => $ct->ghi_chu,
                         'gia_ve'        => $ct->gia_ve,
                         'tinh_trang'    => $ct->tinh_trang,
-                        'ghe'           => $ct->relationLoaded('ghe') ? [
+                        'ghe'           => ($ct->relationLoaded('ghe') && $ct->ghe) ? [
                             'id'       => $ct->ghe->id,
                             'ma_ghe'   => $ct->ghe->ma_ghe,
                             'tang'     => $ct->ghe->tang,
                         ] : null,
-                        'tram_don'      => $ct->relationLoaded('tramDon') ? [
+                        'tram_don'      => ($ct->relationLoaded('tramDon') && $ct->tramDon) ? [
                             'id'        => $ct->tramDon->id,
                             'ten_tram'  => $ct->tramDon->ten_tram,
                             'dia_chi'   => $ct->tramDon->dia_chi,
                         ] : null,
-                        'tram_tra'      => $ct->relationLoaded('tramTra') ? [
+                        'tram_tra'      => ($ct->relationLoaded('tramTra') && $ct->tramTra) ? [
                             'id'        => $ct->tramTra->id,
                             'ten_tram'  => $ct->tramTra->ten_tram,
                             'dia_chi'   => $ct->tramTra->dia_chi,
