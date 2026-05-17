@@ -1,11 +1,10 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
+import { anyTrue, textOrEmpty } from "../value.js";
 
-import { classifyIntentText } from "./intent-classifier.js";
+import { classifyIntentText } from "../intent/intent-classifier.js";
 
 function getLastUserMessage(messages = []) {
-  return (
-    [...messages].reverse().find((m) => m?.role === "user")?.content ?? ""
-  );
+  return textOrEmpty([...messages].reverse().find((m) => m?.role === "user")?.content);
 }
 
 export function createIntentDetectionNode(graphDependencies) {
@@ -25,8 +24,10 @@ export function createIntentDetectionNode(graphDependencies) {
         ...graphState.signals,
         intent,
         needs_grounding: Boolean(
-          graphState.signals?.needs_grounding ||
-            (isPolicyQuestion && !isOperational),
+          anyTrue(
+            graphState.signals?.needs_grounding,
+            isPolicyQuestion && !isOperational,
+          ),
         ),
       },
       journal: [

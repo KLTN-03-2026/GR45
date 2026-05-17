@@ -4,8 +4,7 @@ import OperatorHeader from "@/components/layout/OperatorHeader.vue";
 import OperatorSidebar from "@/components/layout/OperatorSidebar.vue";
 import BaseToast from "@/components/common/BaseToast.vue";
 import { useOperatorStore } from "@/stores/operatorStore";
-import Echo from "laravel-echo";
-import { buildLaravelEchoTransportOptions } from "@/utils/echo.js";
+import { createEcho } from "@/utils/echo.js";
 
 // Store state
 const operatorStore = useOperatorStore();
@@ -42,31 +41,15 @@ const showToast = (message, type = "success") => {
   }, 3000);
 };
 
-// ─── Lắng nghe sự kiện Pusher (WebSocket) ──────────────────────────────────
+// ─── Lắng nghe sự kiện Reverb (WebSocket) ──────────────────────────────────
 let echoInstance = null;
 
 onMounted(() => {
-  // Chỉ subscribe Pusher khi là chủ nhà xe (guard nha_xe).
+  // Chỉ subscribe Reverb khi là chủ nhà xe (guard nha_xe).
   // Nhân viên dùng token guard nhan_vien — endpoint /nha-xe/broadcasting/auth sẽ từ chối.
   if (operatorStore.user && operatorStore.token && operatorStore.isOwner) {
-    // Gán biến global để Echo dùng
-    window.Pusher = Pusher;
-
-    let apiUrl =
-      import.meta.env.VITE_API_URL || "https://api.bussafe.io.vn/api/";
-    if (!apiUrl.endsWith("/")) apiUrl += "/";
-
-    echoInstance = new Echo({
-      ...transport,
-      authEndpoint: `${apiUrl}v1/nha-xe/broadcasting/auth`,
-      auth: {
-        headers: {
-          Authorization: `Bearer ${operatorStore.token}`,
-          Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
-        },
-      },
-    });
+    echoInstance = createEcho(operatorStore.token);
+    if (!echoInstance) return;
 
     const channelName = `nha-xe.${operatorStore.user.ma_nha_xe}`;
     console.log(`Đang subscribe kênh: ${channelName}`);

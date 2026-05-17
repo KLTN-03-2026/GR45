@@ -1,4 +1,5 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
+import { errorText, isFunction, isObject, textOrEmpty } from "../value.js";
 
 function safeRandomId() {
   return globalThis.crypto?.randomUUID
@@ -7,7 +8,7 @@ function safeRandomId() {
 }
 
 function getLastUserMessage(messages = []) {
-  return [...messages].reverse().find((m) => m?.role === "user")?.content ?? "";
+  return textOrEmpty([...messages].reverse().find((m) => m?.role === "user")?.content);
 }
 
 export function createToolRouterNode(graphDependencies) {
@@ -18,7 +19,7 @@ export function createToolRouterNode(graphDependencies) {
       correlationId: graphState.correlationId,
     });
 
-    const rawUserMsg = String(getLastUserMessage(graphState.messages));
+    const rawUserMsg = textOrEmpty(getLastUserMessage(graphState.messages));
 
     const toolCalls = Array.isArray(graphState.plan?.toolCalls)
       ? graphState.plan.toolCalls
@@ -28,7 +29,7 @@ export function createToolRouterNode(graphDependencies) {
     const pending = [];
 
     for (const call of toolCalls) {
-      const toolName = String(call?.toolName ?? "").trim();
+      const toolName = textOrEmpty(call?.toolName).trim();
 
       if (!toolName) {
         skipped.push({ toolName: "", reason: "missing_tool_name" });
@@ -42,12 +43,12 @@ export function createToolRouterNode(graphDependencies) {
 
       let argumentsPayload = {
         raw_message: rawUserMsg,
-        ...(call.arguments && typeof call.arguments === "object"
+        ...(isObject(call.arguments)
           ? call.arguments
           : {}),
       };
 
-      if (typeof graphDependencies.enhanceToolCallArguments === "function") {
+      if (isFunction(graphDependencies.enhanceToolCallArguments)) {
         try {
           argumentsPayload = await graphDependencies.enhanceToolCallArguments({
             llm: graphDependencies.llm,
@@ -60,7 +61,7 @@ export function createToolRouterNode(graphDependencies) {
           skipped.push({
             toolName,
             reason: "argument_enhancer_error",
-            error: String(error?.message ?? error).slice(0, 300),
+            error: errorText(error).slice(0, 300),
           });
           continue;
         }

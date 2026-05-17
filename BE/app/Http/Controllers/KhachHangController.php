@@ -29,13 +29,13 @@ class KhachHangController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Dang nhap thanh cong.',
+                'message' => 'Đăng nhập thành công.',
                 'data'    => $result,
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Du lieu khong hop le.',
+                'message' => 'Dữ liệu không hợp lệ.',
                 'errors'  => $e->errors(),
             ], 422);
         }
@@ -64,7 +64,7 @@ class KhachHangController extends Controller
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Du lieu khong hop le.',
+                'message' => 'Dữ liệu không hợp lệ.',
                 'errors'  => $e->errors(),
             ], 422);
         }
@@ -173,7 +173,7 @@ class KhachHangController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Dang xuat thanh cong.',
+            'message' => 'Đăng xuất thành công.',
         ]);
     }
 
@@ -205,13 +205,13 @@ class KhachHangController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Cap nhat thong tin thanh cong.',
+                'message' => 'Cập nhật thông tin thành công.',
                 'data'    => $khachHang,
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Du lieu khong hop le.',
+                'message' => 'Dữ liệu không hợp lệ.',
                 'errors'  => $e->errors(),
             ], 422);
         }
@@ -228,12 +228,12 @@ class KhachHangController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Doi mat khau thanh cong. Vui long dang nhap lai.',
+                'message' => 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Du lieu khong hop le.',
+                'message' => 'Dữ liệu không hợp lệ.',
                 'errors'  => $e->errors(),
             ], 422);
         }
@@ -280,7 +280,7 @@ class KhachHangController extends Controller
         if (!$khachHang) {
             return response()->json([
                 'success' => false,
-                'message' => 'Khong tim thay khach hang.',
+                'message' => 'Không tìm thấy khách hàng.',
             ], 404);
         }
 
@@ -301,7 +301,7 @@ class KhachHangController extends Controller
         if (!$khachHang) {
             return response()->json([
                 'success' => false,
-                'message' => 'Khong tim thay khach hang.',
+                'message' => 'Không tìm thấy khách hàng.',
             ], 404);
         }
         $message = $khachHang->tinh_trang === 'hoat_dong'
@@ -325,13 +325,13 @@ class KhachHangController extends Controller
         if (!$ok) {
             return response()->json([
                 'success' => false,
-                'message' => 'Khong tim thay khach hang.',
+                'message' => 'Không tìm thấy khách hàng.',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Xoa khach hang thanh cong.',
+            'message' => 'Xóa khách hàng thành công.',
         ]);
     }
 

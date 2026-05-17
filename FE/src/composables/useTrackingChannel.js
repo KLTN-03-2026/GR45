@@ -11,7 +11,7 @@ import { createEcho } from '@/utils/echo.js';
  *   unsubscribeAll()                          // Dừng tất cả
  */
 export function useTrackingChannel() {
-  /** @type {ReturnType<typeof createEcho> | undefined} */
+  
   let echoInstance;
   const subscribedChannels = ref(new Map()); // tripId → channel name
 
@@ -22,11 +22,7 @@ export function useTrackingChannel() {
     return echoInstance;
   };
 
-  /**
-   * Subscribe vào channel tracking của 1 chuyến xe.
-   * @param {number} tripId - ID chuyến xe
-   * @param {Function} onUpdate - Callback nhận dữ liệu tracking mới
-   */
+  
   const subscribe = (tripId, onUpdate) => {
     if (subscribedChannels.value.has(tripId)) return; // Đã subscribe rồi
 

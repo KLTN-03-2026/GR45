@@ -221,6 +221,38 @@ const selectSession = async (session) => {
             s.staff_unread_count = (Number(s.staff_unread_count) || 0) + 1;
           }
         }
+      }, {
+        onSessionEnded: (detail) => {
+          const pid = String(detail?.public_id || "").trim();
+          if (pid !== String(session.public_id || "").trim()) return;
+
+          // Phiên kết thúc (khách thoát hoặc resolved) → khoá ô soạn, cập nhật badge.
+          const resolvedAtIso = new Date().toISOString();
+          if (sameLiveSupportSessionId(currentSessionId.value, session.id)) {
+            currentSessionDetails.value = {
+              ...(currentSessionDetails.value || {}),
+              staff_can_reply: false,
+              thread_archived: true,
+              ...(detail?.kind === "resolved" || detail?.kind === "customer_disconnected"
+                ? { status: "resolved", resolved_at: currentSessionDetails.value?.resolved_at || resolvedAtIso }
+                : {}),
+            };
+          }
+
+          const idx = sessions.value.findIndex((x) =>
+            sameLiveSupportSessionId(x.id, session.id),
+          );
+          if (idx !== -1) {
+            sessions.value[idx] = {
+              ...sessions.value[idx],
+              staff_can_reply: false,
+              thread_archived: true,
+              ...(detail?.kind === "resolved" || detail?.kind === "customer_disconnected"
+                ? { status: "resolved", resolved_at: sessions.value[idx].resolved_at || resolvedAtIso }
+                : {}),
+            };
+          }
+        },
       });
     }
   } catch (error) {
@@ -632,7 +664,7 @@ const formatTime = (isoString) => {
             v-if="currentSessionDetails?.thread_archived"
             class="px-3 py-2 bg-warning-subtle border-bottom small text-dark"
           >
-            Phiên đã đóng / resolve hoặc không còn nhận tin — chỉ xem lịch sử.
+            Phiên đã resolve hoặc không còn nhận tin — chỉ xem lịch sử.
           </div>
 
           <div

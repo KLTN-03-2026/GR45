@@ -49,6 +49,12 @@ const WELCOME_QUICK_REPLIES = [
   "Liên hệ hỗ trợ",
 ];
 
+const ASSISTANT_TYPE_CHAR_DELAY_MS = 2;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function flushUserCloseBeacon() {
   const key = chatAiSessionId.value?.trim();
   if (!key) return;
@@ -341,6 +347,24 @@ function patchAssistant(delta) {
   }
 }
 
+async function typeAssistantText(fullText) {
+  const text = String(fullText || "");
+  assistantBuffer.value = "";
+  const chars = Array.from(text);
+
+  for (const ch of chars) {
+    if (!streaming.value) break;
+    patchAssistant(ch);
+    await delay(ASSISTANT_TYPE_CHAR_DELAY_MS);
+  }
+
+  const last = messages.value[messages.value.length - 1];
+  if (last && last.role === "assistant") {
+    assistantBuffer.value = text;
+    last.text = text;
+  }
+}
+
 function historyForApi() {
   return messages.value
     .filter(
@@ -469,7 +493,7 @@ async function submitMessage(text) {
     return;
   }
   if (!lastGeo.value) {
-    await refreshGeoOnce();
+    void refreshGeoOnce();
   }
   quickReplies.value = [];
   const history = historyForApi();
@@ -481,6 +505,14 @@ async function submitMessage(text) {
   const opts = {
     history,
     session_id: chatAiSessionId.value,
+  };
+  let streamedAnswer = false;
+  opts.onToken = (token) => {
+    const chunk = String(token || "");
+    if (!chunk) return;
+    waitingFirstToken.value = false;
+    streamedAnswer = true;
+    patchAssistant(chunk);
   };
   if (
     lastGeo.value &&
@@ -550,24 +582,28 @@ async function submitMessage(text) {
 
       const structured = coerceAssistantStructured(body.assistant);
       let suggestionsForQuick = [];
+      let answerForUi = "";
 
       if (structured) {
-        const ans = String(structured.answer ?? "").trim();
-        assistantBuffer.value = ans;
-        last.text = ans;
+        answerForUi = String(structured.answer ?? "").trim();
         suggestionsForQuick = Array.isArray(structured.suggestions)
           ? structured.suggestions
           : [];
       } else {
         const rawForUi = String(body.assistant ?? "").trim();
-        assistantBuffer.value = rawForUi;
-        last.text = rawForUi;
+        answerForUi = rawForUi;
         const parsed = parseAssistantJsonPayload(rawForUi);
         if (parsed?.answer?.trim()) {
-          last.text = parsed.answer.trim();
-          assistantBuffer.value = last.text;
+          answerForUi = parsed.answer.trim();
         }
         suggestionsForQuick = parsed?.suggestions ?? [];
+      }
+
+      if (streamedAnswer) {
+        assistantBuffer.value = answerForUi;
+        last.text = answerForUi;
+      } else {
+        await typeAssistantText(answerForUi);
       }
 
       quickReplies.value = normalizeQuickReplies(suggestionsForQuick);

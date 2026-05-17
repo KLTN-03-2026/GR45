@@ -34,14 +34,14 @@ const props = defineProps({
   labels: {
     type: Array,
     default: () => [
-      "Tổng tin nhắn",
-      "Đã đóng (user)",
-      "Đã resolve",
+      "Tổng phiên",
+      "Đang mở",
+      "Phiên đã xử lý",
     ],
   },
   keys: {
     type: Array,
-    default: () => ["total", "in_closed_sessions", "in_resolved_sessions"],
+    default: () => ["total", "open_sessions", "in_resolved_sessions"],
   },
 });
 
@@ -55,7 +55,12 @@ function padRange() {
   const to = new Date();
   const from = new Date(to);
   from.setDate(from.getDate() - 6);
-  const iso = (d) => d.toISOString().slice(0, 10);
+  const iso = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
   dateFrom.value = iso(from);
   dateTo.value = iso(to);
 }
@@ -70,7 +75,14 @@ async function load() {
         date_to: dateTo.value || undefined,
       },
     });
-    daily.value = Array.isArray(res?.data?.daily) ? res.data.daily : [];
+    // axiosClient interceptor trả về body JSON. BE đóng gói `{ success, data: { daily } }`,
+    // nhưng nhận thêm shape `{ daily }` nếu BE đổi format sau này.
+    const rows = Array.isArray(res?.data?.daily)
+      ? res.data.daily
+      : Array.isArray(res?.daily)
+        ? res.daily
+        : [];
+    daily.value = rows;
   } catch (e) {
     daily.value = [];
     loadError.value =
@@ -82,6 +94,27 @@ async function load() {
   }
 }
 
+const allZeroData = computed(() => {
+  if (!daily.value.length) return false;
+  return daily.value.every((r) => {
+    return props.keys.every((k) => Number(r?.[k]) === 0);
+  });
+});
+
+/**
+ * Tổng cộng theo từng dataset trên cả khoảng ngày đang xem.
+ *
+ * Chart 200px với 7 ngày + 1 ngày spike trông như đường thẳng — user khó nhận ra
+ * có dữ liệu hay không. Bảng số này hiển thị tổng tuyệt đối kế trên chart để
+ * khỏi bị nhầm "chart hiện 0".
+ */
+const totalsByLabel = computed(() => {
+  return props.keys.map((key, idx) => ({
+    label: props.labels[idx] ?? key,
+    value: daily.value.reduce((sum, r) => sum + (Number(r?.[key]) || 0), 0),
+  }));
+});
+
 function rowLabels(rows) {
   return rows.map((r) => {
     const parts = String(r.date || "").split("-");
@@ -92,35 +125,22 @@ function rowLabels(rows) {
 
 const chartData = computed(() => ({
   labels: rowLabels(daily.value),
-  datasets: [
-    {
-      label: props.labels[0],
-      data: daily.value.map((r) => Number(r[props.keys[0]]) || 0),
-      borderColor: "rgba(37, 99, 235, 1)",
-      backgroundColor: "rgba(37, 99, 235, 0.08)",
+  datasets: props.keys.map((key, index) => {
+    const colors = [
+      ["rgba(37, 99, 235, 1)", "rgba(37, 99, 235, 0.08)"],
+      ["rgba(245, 158, 11, 1)", "rgba(245, 158, 11, 0.06)"],
+      ["rgba(22, 163, 74, 1)", "rgba(22, 163, 74, 0.06)"],
+    ];
+    return {
+      label: props.labels[index] ?? key,
+      data: daily.value.map((r) => Number(r[key]) || 0),
+      borderColor: colors[index]?.[0] ?? "rgba(100, 116, 139, 1)",
+      backgroundColor: colors[index]?.[1] ?? "rgba(100, 116, 139, 0.06)",
       tension: 0.35,
       fill: true,
       pointRadius: 3,
-    },
-    {
-      label: props.labels[1],
-      data: daily.value.map((r) => Number(r[props.keys[1]]) || 0),
-      borderColor: "rgba(245, 158, 11, 1)",
-      backgroundColor: "rgba(245, 158, 11, 0.06)",
-      tension: 0.35,
-      fill: true,
-      pointRadius: 3,
-    },
-    {
-      label: props.labels[2],
-      data: daily.value.map((r) => Number(r[props.keys[2]]) || 0),
-      borderColor: "rgba(22, 163, 74, 1)",
-      backgroundColor: "rgba(22, 163, 74, 0.06)",
-      tension: 0.35,
-      fill: true,
-      pointRadius: 3,
-    },
-  ],
+    };
+  }),
 }));
 
 const chartOptions = computed(() => ({
@@ -140,6 +160,9 @@ const chartOptions = computed(() => ({
     },
     y: {
       beginAtZero: true,
+      // suggestedMax giữ trục y có chiều cao khi tất cả series = 0 (lines vẫn thấy
+      // rõ tại baseline, không bị Chart.js render thành dải mờ sát đáy).
+      suggestedMax: allZeroData.value ? 4 : undefined,
       ticks: { font: { size: 11 }, color: "#64748b", precision: 0 },
       grid: { color: "rgba(148, 163, 184, 0.25)" },
     },
@@ -167,7 +190,7 @@ defineExpose({ reload: load, padRange });
       <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
         <div>
           <h6 class="fw-bold text-primary mb-0 small text-uppercase tracking-wide">
-            Thống kê tin nhắn theo ngày
+            Thống kê phiên live chat theo ngày
           </h6>
           <span v-if="scopeHint" class="text-muted small d-block">{{ scopeHint }}</span>
           <span class="text-muted small">Chọn khoảng ngày để xem biểu đồ</span>
@@ -192,6 +215,26 @@ defineExpose({ reload: load, padRange });
         </div>
       </div>
       <p v-if="loadError" class="text-danger small mb-2">{{ loadError }}</p>
+      <div
+        v-if="daily.length && !loading && !loadError"
+        class="stats-totals d-flex flex-wrap gap-3 mb-2"
+      >
+        <div
+          v-for="(t, i) in totalsByLabel"
+          :key="i"
+          class="stats-total-pill"
+          :class="`stats-total-pill--ds${i}`"
+        >
+          <span class="stats-total-pill__label">{{ t.label }}</span>
+          <strong class="stats-total-pill__value">{{ t.value }}</strong>
+        </div>
+      </div>
+      <p
+        v-if="allZeroData && !loading && !loadError"
+        class="text-muted small mb-2"
+      >
+        Chưa có hoạt động trong khoảng này — biểu đồ hiển thị mức 0.
+      </p>
       <div class="chart-shell position-relative">
         <div v-if="loading" class="chart-loading position-absolute top-50 start-50 translate-middle">
           <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
@@ -211,10 +254,43 @@ defineExpose({ reload: load, padRange });
 
 <style scoped>
 .chart-shell {
-  height: 200px;
+  height: 220px;
   width: 100%;
 }
 .stats-chart-card {
   background: #fff;
+}
+.stats-totals {
+  align-items: center;
+}
+.stats-total-pill {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.6rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  min-width: 7rem;
+  line-height: 1.2;
+}
+.stats-total-pill__label {
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.stats-total-pill__value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.stats-total-pill--ds0 {
+  border-left: 4px solid rgba(37, 99, 235, 1);
+}
+.stats-total-pill--ds1 {
+  border-left: 4px solid rgba(245, 158, 11, 1);
+}
+.stats-total-pill--ds2 {
+  border-left: 4px solid rgba(22, 163, 74, 1);
 }
 </style>

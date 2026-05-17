@@ -143,12 +143,17 @@ async function handlePdfUploadChange(event) {
 
   ingestUploading.value = true;
   try {
-    const {
-      createAuthenticatedHttpVectorProvider,
-      createLangChainRagEmbedderDeps,
-      ingestPdfToVectorCollection,
-      resolveBrowserAgentRuntimeConfig,
-    } = await import("@fe-agent/sdk");
+    const [
+      { createAuthenticatedHttpVectorProvider },
+      { resolveBrowserAgentRuntimeConfig },
+      { createLangChainRagEmbedderDeps },
+      { ingestPdfToVectorCollection },
+    ] = await Promise.all([
+      import("@fe-agent/browser-runtime/providers/authenticated-vector-provider"),
+      import("@fe-agent/browser-runtime/config"),
+      import("@fe-agent/core/langchain-providers"),
+      import("@fe-agent/rag/pipeline"),
+    ]);
 
     const config = resolveBrowserAgentRuntimeConfig({
       env: import.meta.env,
@@ -419,13 +424,10 @@ function outcomeLabel(row) {
   return "Chưa hỗ trợ";
 }
 
-/**
- * Chỉ parse JSON assistant (đầy đủ có suggestions). Ưu `assistant_message` (object|string).
- * @returns {string[]}
- */
+
 function suggestionTextsFromAssistant(row) {
   const raw = row?.assistant_message ?? "";
-  /** @type {unknown} */
+  
   let source = raw;
   if ((!raw || String(raw).trim() === "") && row?.assistant_display) {
     source = row.assistant_display;
@@ -460,12 +462,7 @@ function suggestionTextsFromAssistant(row) {
   }
 }
 
-/**
- * Nút số trang + chỗ "…" khi tổng trang lớn.
- * @param {number} current
- * @param {number} last
- * @returns {({ kind: 'p', n: number } | { kind: 'g' })[]}
- */
+
 function buildPaginationItems(current, last) {
   const L = Math.max(1, Math.floor(Number(last)) || 1);
   const c = Math.min(Math.max(1, Math.floor(Number(current)) || 1), L);
@@ -476,7 +473,7 @@ function buildPaginationItems(current, last) {
     [1, 2, L - 1, L, c - 1, c, c + 1].filter((x) => x >= 1 && x <= L),
   );
   const sorted = [...want].sort((a, b) => a - b);
-  /** @type {({ kind: 'p', n: number } | { kind: 'g' })[]} */
+  
   const out = [];
   for (let i = 0; i < sorted.length; i++) {
     if (i > 0 && sorted[i] - sorted[i - 1] > 1) {

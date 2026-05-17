@@ -15,10 +15,6 @@ This template should help get you started developing with Vue 3 in Vite.
   - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
   - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
 
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
 ## Customize configuration
 
 See [Vite Configuration Reference](https://vite.dev/config/).
@@ -35,7 +31,7 @@ npm install
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+### Compile and Minify for Production
 
 ```sh
 npm run build
@@ -54,7 +50,7 @@ Dưới đây là danh sách các lệnh cài đặt chi tiết từng nhóm th�
 
 - **API & Realtime**:
   - `axios` (Gọi HTTP requests)
-  - `laravel-echo` & `pusher-js` (Kết nối Websocket thời gian thực)
+  - `laravel-echo` & `pusher-js` (Echo client cho Laravel Reverb realtime)
   ```sh
   npm install axios laravel-echo pusher-js
   ```
@@ -78,9 +74,11 @@ Bạn cần tạo file `.env` ở thư mục gốc của dự án Frontend (ngan
 # Địa chỉ API của Backend (Ví dụ local: http://127.0.0.1:8000/api/)
 VITE_API_URL=http://127.0.0.1:8000/api/
 
-# Cấu hình Pusher (Websocket Realtime) - Đồng bộ với Backend
-VITE_PUSHER_APP_KEY=YOUR_PUSHER_KEY
-VITE_PUSHER_APP_CLUSTER=ap1
+# Cấu hình Laravel Reverb - Đồng bộ với Backend
+VITE_REVERB_APP_KEY=YOUR_REVERB_KEY
+VITE_REVERB_HOST=127.0.0.1
+VITE_REVERB_PORT=8080
+VITE_REVERB_SCHEME=http
 
 # Cấu hình Thanh toán VietQR
 VITE_BANK_ID=

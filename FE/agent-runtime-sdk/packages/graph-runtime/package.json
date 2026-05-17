@@ -2,13 +2,12 @@
   "name": "@fe-agent/graph-runtime",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.js",
+  "main": "./src/agent-graph.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/agent-graph.js"
   },
   "dependencies": {
     "@fe-agent/core": "0.1.0",
-    "@fe-agent/observability": "0.1.0",
     "@fe-agent/rag": "0.1.0",
     "@fe-agent/shared-zod-schemas": "0.1.0",
     "@fe-agent/streaming": "0.1.0",

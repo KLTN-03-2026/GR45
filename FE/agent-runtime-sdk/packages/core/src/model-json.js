@@ -39,24 +39,6 @@ function tryParseJson(value) {
   }
 }
 
-function normalizeStringArray(value) {
-  if (!Array.isArray(value)) return [];
-
-  return [
-    ...new Set(
-      value
-        .map((item) => {
-          if (typeof item === "string") return item.trim();
-          if (item && typeof item === "object") {
-            return String(item.text ?? item.label ?? item.value ?? "").trim();
-          }
-          return "";
-        })
-        .filter(Boolean),
-    ),
-  ];
-}
-
 function pickReplyText(payload) {
   if (!payload || typeof payload !== "object") return "";
 
@@ -98,39 +80,4 @@ export function unwrapSyntheticReplyEnvelope(rawLanguageModelOutput) {
   }
 
   return current;
-}
-
-export function unwrapSuggestionsEnvelope(rawLanguageModelOutput) {
-  let current = asText(rawLanguageModelOutput);
-
-  for (let depth = 0; depth < MAX_UNWRAP_DEPTH; depth += 1) {
-    const parsed = tryParseJson(current);
-
-    if (!parsed) break;
-
-    if (Array.isArray(parsed)) {
-      return normalizeStringArray(parsed);
-    }
-
-    if (parsed && typeof parsed === "object") {
-      const suggestions = normalizeStringArray(
-        parsed.suggestions ??
-          parsed.options ??
-          parsed.items ??
-          parsed.choices,
-      );
-
-      if (suggestions.length) return suggestions;
-
-      const nested = pickReplyText(parsed);
-      if (!nested || nested === current) break;
-
-      current = nested;
-      continue;
-    }
-
-    break;
-  }
-
-  return [];
 }

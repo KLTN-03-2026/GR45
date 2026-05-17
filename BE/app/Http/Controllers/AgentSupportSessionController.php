@@ -148,7 +148,7 @@ final class AgentSupportSessionController extends Controller
     }
 
     /**
-     * Khách reload / đóng tab — đánh dấu phiên đang mở theo widget key là không còn chat (status closed), broadcast Echo.
+     * Khách reload / đóng tab — đánh dấu phiên đang mở là resolved, broadcast Echo.
      *
      * POST /api/v1/agent/support/sessions/widget-disconnect
      */
@@ -165,22 +165,22 @@ final class AgentSupportSessionController extends Controller
 
         $key = trim((string) $data['chat_widget_session_key']);
         if ($key === '') {
-            return response()->json(['success' => true, 'data' => ['closed_count' => 0]]);
+            return response()->json(['success' => true, 'data' => ['resolved_count' => 0]]);
         }
 
         /** @var array<int|string, mixed>|mixed $allowedRaw */
-        $allowedRaw = config('live_support.allowed_session_statuses', ['open', 'closed', 'done']);
+        $allowedRaw = config('live_support.allowed_session_statuses', ['open', 'resolved']);
         $allowedStatuses = is_array($allowedRaw)
             ? array_values(array_filter(
                 array_map(static fn ($s) => is_string($s) ? trim($s) : '', $allowedRaw),
                 static fn ($s) => $s !== ''
             ))
-            : ['open', 'closed', 'done'];
+            : ['open', 'resolved'];
 
-        if (! in_array('closed', $allowedStatuses, true)) {
+        if (! in_array('resolved', $allowedStatuses, true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cấu hình LIVE_SUPPORT_SESSION_STATUSES cần có closed để đóng phiên khi khách rời trang.',
+                'message' => 'Cấu hình LIVE_SUPPORT_SESSION_STATUSES cần có resolved để resolve phiên khi khách rời trang.',
             ], 503);
         }
 
@@ -193,22 +193,26 @@ final class AgentSupportSessionController extends Controller
             ->whereIn('status', $statusesOpen)
             ->get();
 
-        $closed = 0;
+        $resolved = 0;
         foreach ($sessions as $session) {
-            $session->status = 'closed';
+            $session->status = 'resolved';
+            // Khách reload/đóng tab → auto-resolve (resolved_by_* để null để biết là customer-driven).
+            $session->resolved_at = now();
             $session->save();
-            SafeLiveSupportBroadcaster::broadcastCustomerDisconnected($session->fresh());
-            $closed++;
+            $fresh = $session->fresh();
+            SafeLiveSupportBroadcaster::broadcastCustomerDisconnected($fresh);
+            SafeLiveSupportBroadcaster::broadcastSessionResolved($fresh);
+            $resolved++;
         }
 
         return response()->json([
             'success' => true,
-            'data' => ['closed_count' => $closed],
+            'data' => ['resolved_count' => $resolved],
         ]);
     }
 
     /**
-     * Khách chủ động thoát chat trực tiếp — đóng phiên (status closed), admin không reply tiếp.
+     * Khách chủ động thoát chat trực tiếp — resolve phiên, admin không reply tiếp.
      *
      * POST /api/v1/agent/support/sessions/{publicId}/customer-close
      */
@@ -248,18 +252,18 @@ final class AgentSupportSessionController extends Controller
         }
 
         /** @var array<int|string, mixed>|mixed $allowedRaw */
-        $allowedRaw = config('live_support.allowed_session_statuses', ['open', 'closed', 'done']);
+        $allowedRaw = config('live_support.allowed_session_statuses', ['open', 'resolved']);
         $allowedStatuses = is_array($allowedRaw)
             ? array_values(array_filter(
                 array_map(static fn ($s) => is_string($s) ? trim($s) : '', $allowedRaw),
                 static fn ($s) => $s !== ''
             ))
-            : ['open', 'closed', 'done'];
+            : ['open', 'resolved'];
 
-        if (! in_array('closed', $allowedStatuses, true)) {
+        if (! in_array('resolved', $allowedStatuses, true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cấu hình LIVE_SUPPORT_SESSION_STATUSES cần có closed để đóng phiên.',
+                'message' => 'Cấu hình LIVE_SUPPORT_SESSION_STATUSES cần có resolved để resolve phiên.',
             ], 503);
         }
 
@@ -269,18 +273,23 @@ final class AgentSupportSessionController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $this->serializeSession($session->fresh()),
-                'already_closed' => true,
+                'already_resolved' => true,
             ]);
         }
 
-        $session->status = 'closed';
+        $session->status = 'resolved';
+        // Khách thoát chat → coi như phiên đã xong, admin không cần resolve thủ công.
+        // resolved_by_* để null để phân biệt với staff-resolve thật sự.
+        $session->resolved_at = now();
         $session->save();
 
-        SafeLiveSupportBroadcaster::broadcastCustomerDisconnected($session->fresh());
+        $fresh = $session->fresh();
+        SafeLiveSupportBroadcaster::broadcastCustomerDisconnected($fresh);
+        SafeLiveSupportBroadcaster::broadcastSessionResolved($fresh);
 
         return response()->json([
             'success' => true,
-            'data' => $this->serializeSession($session->fresh()),
+            'data' => $this->serializeSession($fresh),
         ]);
     }
 
@@ -382,7 +391,7 @@ final class AgentSupportSessionController extends Controller
     private function defaultCreateStatus(): string
     {
         /** @var array<int|string, mixed>|mixed $listRaw */
-        $listRaw = config('live_support.allowed_session_statuses', ['open', 'closed', 'done']);
+        $listRaw = config('live_support.allowed_session_statuses', ['open', 'resolved']);
         $list = is_array($listRaw) && count($listRaw) > 0
             ? array_values(array_filter($listRaw, fn ($s) => is_string($s) && $s !== ''))
             : ['open'];

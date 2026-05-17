@@ -167,7 +167,7 @@ final class LiveSupportBridgeController extends Controller
         ]);
 
         /** @var array<int|string, mixed> $allowedRaw */
-        $allowedRaw = config('live_support.allowed_session_statuses', ['open', 'closed', 'done']);
+        $allowedRaw = config('live_support.allowed_session_statuses', ['open', 'resolved']);
         $allowedStatuses = is_array($allowedRaw)
             ? array_values(array_filter(
                 array_map(static fn ($s) => is_string($s) ? trim($s) : '', $allowedRaw),
@@ -284,7 +284,7 @@ final class LiveSupportBridgeController extends Controller
     private function defaultCreateStatus(): string
     {
         /** @var array<int|string, mixed>|mixed $listRaw */
-        $listRaw = config('live_support.allowed_session_statuses', ['open', 'closed', 'done']);
+        $listRaw = config('live_support.allowed_session_statuses', ['open', 'resolved']);
         $list = is_array($listRaw) && count($listRaw) > 0
             ? array_values(array_filter($listRaw, fn ($s) => is_string($s) && $s !== ''))
             : ['open'];

@@ -7,15 +7,10 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
-/** Monorepo agent runtime — nằm trong `FE/agent-runtime-sdk`. */
 function resolveAgentPackagesDir(feDir) {
   return path.join(feDir, 'agent-runtime-sdk', 'packages')
 }
 
-/**
- * @param {string} packagesDir
- * @returns {Record<string, string>}
- */
 function feAgentSdkAliasesFromPackagesDir(packagesDir) {
   const aliases = {}
   if (!packagesDir || !fs.existsSync(packagesDir)) {
@@ -29,7 +24,21 @@ function feAgentSdkAliasesFromPackagesDir(packagesDir) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'))
       if (!pkg.name) continue
-      const entry = path.join(pkgDir, 'src', 'index.js')
+      const exportMap = pkg.exports?.constructor === Object ? pkg.exports : {}
+      for (const [exportName, exportPath] of Object.entries(exportMap)) {
+        if (exportName === '.') continue
+        if (exportPath?.constructor !== String) continue
+        const subpathEntry = path.join(pkgDir, exportPath)
+        if (fs.existsSync(subpathEntry)) {
+          aliases[`${pkg.name}${exportName.slice(1)}`] = subpathEntry
+        }
+      }
+      const rootExport = exportMap['.']?.constructor === String
+        ? path.join(pkgDir, exportMap['.'])
+        : path.join(pkgDir, 'src', 'index.js')
+      const entry = fs.existsSync(rootExport)
+        ? rootExport
+        : path.join(pkgDir, 'src', 'index.js')
       if (fs.existsSync(entry)) {
         aliases[pkg.name] = entry
       }
@@ -62,7 +71,6 @@ export default defineConfig(({ mode }) => {
   const ollamaProxyTarget =
     String(env.DEV_PROXY_OLLAMA_TARGET ?? '').trim() || 'http://127.0.0.1:11434'
 
-  /** @type {import('vite').ProxyOptions} */
   const proxy = {
     '/api': {
       target: apiProxyTarget,
@@ -99,10 +107,10 @@ export default defineConfig(({ mode }) => {
     'gr45-fe-chat-runtime',
     'src',
   )
-  /** alias gốc @fe-agent/gr45-fe-chat-runtime */
   delete feAgentAliases['@fe-agent/gr45-fe-chat-runtime']
   const gr45RuntimeAliases = {
     '@fe-agent/gr45-fe-chat-runtime/catalog': path.join(gr45RuntimeRoot, 'catalog', 'index.js'),
+    '@fe-agent/gr45-fe-chat-runtime/chat-widget-agent': path.join(gr45RuntimeRoot, 'chat-widget-agent.js'),
     '@fe-agent/gr45-fe-chat-runtime/runtime': path.join(gr45RuntimeRoot, 'runtime.js'),
     '@fe-agent/gr45-fe-chat-runtime': path.join(gr45RuntimeRoot, 'index.js'),
   }

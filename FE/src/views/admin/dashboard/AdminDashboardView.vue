@@ -123,7 +123,7 @@ const initWs = () => {
     if (!transport) return
     let url = import.meta.env.VITE_API_URL || 'https://api.bussafe.io.vn/api/'
     if (!url.endsWith('/')) url += '/'
-    /** Kênh `he-thong.giam-sat` là public — không cần auth; vẫn giữ transport Reverb/Pusher thống nhất. */
+    /** Kênh `he-thong.giam-sat` là public — không cần auth; vẫn giữ transport Reverb thống nhất. */
     echoInstance = new Echo(transport)
     const ch = echoInstance.channel('he-thong.giam-sat')
     ch.listen('.bao-dong.vi-pham', onRealtimeViolation)

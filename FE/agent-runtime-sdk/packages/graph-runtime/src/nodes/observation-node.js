@@ -1,10 +1,18 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
+import {
+  anyTrue,
+  isNumber,
+  isObject,
+  isString,
+  textOrEmpty,
+  valueOr,
+} from "../value.js";
 
-import { shouldPreferPdfAfterBarrenTools } from "./intent-classifier.js";
+import { shouldPreferPdfAfterBarrenTools } from "../intent/intent-classifier.js";
 
 function getLastUserContent(messages = []) {
-  return String(
-    [...messages].reverse().find((m) => m?.role === "user")?.content ?? "",
+  return textOrEmpty(
+    [...messages].reverse().find((m) => m?.role === "user")?.content,
   );
 }
 
@@ -15,20 +23,19 @@ function getLastUserContent(messages = []) {
 function toolRowGivesOperationalPayload(row) {
   if (!row?.ok) return false;
   const data = row.data;
-  if (!data || typeof data !== "object") return false;
+  if (!isObject(data)) return false;
   if (data.clarification_needed === true) return false;
 
-  const name = String(row.toolName ?? "").trim();
+  const name = textOrEmpty(row.toolName).trim();
 
   if (name === "support_create_support_session") {
-    const inner =
-      data.data && typeof data.data === "object" ? data.data : data;
-    return Boolean(inner?.public_id ?? data.public_id);
+    const inner = isObject(data.data) ? data.data : data;
+    return Boolean(valueOr(inner?.public_id, data.public_id));
   }
 
-  if (name === "search_routes" || name === "search_trips") {
+  if (["search_routes", "search_trips"].includes(name)) {
     if (data.success !== true) return false;
-    if (typeof data.count === "number") return data.count > 0;
+    if (isNumber(data.count)) return data.count > 0;
     const rows = Array.isArray(data.data)
       ? data.data
       : Array.isArray(data.rows)
@@ -42,21 +49,17 @@ function toolRowGivesOperationalPayload(row) {
   if (data.login_success === true) return true;
   if (
     data.khach_hang &&
-    typeof data.khach_hang === "object" &&
+    isObject(data.khach_hang) &&
     data.khach_hang.id != null
   ) {
     return true;
   }
-  if (data.booking_confirmed === true || data.ma_dat_ve) return true;
+  if ([data.booking_confirmed === true, Boolean(data.ma_dat_ve)].some(Boolean)) return true;
   if (data.cancellation_confirmed === true) return true;
 
   return false;
 }
 
-/**
- * @param graphDependencies
- * @param {{ maxPlannerLoops: number }} runtimeConfiguration
- */
 export function createObservationNode(graphDependencies, runtimeConfiguration) {
   return async function observationGraphNode(graphState) {
     graphDependencies.bus?.emit("stage", {
@@ -75,23 +78,23 @@ export function createObservationNode(graphDependencies, runtimeConfiguration) {
     const needsConfirmation = completedResultRows.some(
       (toolResultRow) =>
         !toolResultRow.ok &&
-        typeof toolResultRow.error === "string" &&
+        isString(toolResultRow.error) &&
         toolResultRow.error.startsWith("confirmation_required:")
     );
-    const planConfidence = graphState.plan?.confidence ?? 0.5;
-    const plannerLoopCount = graphState.signals.planner_loop ?? 0;
+    const planConfidence = valueOr(graphState.plan?.confidence, 0.5);
+    const plannerLoopCount = valueOr(graphState.signals.planner_loop, 0);
 
     const maxPlannerLoopsReached =
       plannerLoopCount >= runtimeConfiguration.maxPlannerLoops;
 
     const toolsPlannedButNoneRan =
       completedResultRows.length === 0 &&
-      (graphState.plan?.toolCalls?.length ?? 0) > 0;
+      valueOr(graphState.plan?.toolCalls?.length, 0) > 0;
 
     const lastUser = getLastUserContent(graphState.messages);
     const corpusLikely = shouldPreferPdfAfterBarrenTools(
       lastUser,
-      graphDependencies.intentClassifierOptions ?? {},
+      valueOr(graphDependencies.intentClassifierOptions, {}),
     );
     const operationalPayloadHit =
       completedResultRows.some(toolRowGivesOperationalPayload);
@@ -106,18 +109,20 @@ export function createObservationNode(graphDependencies, runtimeConfiguration) {
 
     const observationSignalsPatch = {
       tool_fail_streak: anyToolFailed
-        ? (graphState.signals.tool_fail_streak ?? 0) + 1
+        ? valueOr(graphState.signals.tool_fail_streak, 0) + 1
         : 0,
       needs_replan: Boolean(anyToolFailed && !needsConfirmation && !maxPlannerLoopsReached),
       // Only trigger RAG when there's nothing useful to replan with, or confidence is low.
       // Tool failures with a live replan path are handled by replanner, not RAG.
       rag_fallback: Boolean(
-        planConfidence < 0.45 ||
-          graphState.plan?.needs_rag_fallback ||
-          (toolsPlannedButNoneRan && !anyToolFailed) ||
+        anyTrue(
+          planConfidence < 0.45,
+          graphState.plan?.needs_rag_fallback,
+          toolsPlannedButNoneRan && !anyToolFailed,
           ragFallbackAfterBarrenTools,
+        ),
       ),
-      replan_terminal: needsConfirmation || maxPlannerLoopsReached,
+      replan_terminal: [needsConfirmation, maxPlannerLoopsReached].some(Boolean),
     };
 
     if (observationSignalsPatch.replan_terminal) {
@@ -132,7 +137,7 @@ export function createObservationNode(graphDependencies, runtimeConfiguration) {
       observations: completedResultRows.map((toolResultRow) => ({
         ok: toolResultRow.ok,
         tool: toolResultRow.toolName,
-        error: toolResultRow.error ?? null,
+        error: valueOr(toolResultRow.error, null),
       })),
       journal: [journalEntry("observation", observationSignalsPatch)],
     };

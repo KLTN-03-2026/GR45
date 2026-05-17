@@ -3,7 +3,8 @@ import {
   extractOtpCode,
   extractPassword,
   extractVnPhone,
-} from "../../fast-planner/text-utils.js";
+  normalize,
+} from "../../domain/planner/text-utils.js";
 import {
   ACCOUNT_TOOL_SLOTS,
   AUTH_TOOL_SLOTS,
@@ -11,141 +12,7 @@ import {
   LOYALTY_TOOL_SLOTS,
   PASSWORD_TOOL_SLOTS,
   REGISTRATION_TOOL_SLOTS,
-} from "../slots.js";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function asString(value) {
-  return String(value ?? "").trim();
-}
-
-function isEmail(value) {
-  return EMAIL_RE.test(asString(value));
-}
-
-function jsonBody(body) {
-  return {
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  };
-}
-
-function pickDefined(source, keys) {
-  const out = {};
-
-  for (const key of keys) {
-    const value = source?.[key];
-
-    if (value !== undefined && value !== null && String(value).trim() !== "") {
-      out[key] = value;
-    }
-  }
-
-  return out;
-}
-
-function requireFields(args, fields) {
-  const missing = fields.filter((field) => !asString(args?.[field]));
-
-  if (missing.length) {
-    return {
-      ok: false,
-      error: `Thiếu ${missing.join(", ")}.`,
-    };
-  }
-
-  return null;
-}
-
-function getProfile(jsonResult) {
-  return jsonResult("profile", {
-    method: "GET",
-    auth: "bearer",
-  });
-}
-
-function updateProfile(jsonResult, payload) {
-  return jsonResult("profile", {
-    method: "PUT",
-    auth: "bearer",
-    ...jsonBody(payload),
-  });
-}
-
-function normalizeProfileUpdatePayload(args) {
-  return pickDefined(args, [
-    "ho_va_ten",
-    "email",
-    "so_dien_thoai",
-    "dia_chi",
-    "ngay_sinh",
-  ]);
-}
-
-function normalizeRegisterPayload(args) {
-  return pickDefined(args, [
-    "ho_va_ten",
-    "so_dien_thoai",
-    "email",
-    "password",
-    "password_confirmation",
-    "dia_chi",
-    "ngay_sinh",
-  ]);
-}
-
-function normalizePasswordChangePayload(args) {
-  const oldPassword = asString(args.old_password ?? args.mat_khau_cu);
-  const password = asString(args.password ?? args.mat_khau_moi);
-  const confirmation = asString(
-    args.password_confirmation ?? args.mat_khau_moi_confirmation,
-  );
-
-  return {
-    mat_khau_cu: oldPassword,
-    mat_khau_moi: password,
-    mat_khau_moi_confirmation: confirmation,
-  };
-}
-
-function normalizeResetPasswordPayload(args) {
-  return {
-    role: "khach_hang",
-    email: asString(args.email),
-    token: asString(args.token),
-    mat_khau_moi: asString(args.password ?? args.mat_khau_moi),
-    mat_khau_moi_confirmation: asString(
-      args.password_confirmation ?? args.mat_khau_moi_confirmation,
-    ),
-  };
-}
-
-function normalizeActivationPayload(args) {
-  return {
-    email: asString(args.email),
-    token: asString(args.token ?? args.otp),
-  };
-}
-
-function validatePasswordConfirmation(password, confirmation) {
-  if (!password || !confirmation) {
-    return {
-      ok: false,
-      error: "Thiếu mật khẩu hoặc xác nhận mật khẩu.",
-    };
-  }
-
-  if (password !== confirmation) {
-    return {
-      ok: false,
-      error: "Mật khẩu xác nhận không khớp.",
-    };
-  }
-
-  return null;
-}
+} from "../slots/auth-account.slots.js";
 
 export function registerAuthAccountTools(ctx) {
   const { clearKhachToken, jsonResult, register, stub, withQuery } = ctx;
@@ -156,10 +23,12 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Đăng nhập"],
     async (args) => {
-      const email = asString(args.email);
-      const password = asString(args.password);
+      const email = String(args.email == null ? "" : args.email).trim();
+      const password = String(
+        args.password == null ? "" : args.password,
+      ).trim();
 
-      if (!isEmail(email)) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return {
           ok: false,
           data: {
@@ -189,7 +58,8 @@ export function registerAuthAccountTools(ctx) {
         method: "POST",
         auth: "none",
         persistToken: true,
-        ...jsonBody({
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           email,
           password,
         }),
@@ -229,6 +99,161 @@ export function registerAuthAccountTools(ctx) {
         error: result.error,
       };
     },
+    {
+      test: (n, rawText, recentUserMessages) => {
+        if (
+          /\b(dang nhap|dang nhap vao|log in|log me in|login|sign in|signin)\b/.test(
+            n,
+          )
+        ) {
+          return true;
+        }
+
+        if (
+          /\b(dang xuat|logout|sign out|quen mat khau|dat lai mat khau|doi mat khau|dang ky|kich hoat|ho so|profile|tai khoan|lich su|diem thuong|hang thanh vien|cap nhat)\b/.test(
+            n,
+          )
+        ) {
+          return false;
+        }
+
+        if (!Array.isArray(recentUserMessages) || recentUserMessages.length < 2) {
+          return false;
+        }
+
+        const prior = recentUserMessages.slice(0, -1);
+        const hadLoginIntent = prior.some((m) =>
+          /\b(dang nhap|log in|login|sign in|signin|email da dang ky|mat khau de dang nhap|mat khau)\b/.test(
+            normalize(m?.content ?? m),
+          ),
+        );
+        if (!hadLoginIntent) return false;
+
+        const raw = String(rawText ?? "").trim();
+        const isBareEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+        if (isBareEmail) return true;
+        const priorHasEmail = prior.some((m) =>
+          (m?.role == null || m.role === "user") &&
+          extractEmailLoose(normalize(m?.content ?? m)),
+        );
+        const isBarePassword = /^[^\s]{3,128}$/.test(raw) && !raw.includes("@");
+        const priorNeedsEmail = recentUserMessages.some((m) =>
+          normalize(m?.content ?? m).includes("chua cung cap email"),
+        );
+        if (priorNeedsEmail && isBarePassword) return true;
+        return priorHasEmail && isBarePassword;
+      },
+      build: (n, _today, rawText, recentUserMessages) => {
+        const args = {};
+        const phone = extractVnPhone(n);
+        let email = extractEmailLoose(n);
+        const raw = String(rawText ?? "").trim();
+        const explicitEmail = raw.match(/\bemail\s+([^\s,;]+)/i)?.[1];
+        if (!email && explicitEmail) email = explicitEmail.replace(/[.,;]+$/, "");
+        if (!email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) email = raw;
+        if (phone) args.so_dien_thoai = phone;
+        if (email) args.email = email;
+        let pwd = extractPassword(raw || n);
+        if (pwd) args.password = pwd;
+        const explicitLoginTurn =
+          /\b(dang nhap|dang nhap vao|log in|login|sign in|signin)\b/.test(n);
+
+        // Multi-turn login: check if this is a continuation from prior "đăng nhập" intent
+        const AUTH_HISTORY_RE =
+          /\b(dang nhap|dang ky|log in|login|sign in|signin|mat khau|password)\b/;
+        if (
+          !explicitLoginTurn &&
+          Array.isArray(recentUserMessages) &&
+          recentUserMessages.length >= 2
+        ) {
+          const prior = recentUserMessages.slice(0, -1);
+          const hadLoginIntent = prior.some((m) =>
+            AUTH_HISTORY_RE.test(normalize(m?.content ?? m)),
+          );
+
+          if (hadLoginIntent) {
+            // If no email extracted yet, scan prior messages
+            if (!email) {
+              for (const msg of prior) {
+                if (msg?.role != null && msg.role !== "user") continue;
+                const extracted = extractEmailLoose(normalize(msg?.content ?? msg));
+                if (extracted) {
+                  email = extracted;
+                  break;
+                }
+              }
+            }
+            // If no password extracted yet, scan prior messages
+            if (!pwd) {
+              for (const msg of prior) {
+                if (msg?.role != null && msg.role !== "user") continue;
+                const extracted = extractPassword(msg?.content ?? msg);
+                if (extracted) {
+                  pwd = extracted;
+                  break;
+                }
+              }
+            }
+
+            if (!pwd && email && !raw.includes("@")) {
+              const rawEmail = extractEmailLoose(normalize(raw));
+              if (
+                !rawEmail &&
+                /^[^\s]{3,128}$/.test(raw) &&
+                !/\b(dang xuat|logout|quen mat khau|dat lai mat khau|doi mat khau|dang ky|kich hoat|ho so|profile|tai khoan|lich su|diem thuong|hang thanh vien|cap nhat)\b/.test(
+                  n,
+                )
+              ) {
+                pwd = raw;
+              }
+            }
+
+            if (!email && !pwd && /^[^\s]{2,128}$/.test(raw)) {
+              const priorNeedsEmail = recentUserMessages.some((m) =>
+                normalize(m?.content ?? m).includes("chua cung cap email"),
+              );
+              if (priorNeedsEmail) email = raw;
+            }
+          }
+        }
+
+        if (email) args.email = email;
+        if (pwd) args.password = pwd;
+        return {
+          toolName: "auth_login",
+          rationale: "Khách muốn đăng nhập.",
+          arguments: args,
+        };
+      },
+      suggestions: (result) => {
+        const data = result?.data ?? {};
+        if (result?.ok === true && data.login_success === true) {
+          return [
+            { text: "Tìm chuyến xe", action: "", params: {} },
+            {
+              text: "Xem vé của tôi",
+              action: "open_tickets",
+              params: { path: "/lich-su-dat-ve" },
+            },
+            { text: "Kiểm tra tuyến xe", action: "", params: {} },
+          ];
+        }
+        if (data.invalid_email_format === true || data.missing_password === true) {
+          return [
+            { text: "Đăng nhập", action: "login", params: {} },
+            { text: "Quên mật khẩu", action: "", params: {} },
+          ];
+        }
+        if (data.auth_failed === true) {
+          return [
+            { text: "Thử lại", action: "", params: {} },
+            { text: "Quên mật khẩu", action: "", params: {} },
+            { text: "Liên hệ hỗ trợ", action: "", params: {} },
+          ];
+        }
+        return [];
+      },
+    },
   );
 
   register(
@@ -249,6 +274,14 @@ export function registerAuthAccountTools(ctx) {
 
       return result;
     },
+    {
+      test: (n) => /\b(dang xuat|thoat tai khoan|logout|sign out)\b/.test(n),
+      build: () => ({
+        toolName: "auth_logout",
+        rationale: "Khách yêu cầu đăng xuất.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -256,7 +289,22 @@ export function registerAuthAccountTools(ctx) {
     ACCOUNT_TOOL_SLOTS.get_profile,
     "safe",
     ["Hồ sơ"],
-    () => getProfile(jsonResult),
+    () =>
+      jsonResult("profile", {
+        method: "GET",
+        auth: "bearer",
+      }),
+    {
+      test: (n) =>
+        /\b(tai khoan cua toi|ho so cua toi|thong tin (ca nhan|tai khoan|ho so)|xem (profile|ho so|tai khoan))\b/.test(
+          n,
+        ),
+      build: () => ({
+        toolName: "account_get_profile",
+        rationale: "Khách xem thông tin tài khoản.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -265,7 +313,23 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Cập nhật hồ sơ"],
     (args) => {
-      const payload = normalizeProfileUpdatePayload(args);
+      const payload = {};
+      for (const key of [
+        "ho_va_ten",
+        "email",
+        "so_dien_thoai",
+        "dia_chi",
+        "ngay_sinh",
+      ]) {
+        const value = args?.[key];
+        if (
+          value !== undefined &&
+          value !== null &&
+          String(value).trim() !== ""
+        ) {
+          payload[key] = value;
+        }
+      }
 
       if (Object.keys(payload).length === 0) {
         return Promise.resolve({
@@ -274,7 +338,30 @@ export function registerAuthAccountTools(ctx) {
         });
       }
 
-      return updateProfile(jsonResult, payload);
+      return jsonResult("profile", {
+        method: "PUT",
+        auth: "bearer",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    {
+      test: (n) =>
+        /\b(doi (ten|ho ten)|cap nhat (ten|ho ten)|thay (ten|ho ten))\b/.test(
+          n,
+        ),
+      build: (_n, _t, rawText) => {
+        const args = {};
+        const m = String(rawText ?? "").match(
+          /(?:thành|sang|to)\s+([\p{L}\s]{2,60})$/u,
+        );
+        if (m) args.ho_va_ten = m[1].trim();
+        return {
+          toolName: "account_update_profile",
+          rationale: "Khách đổi họ tên.",
+          arguments: args,
+        };
+      },
     },
   );
 
@@ -284,6 +371,17 @@ export function registerAuthAccountTools(ctx) {
     "safe",
     ["Ảnh đại diện"],
     (args) => stub("account_update_avatar", args),
+    {
+      test: (n) =>
+        /\b(doi (anh dai dien|avatar)|cap nhat (anh dai dien|avatar)|thay avatar)\b/.test(
+          n,
+        ),
+      build: () => ({
+        toolName: "account_update_avatar",
+        rationale: "Khách đổi ảnh đại diện.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -292,16 +390,34 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Đổi email"],
     (args) => {
-      const email = asString(args.email);
+      const email = String(args.email == null ? "" : args.email).trim();
 
-      if (!isEmail(email)) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return Promise.resolve({
           ok: false,
           error: "Email không hợp lệ.",
         });
       }
 
-      return updateProfile(jsonResult, { email });
+      return jsonResult("profile", {
+        method: "PUT",
+        auth: "bearer",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    },
+    {
+      test: (n) => /\b(doi email|cap nhat email|thay email)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const email = extractEmailLoose(n);
+        if (email) args.email = email;
+        return {
+          toolName: "account_update_email",
+          rationale: "Khách đổi email.",
+          arguments: args,
+        };
+      },
     },
   );
 
@@ -311,7 +427,9 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Đổi SĐT"],
     (args) => {
-      const soDienThoai = asString(args.so_dien_thoai);
+      const soDienThoai = String(
+        args.so_dien_thoai == null ? "" : args.so_dien_thoai,
+      ).trim();
 
       if (!soDienThoai) {
         return Promise.resolve({
@@ -320,9 +438,30 @@ export function registerAuthAccountTools(ctx) {
         });
       }
 
-      return updateProfile(jsonResult, {
-        so_dien_thoai: soDienThoai,
+      return jsonResult("profile", {
+        method: "PUT",
+        auth: "bearer",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          so_dien_thoai: soDienThoai,
+        }),
       });
+    },
+    {
+      test: (n) =>
+        /\b(doi (so dien thoai|sdt|so dt)|cap nhat (so dien thoai|sdt))\b/.test(
+          n,
+        ),
+      build: (n) => {
+        const args = {};
+        const phone = extractVnPhone(n);
+        if (phone) args.so_dien_thoai = phone;
+        return {
+          toolName: "account_update_phone",
+          rationale: "Khách đổi số điện thoại.",
+          arguments: args,
+        };
+      },
     },
   );
 
@@ -332,30 +471,76 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Đổi mật khẩu"],
     (args) => {
-      const payload = normalizePasswordChangePayload(args);
-
-      const missing = requireFields(payload, [
+      const payload = {
+        mat_khau_cu: String(
+          args.old_password == null ? args.mat_khau_cu : args.old_password,
+        ).trim(),
+        mat_khau_moi: String(
+          args.password == null ? args.mat_khau_moi : args.password,
+        ).trim(),
+        mat_khau_moi_confirmation: String(
+          args.password_confirmation == null
+            ? args.mat_khau_moi_confirmation
+            : args.password_confirmation,
+        ).trim(),
+      };
+      const missing = [
         "mat_khau_cu",
         "mat_khau_moi",
         "mat_khau_moi_confirmation",
-      ]);
-
-      if (missing) return Promise.resolve(missing);
-
-      const confirmationError = validatePasswordConfirmation(
-        payload.mat_khau_moi,
-        payload.mat_khau_moi_confirmation,
+      ].filter(
+        (field) => !String(payload[field] == null ? "" : payload[field]).trim(),
       );
-
-      if (confirmationError) {
-        return Promise.resolve(confirmationError);
+      if (missing.length) {
+        return Promise.resolve({
+          ok: false,
+          error: `Thiếu ${missing.join(", ")}.`,
+        });
+      }
+      if (!payload.mat_khau_moi || !payload.mat_khau_moi_confirmation) {
+        return Promise.resolve({
+          ok: false,
+          error: "Thiếu mật khẩu hoặc xác nhận mật khẩu.",
+        });
+      }
+      if (payload.mat_khau_moi !== payload.mat_khau_moi_confirmation) {
+        return Promise.resolve({
+          ok: false,
+          error: "Mật khẩu xác nhận không khớp.",
+        });
       }
 
       return jsonResult("doi-mat-khau", {
         method: "POST",
         auth: "bearer",
-        ...jsonBody(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+    },
+    {
+      test: (n) =>
+        /\b(doi mat khau|thay mat khau|change password|cap nhat mat khau)\b/.test(
+          n,
+        ),
+      build: (_n, _today, rawText) => {
+        const text = String(rawText == null ? "" : rawText);
+        const oldPassword = text.match(/(?:cũ|cu|old)\s+([^\s,;]+)/i)?.[1];
+        const newPassword = text.match(
+          /(?:mới|moi|new)\s+([^\s,;]+)/i,
+        )?.[1];
+        const confirmation = text.match(
+          /(?:xác nhận|xac nhan|confirm)\s+([^\s,;]+)/i,
+        )?.[1];
+        const args = {};
+        if (oldPassword) args.old_password = oldPassword;
+        if (newPassword) args.password = newPassword;
+        if (confirmation) args.password_confirmation = confirmation;
+        return {
+          toolName: "password_change_password",
+          rationale: "Khách đổi mật khẩu.",
+          arguments: args,
+        };
+      },
     },
   );
 
@@ -365,9 +550,9 @@ export function registerAuthAccountTools(ctx) {
     "safe",
     ["Quên mật khẩu", "Đặt lại mật khẩu"],
     (args) => {
-      const email = asString(args.email);
+      const email = String(args.email == null ? "" : args.email).trim();
 
-      if (!isEmail(email)) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return Promise.resolve({
           ok: false,
           error:
@@ -378,11 +563,29 @@ export function registerAuthAccountTools(ctx) {
       return jsonResult("quen-mat-khau", {
         method: "POST",
         auth: "none",
-        ...jsonBody({
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           role: "khach_hang",
           email,
         }),
       });
+    },
+    {
+      test: (n) =>
+        /\b(quen mat khau|forgot password|khoi phuc mat khau)\b/.test(n) &&
+        !/\b(dat lai mat khau|reset password)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const phone = extractVnPhone(n);
+        const email = extractEmailLoose(n);
+        if (phone) args.so_dien_thoai = phone;
+        if (email) args.email = email;
+        return {
+          toolName: "password_forgot_password",
+          rationale: "Khách quên mật khẩu.",
+          arguments: args,
+        };
+      },
     },
   );
 
@@ -392,38 +595,85 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Đặt lại mật khẩu", "Đổi mật khẩu"],
     (args) => {
-      const payload = normalizeResetPasswordPayload(args);
-
-      const missing = requireFields(payload, [
+      const payload = {
+        role: "khach_hang",
+        email: String(args.email == null ? "" : args.email).trim(),
+        token: String(args.token == null ? "" : args.token).trim(),
+        mat_khau_moi: String(
+          args.password == null ? args.mat_khau_moi : args.password,
+        ).trim(),
+        mat_khau_moi_confirmation: String(
+          args.password_confirmation == null
+            ? args.mat_khau_moi_confirmation
+            : args.password_confirmation,
+        ).trim(),
+      };
+      const missing = [
         "email",
         "token",
         "mat_khau_moi",
         "mat_khau_moi_confirmation",
-      ]);
+      ].filter(
+        (field) => !String(payload[field] == null ? "" : payload[field]).trim(),
+      );
+      if (missing.length) {
+        return Promise.resolve({
+          ok: false,
+          error: `Thiếu ${missing.join(", ")}.`,
+        });
+      }
 
-      if (missing) return Promise.resolve(missing);
-
-      if (!isEmail(payload.email)) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
         return Promise.resolve({
           ok: false,
           error: "Email không hợp lệ.",
         });
       }
 
-      const confirmationError = validatePasswordConfirmation(
-        payload.mat_khau_moi,
-        payload.mat_khau_moi_confirmation,
-      );
-
-      if (confirmationError) {
-        return Promise.resolve(confirmationError);
+      if (!payload.mat_khau_moi || !payload.mat_khau_moi_confirmation) {
+        return Promise.resolve({
+          ok: false,
+          error: "Thiếu mật khẩu hoặc xác nhận mật khẩu.",
+        });
+      }
+      if (payload.mat_khau_moi !== payload.mat_khau_moi_confirmation) {
+        return Promise.resolve({
+          ok: false,
+          error: "Mật khẩu xác nhận không khớp.",
+        });
       }
 
       return jsonResult("dat-lai-mat-khau", {
         method: "POST",
         auth: "none",
-        ...jsonBody(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+    },
+    {
+      test: (n) =>
+        /\b(dat lai mat khau|reset password|tao mat khau moi)\b/.test(n),
+      build: (n, _today, rawText) => {
+        const text = String(rawText == null ? "" : rawText);
+        const args = {};
+        const email = extractEmailLoose(n);
+        const token = text.match(/(?:token|mã|ma)\s+([^\s,;]+)/i)?.[1];
+        const password = text.match(
+          /(?:mật khẩu mới|mat khau moi|password new|new password)\s+([^\s,;]+)/i,
+        )?.[1];
+        const confirmation = text.match(
+          /(?:xác nhận|xac nhan|confirm)\s+([^\s,;]+)/i,
+        )?.[1];
+        if (email) args.email = email;
+        if (token) args.token = token;
+        if (password) args.password = password;
+        if (confirmation) args.password_confirmation = confirmation;
+        return {
+          toolName: "password_reset_password",
+          rationale: "Khách đặt lại mật khẩu.",
+          arguments: args,
+        };
+      },
     },
   );
 
@@ -441,27 +691,65 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Đăng ký", "Xác thực OTP"],
     (args) => {
-      const payload = normalizeRegisterPayload(args);
-
-      const missing = requireFields(payload, [
+      const payload = {};
+      for (const key of [
+        "ho_va_ten",
+        "so_dien_thoai",
+        "email",
+        "password",
+        "password_confirmation",
+        "dia_chi",
+        "ngay_sinh",
+      ]) {
+        const value = args?.[key];
+        if (
+          value !== undefined &&
+          value !== null &&
+          String(value).trim() !== ""
+        ) {
+          payload[key] = value;
+        }
+      }
+      const missing = [
         "ho_va_ten",
         "so_dien_thoai",
         "password",
         "password_confirmation",
-      ]);
-
-      if (missing) return Promise.resolve(missing);
-
-      const confirmationError = validatePasswordConfirmation(
-        asString(payload.password),
-        asString(payload.password_confirmation),
+      ].filter(
+        (field) => !String(payload[field] == null ? "" : payload[field]).trim(),
       );
-
-      if (confirmationError) {
-        return Promise.resolve(confirmationError);
+      if (missing.length) {
+        return Promise.resolve({
+          ok: false,
+          error: `Thiếu ${missing.join(", ")}.`,
+        });
       }
 
-      if (payload.email && !isEmail(payload.email)) {
+      const password = String(
+        payload.password == null ? "" : payload.password,
+      ).trim();
+      const confirmation = String(
+        payload.password_confirmation == null
+          ? ""
+          : payload.password_confirmation,
+      ).trim();
+      if (!password || !confirmation) {
+        return Promise.resolve({
+          ok: false,
+          error: "Thiếu mật khẩu hoặc xác nhận mật khẩu.",
+        });
+      }
+      if (password !== confirmation) {
+        return Promise.resolve({
+          ok: false,
+          error: "Mật khẩu xác nhận không khớp.",
+        });
+      }
+
+      if (
+        payload.email &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payload.email).trim())
+      ) {
         return Promise.resolve({
           ok: false,
           error: "Email không hợp lệ.",
@@ -471,18 +759,57 @@ export function registerAuthAccountTools(ctx) {
       return jsonResult("dang-ky", {
         method: "POST",
         auth: "none",
-        ...jsonBody(payload),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+    },
+    {
+      test: (n) =>
+        /\b(dang ky tai khoan|dang ky moi|tao tai khoan|sign up|signup|register)\b/.test(
+          n,
+        ),
+      build: (n, _today, rawText) => {
+        const args = {};
+        const text = String(rawText == null ? "" : rawText);
+        const phone = extractVnPhone(n);
+        const email = extractEmailLoose(n);
+        const name = text.match(
+          /(?:tên|ten|họ tên|ho ten)\s+(.+?)\s+(?:số điện thoại|so dien thoai|sdt|email|mật khẩu|mat khau)/iu,
+        )?.[1];
+        if (phone) args.so_dien_thoai = phone;
+        if (email) args.email = email;
+        const pwd = extractPassword(rawText ?? n);
+        if (pwd) args.password = pwd;
+        const confirmation = text.match(
+          /(?:xác nhận|xac nhan|confirm)\s+([^\s,;]+)/i,
+        )?.[1];
+        if (name) args.ho_va_ten = name.trim();
+        if (confirmation) args.password_confirmation = confirmation;
+        return {
+          toolName: "registration_register_account",
+          rationale: "Khách muốn đăng ký tài khoản.",
+          arguments: args,
+        };
+      },
     },
   );
 
   const activateAccountRequest = (args) => {
-    const payload = normalizeActivationPayload(args);
+    const payload = {
+      email: String(args.email == null ? "" : args.email).trim(),
+      token: String(args.token == null ? args.otp : args.token).trim(),
+    };
+    const missing = ["email", "token"].filter(
+      (field) => !String(payload[field] == null ? "" : payload[field]).trim(),
+    );
+    if (missing.length) {
+      return Promise.resolve({
+        ok: false,
+        error: `Thiếu ${missing.join(", ")}.`,
+      });
+    }
 
-    const missing = requireFields(payload, ["email", "token"]);
-    if (missing) return Promise.resolve(missing);
-
-    if (!isEmail(payload.email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
       return Promise.resolve({
         ok: false,
         error: "Email không hợp lệ.",
@@ -492,7 +819,8 @@ export function registerAuthAccountTools(ctx) {
     return jsonResult("kich-hoat-tai-khoan", {
       method: "POST",
       auth: "none",
-      ...jsonBody(payload),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
   };
 
@@ -502,6 +830,20 @@ export function registerAuthAccountTools(ctx) {
     "safe",
     ["Xác thực OTP", "Đăng ký"],
     activateAccountRequest,
+    {
+      test: (n) =>
+        /\b(xac (minh|nhan) otp|nhap otp|ma otp|verify otp|otp la|otp:)\b/.test(
+          n,
+        ),
+      build: (n) => {
+        const otp = extractOtpCode(n);
+        return {
+          toolName: "registration_verify_otp",
+          rationale: "Khách xác minh OTP.",
+          arguments: otp ? { otp } : {},
+        };
+      },
+    },
   );
 
   register(
@@ -510,6 +852,24 @@ export function registerAuthAccountTools(ctx) {
     "safe",
     ["Kích hoạt tài khoản", "Đăng nhập"],
     activateAccountRequest,
+    {
+      test: (n) =>
+        /\b(kich hoat tai khoan|activate account|xac nhan tai khoan)\b/.test(
+          n,
+        ),
+      build: (n) => {
+        const args = {};
+        const email = extractEmailLoose(n);
+        const token = extractOtpCode(n);
+        if (email) args.email = email;
+        if (token) args.token = token;
+        return {
+          toolName: "registration_activate_account",
+          rationale: "Khách kích hoạt tài khoản.",
+          arguments: args,
+        };
+      },
+    },
   );
 
   register(
@@ -517,7 +877,11 @@ export function registerAuthAccountTools(ctx) {
     CUSTOMER_TOOL_SLOTS.get_customer_info,
     "safe",
     ["Thông tin khách hàng", "Hồ sơ"],
-    () => getProfile(jsonResult),
+    () =>
+      jsonResult("profile", {
+        method: "GET",
+        auth: "bearer",
+      }),
   );
 
   register(
@@ -526,7 +890,10 @@ export function registerAuthAccountTools(ctx) {
     "safe",
     ["Trạng thái tài khoản", "Hồ sơ"],
     async () => {
-      const result = await getProfile(jsonResult);
+      const result = await jsonResult("profile", {
+        method: "GET",
+        auth: "bearer",
+      });
 
       if (!result.ok) return result;
 
@@ -548,6 +915,17 @@ export function registerAuthAccountTools(ctx) {
         },
       };
     },
+    {
+      test: (n) =>
+        /\b(trang thai tai khoan|tinh trang tai khoan|account status)\b/.test(
+          n,
+        ),
+      build: () => ({
+        toolName: "customer_get_account_status",
+        rationale: "Khách xem trạng thái tài khoản.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -567,6 +945,15 @@ export function registerAuthAccountTools(ctx) {
           auth: "bearer",
         },
       ),
+    {
+      test: (n) =>
+        /\b(lich su dat ve|cac don da dat|booking history)\b/.test(n),
+      build: () => ({
+        toolName: "customer_get_booking_history",
+        rationale: "Khách xem lịch sử đặt vé.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -575,6 +962,15 @@ export function registerAuthAccountTools(ctx) {
     "safe",
     ["Lịch sử giao dịch", "Thanh toán"],
     (args) => stub("customer_get_transaction_history", args),
+    {
+      test: (n) =>
+        /\b(lich su giao dich|cac giao dich|transaction history)\b/.test(n),
+      build: () => ({
+        toolName: "customer_get_transaction_history",
+        rationale: "Khách xem lịch sử giao dịch.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -587,6 +983,15 @@ export function registerAuthAccountTools(ctx) {
         method: "GET",
         auth: "bearer",
       }),
+    {
+      test: (n) =>
+        /\b(diem (thuong|tich luy|hang)|loyalty|diem cua toi)\b/.test(n),
+      build: () => ({
+        toolName: "loyalty_get_current_points",
+        rationale: "Khách xem điểm thưởng.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -595,6 +1000,15 @@ export function registerAuthAccountTools(ctx) {
     "sensitive",
     ["Đổi điểm thưởng", "Voucher khả dụng"],
     (args) => stub("loyalty_redeem_points", args),
+    {
+      test: (n) =>
+        /\b(doi diem|redeem (point|diem)|quy doi diem|su dung diem)\b/.test(n),
+      build: () => ({
+        toolName: "loyalty_redeem_points",
+        rationale: "Khách quy đổi điểm thưởng.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -614,6 +1028,15 @@ export function registerAuthAccountTools(ctx) {
           auth: "bearer",
         },
       ),
+    {
+      test: (n) =>
+        /\b(lich su diem|points history|lich su tich diem)\b/.test(n),
+      build: () => ({
+        toolName: "loyalty_get_points_history",
+        rationale: "Khách xem lịch sử điểm.",
+        arguments: {},
+      }),
+    },
   );
 
   register(
@@ -644,250 +1067,16 @@ export function registerAuthAccountTools(ctx) {
         },
       };
     },
+    {
+      test: (n) =>
+        /\b(hang thanh vien|membership tier|hang hien tai|hang bac|hang vang|hang kim cuong)\b/.test(
+          n,
+        ),
+      build: () => ({
+        toolName: "loyalty_get_membership_tier",
+        rationale: "Khách xem hạng thành viên.",
+        arguments: {},
+      }),
+    },
   );
 }
-
-/**
- * Rule-base triggers for auth / account / password / registration / loyalty / customer-history.
- * Each entry: { test(normalizedText) → bool, build(n, todayIso, rawText) → toolCall }
- */
-export const AUTH_ACCOUNT_TOOL_PATTERNS = [
-  // auth_login — must come first; phone in msg shouldn't divert to trip search
-  {
-    test: (n) =>
-      /\b(dang nhap|dang nhap vao|log in|log me in|login|sign in|signin)\b/.test(
-        n,
-      ),
-    build: (n, _today, rawText) => {
-      const args = {};
-      const phone = extractVnPhone(n);
-      const email = extractEmailLoose(n);
-      if (phone) args.so_dien_thoai = phone;
-      if (email) args.email = email;
-      const pwd = extractPassword(rawText ?? n);
-      if (pwd) args.password = pwd;
-      return {
-        toolName: "auth_login",
-        rationale: "Khách muốn đăng nhập.",
-        arguments: args,
-      };
-    },
-  },
-  // auth_logout
-  {
-    test: (n) => /\b(dang xuat|thoat tai khoan|logout|sign out)\b/.test(n),
-    build: () => ({
-      toolName: "auth_logout",
-      rationale: "Khách yêu cầu đăng xuất.",
-      arguments: {},
-    }),
-  },
-  // registration_register_account
-  {
-    test: (n) =>
-      /\b(dang ky tai khoan|dang ky moi|tao tai khoan|sign up|signup|register)\b/.test(
-        n,
-      ),
-    build: (n, _today, rawText) => {
-      const args = {};
-      const phone = extractVnPhone(n);
-      const email = extractEmailLoose(n);
-      if (phone) args.so_dien_thoai = phone;
-      if (email) args.email = email;
-      const pwd = extractPassword(rawText ?? n);
-      if (pwd) args.password = pwd;
-      return {
-        toolName: "registration_register_account",
-        rationale: "Khách muốn đăng ký tài khoản.",
-        arguments: args,
-      };
-    },
-  },
-  // registration_verify_otp
-  {
-    test: (n) =>
-      /\b(xac (minh|nhan) otp|nhap otp|ma otp|verify otp|otp la|otp:)\b/.test(
-        n,
-      ),
-    build: (n) => {
-      const otp = extractOtpCode(n);
-      return {
-        toolName: "registration_verify_otp",
-        rationale: "Khách xác minh OTP.",
-        arguments: otp ? { otp } : {},
-      };
-    },
-  },
-  // password_forgot_password
-  {
-    test: (n) =>
-      /\b(quen mat khau|forgot password|khoi phuc mat khau|reset password)\b/.test(
-        n,
-      ),
-    build: (n) => {
-      const args = {};
-      const phone = extractVnPhone(n);
-      const email = extractEmailLoose(n);
-      if (phone) args.so_dien_thoai = phone;
-      if (email) args.email = email;
-      return {
-        toolName: "password_forgot_password",
-        rationale: "Khách quên mật khẩu.",
-        arguments: args,
-      };
-    },
-  },
-  // password_change_password
-  {
-    test: (n) =>
-      /\b(doi mat khau|thay mat khau|change password|cap nhat mat khau)\b/.test(
-        n,
-      ),
-    build: () => ({
-      toolName: "password_change_password",
-      rationale: "Khách đổi mật khẩu.",
-      arguments: {},
-    }),
-  },
-  // account_update_profile (name)
-  {
-    test: (n) =>
-      /\b(doi (ten|ho ten)|cap nhat (ten|ho ten)|thay (ten|ho ten))\b/.test(n),
-    build: (_n, _t, rawText) => {
-      const args = {};
-      const m = String(rawText ?? "").match(/(?:thành|sang|to)\s+([\p{L}\s]{2,60})$/u);
-      if (m) args.ho_va_ten = m[1].trim();
-      return {
-        toolName: "account_update_profile",
-        rationale: "Khách đổi họ tên.",
-        arguments: args,
-      };
-    },
-  },
-  // account_update_phone
-  {
-    test: (n) =>
-      /\b(doi (so dien thoai|sdt|so dt)|cap nhat (so dien thoai|sdt))\b/.test(
-        n,
-      ),
-    build: (n) => {
-      const args = {};
-      const phone = extractVnPhone(n);
-      if (phone) args.so_dien_thoai = phone;
-      return {
-        toolName: "account_update_phone",
-        rationale: "Khách đổi số điện thoại.",
-        arguments: args,
-      };
-    },
-  },
-  // account_update_email
-  {
-    test: (n) => /\b(doi email|cap nhat email|thay email)\b/.test(n),
-    build: (n) => {
-      const args = {};
-      const email = extractEmailLoose(n);
-      if (email) args.email = email;
-      return {
-        toolName: "account_update_email",
-        rationale: "Khách đổi email.",
-        arguments: args,
-      };
-    },
-  },
-  // account_update_avatar
-  {
-    test: (n) =>
-      /\b(doi (anh dai dien|avatar)|cap nhat (anh dai dien|avatar)|thay avatar)\b/.test(
-        n,
-      ),
-    build: () => ({
-      toolName: "account_update_avatar",
-      rationale: "Khách đổi ảnh đại diện.",
-      arguments: {},
-    }),
-  },
-  // account_get_profile
-  {
-    test: (n) =>
-      /\b(tai khoan cua toi|ho so cua toi|thong tin (ca nhan|tai khoan|ho so)|xem (profile|ho so|tai khoan))\b/.test(
-        n,
-      ),
-    build: () => ({
-      toolName: "account_get_profile",
-      rationale: "Khách xem thông tin tài khoản.",
-      arguments: {},
-    }),
-  },
-  // customer_get_booking_history
-  {
-    test: (n) =>
-      /\b(lich su dat ve|cac don da dat|booking history)\b/.test(n),
-    build: () => ({
-      toolName: "customer_get_booking_history",
-      rationale: "Khách xem lịch sử đặt vé.",
-      arguments: {},
-    }),
-  },
-  // customer_get_transaction_history
-  {
-    test: (n) =>
-      /\b(lich su giao dich|cac giao dich|transaction history)\b/.test(n),
-    build: () => ({
-      toolName: "customer_get_transaction_history",
-      rationale: "Khách xem lịch sử giao dịch.",
-      arguments: {},
-    }),
-  },
-  // customer_get_account_status
-  {
-    test: (n) =>
-      /\b(trang thai tai khoan|tinh trang tai khoan|account status)\b/.test(n),
-    build: () => ({
-      toolName: "customer_get_account_status",
-      rationale: "Khách xem trạng thái tài khoản.",
-      arguments: {},
-    }),
-  },
-  // loyalty_redeem_points
-  {
-    test: (n) =>
-      /\b(doi diem|redeem (point|diem)|quy doi diem|su dung diem)\b/.test(n),
-    build: () => ({
-      toolName: "loyalty_redeem_points",
-      rationale: "Khách quy đổi điểm thưởng.",
-      arguments: {},
-    }),
-  },
-  // loyalty_get_points_history
-  {
-    test: (n) => /\b(lich su diem|points history|lich su tich diem)\b/.test(n),
-    build: () => ({
-      toolName: "loyalty_get_points_history",
-      rationale: "Khách xem lịch sử điểm.",
-      arguments: {},
-    }),
-  },
-  // loyalty_get_membership_tier
-  {
-    test: (n) =>
-      /\b(hang thanh vien|membership tier|hang hien tai|hang bac|hang vang|hang kim cuong)\b/.test(
-        n,
-      ),
-    build: () => ({
-      toolName: "loyalty_get_membership_tier",
-      rationale: "Khách xem hạng thành viên.",
-      arguments: {},
-    }),
-  },
-  // loyalty_get_current_points
-  {
-    test: (n) =>
-      /\b(diem (thuong|tich luy|hang)|loyalty|diem cua toi)\b/.test(n),
-    build: () => ({
-      toolName: "loyalty_get_current_points",
-      rationale: "Khách xem điểm thưởng.",
-      arguments: {},
-    }),
-  },
-];

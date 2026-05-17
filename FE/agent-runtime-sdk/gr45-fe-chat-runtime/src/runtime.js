@@ -1,183 +1,166 @@
 import {
-  bearerHeadersFromStorage,
-  compileAgentGraph,
-  createAuthenticatedHttpVectorProvider,
-  createBrowserSessionProvider,
+  createBrowserAgentRuntime,
+} from "@fe-agent/browser-runtime/runtime";
+import {
   createInitialAgentState,
-  createRuntimeBus,
-  resolveBrowserAgentRuntimeConfig,
-  ToolRegistry,
-} from '@fe-agent/sdk';
+} from "@fe-agent/graph-runtime";
+import { createRuntimeBus } from "@fe-agent/streaming";
 
-import { registerGr45CatalogTools } from './catalog/index.js';
-import { gr45FastPlanner } from './gr45-fast-planner.js';
 import {
   collectLiveSupportDeferredOpeningFromToolResults,
   collectLiveSupportPublicIdsFromToolResults,
-  GR45_REPLY_SURFACE_TRANSPORT_VI,
-  postProcessGr45Plan,
-} from './gr45-planner-policy.js';
-import {
-  GR45_INTENT_CLASSIFIER_OPTIONS,
-  GR45_PINNED_SUGGESTION_LABELS,
-  GR45_SUPPORT_SUGGESTION_LABEL,
-  GR45_SUGGESTION_INTENT_GROUPS,
-} from './gr45-agent-domain-config.js';
-import { deriveRuntimeOutcome } from './gr45-runtime-outcome.js';
-import { summarizeToolResults } from './gr45-tool-summary.js';
-import { enhanceGr45TripSearchArgumentsRuleOnly } from './trip-search-slot-extractor.js';
+} from "./domain/planner/planner-policy.js";
+import { GR45_DOMAIN_POLICY } from "./domain/gr45-domain-policy.js";
+import { deriveRuntimeOutcome } from "./domain/outcome/runtime-outcome.js";
+import { summarizeToolResults } from "./domain/outcome/tool-summary.js";
+import { createDefaultToolRegistry } from "./runtime/providers/tool-registry.js";
+import { deriveGr45ToolSuggestions } from "./catalog/tools/index.js";
+import { enhanceGr45TripSearchArgumentsRuleOnly } from "./catalog/slots/trip-search-slot-extractor.js";
 
 let defaultRuntime = null;
 
-function defaultStorage() {
-  return typeof localStorage !== 'undefined' ? localStorage : null;
-}
-
-function defaultFetch() {
-  return globalThis.fetch.bind(globalThis);
-}
-
-function createDefaultToolRegistry(opts = {}) {
-  const tools = new ToolRegistry({
-    defaultToolTimeoutMs: opts.defaultToolTimeoutMs ?? 60_000,
-    requireSensitiveToolConfirmation: opts.requireSensitiveToolConfirmation ?? true,
-  });
-  registerGr45CatalogTools(tools);
-  if (typeof opts.registerTools === 'function') {
-    opts.registerTools(tools);
-  }
-  return tools;
-}
-
-const VALID_ROLES = new Set(['user', 'assistant', 'tool', 'system']);
+const VALID_ROLES = new Set(["user", "assistant", "tool", "system"]);
 
 function normalizeRole(raw) {
-  const r = String(raw ?? '').trim();
-  return VALID_ROLES.has(r) ? r : 'user';
+  const r = String(raw == null ? "" : raw).trim();
+  return VALID_ROLES.has(r) ? r : "user";
+}
+
+function useProvidedValue(value, defaultValue) {
+  return value == null ? defaultValue : value;
+}
+
+function textFromToolData(data) {
+  const direct = [
+    data?.message,
+    data?.error,
+    data?.data?.message,
+    data?.data?.error,
+    data?.data?.suggested_questions_vi?.[0],
+    data?.suggested_questions_vi?.[0],
+  ]
+    .map((value) => String(value == null ? "" : value).trim())
+    .find((value) => value.length > 0);
+
+  if (direct) return direct;
+  return "";
+}
+
+function createDeterministicToolReply({ toolResults }) {
+  const rows = Array.isArray(toolResults) ? toolResults : [];
+  if (rows.length !== 1) return "";
+
+  const row = rows[0];
+  const text = textFromToolData(row?.data);
+  if (text) return text;
+  const err = String(row?.error ?? "").trim();
+  if (err && !err.startsWith("confirmation_required:")) return err;
+
+  const simpleToolNames = new Set([
+    "auth_login",
+    "auth_logout",
+    "auth_forgot_password",
+    "auth_reset_password",
+    "auth_activate_account",
+    "profile_update",
+    "password_change",
+    "booking_cancel_booking",
+    "ticket_cancel_ticket",
+    "support_send_message",
+  ]);
+  if (row?.ok === true && simpleToolNames.has(row?.toolName)) {
+    return "Thao tác đã hoàn tất.";
+  }
+
+  return "";
 }
 
 export function createFeChatAgentRuntime(opts = {}) {
-  const collectLiveSupportIds =
-    typeof opts.collectLiveSupportPublicIds === 'function'
-      ? opts.collectLiveSupportPublicIds
-      : collectLiveSupportPublicIdsFromToolResults;
-  const fetchImpl = opts.fetchImpl || defaultFetch();
-  const storage = opts.storage === undefined ? defaultStorage() : opts.storage;
-  const config = resolveBrowserAgentRuntimeConfig({
-    env: import.meta.env,
-    locationOrigin:
-      typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '',
-    defaults: opts,
-  });
-  const getAuthHeaders =
-    opts.getAuthHeaders ||
-    (() => bearerHeadersFromStorage(storage, 'auth.client.token'));
-  const tools = opts.tools || createDefaultToolRegistry(opts);
-  const sessions =
-    opts.sessions !== undefined
-      ? opts.sessions
-      : storage
-        ? createBrowserSessionProvider(storage)
-        : undefined;
-
-  // Vector provider and compiled graph are created once per runtime instance.
-  const vector =
-    opts.vector ||
-    createAuthenticatedHttpVectorProvider({
-      baseUrl: opts.vectorBaseUrl || config.vectorBaseUrl,
-      fetchImpl,
-      getHeaders: getAuthHeaders,
-    });
-
-  const compiledGraph = compileAgentGraph({
-    llm: opts.llm,
-    ollamaModel: config.ollamaModel,
-    ollamaEmbedModel: config.ollamaEmbedModel,
-    ollamaBaseUrl: config.ollamaBaseUrl,
-    ollamaKeepAlive: config.ollamaKeepAlive,
-    ollamaNumCtx: config.ollamaNumCtx,
-    groqKey: config.groqKey,
-    groqModel: config.groqModel,
-    groqBaseUrl: config.groqBaseUrl,
-    huggingFaceKey: config.huggingFaceKey,
-    huggingFaceModel: config.huggingFaceModel,
-    huggingFaceEndpointUrl: config.huggingFaceEndpointUrl,
-    huggingFaceProvider: config.huggingFaceProvider,
-    fetchImpl,
-    tools,
-    bus: opts.bus || createRuntimeBus(),
-    sessions,
-    // No compile-time signal; per-request signal is passed via graph state _signal.
-    checkpointer: false,
-    confirmToolCall: opts.confirmToolCall,
-    domainInstructions: opts.domainInstructions,
-    synthesizerDomainInstructions:
-      opts.synthesizerDomainInstructions ?? GR45_REPLY_SURFACE_TRANSPORT_VI,
-    synthesizerReplyOverride: opts.synthesizerReplyOverride,
-    intentClassifierOptions:
-      opts.intentClassifierOptions ?? GR45_INTENT_CLASSIFIER_OPTIONS,
-    suggestionIntentGroups:
-      opts.suggestionIntentGroups ?? GR45_SUGGESTION_INTENT_GROUPS,
-    pinnedSuggestionLabels:
-      opts.pinnedSuggestionLabels ?? GR45_PINNED_SUGGESTION_LABELS,
-    supportSuggestionLabel:
-      opts.supportSuggestionLabel ?? GR45_SUPPORT_SUGGESTION_LABEL,
-    planPostProcessor: opts.planPostProcessor ?? postProcessGr45Plan,
-    prePlannerHook: opts.prePlannerHook ?? gr45FastPlanner,
-    enhanceToolCallArguments:
-      opts.enhanceToolCallArguments ?? enhanceGr45TripSearchArgumentsRuleOnly,
-    suggestionSource: opts.suggestionSource || 'tool_labels',
-    qaPdfOnly: opts.qaPdfOnly,
-    restrictedAnswerSources: opts.restrictedAnswerSources,
-    rag: {
-      collection: opts.collection || config.collection,
-      embedder: opts.embedder,
-      vector,
+  const collectLiveSupportIds = useProvidedValue(
+    opts.collectLiveSupportPublicIds,
+    collectLiveSupportPublicIdsFromToolResults,
+  );
+  const tools = useProvidedValue(opts.tools, createDefaultToolRegistry(opts));
+  const bus = useProvidedValue(opts.bus, createRuntimeBus());
+  const { compiledGraph, sessions } = createBrowserAgentRuntime({
+    options: {
+      ...opts,
+      bus,
+      synthesizerReplyOverride: useProvidedValue(
+        opts.synthesizerReplyOverride,
+        createDeterministicToolReply,
+      ),
     },
-    config: opts.config || {},
+    env: import.meta.env,
+    locationOrigin: globalThis.window?.location?.origin ? globalThis.window.location.origin : "",
+    tools,
+    domainPolicy: GR45_DOMAIN_POLICY,
+    prompt: opts.synthesizerDomainInstructions,
+    enhanceToolCallArguments: useProvidedValue(
+      opts.enhanceToolCallArguments,
+      enhanceGr45TripSearchArgumentsRuleOnly,
+    ),
   });
 
   async function invoke(message, invokeOpts = null, signal = undefined) {
-    const text = String(message || '').trim();
+    const text = String(message == null ? "" : message).trim();
     if (!text) {
-      throw new Error('Thiếu nội dung tin nhắn.');
+      throw new Error("Thiếu nội dung tin nhắn.");
     }
 
-    const requestOptions = invokeOpts && typeof invokeOpts === 'object' ? invokeOpts : null;
-    const history = requestOptions && Array.isArray(requestOptions.history) ? requestOptions.history : [];
+    const requestOptions = invokeOpts == null ? {} : invokeOpts;
+    const stopTokenStream =
+      requestOptions.onToken == null
+        ? null
+        : bus.onToken(requestOptions.onToken);
+    const history =
+      Array.isArray(requestOptions.history)
+        ? requestOptions.history
+        : [];
+    const requestSessionId = String(
+      requestOptions.session_id == null ? "" : requestOptions.session_id,
+    ).trim();
     const sessionId =
-      requestOptions && typeof requestOptions.session_id === 'string' && requestOptions.session_id.trim()
-        ? requestOptions.session_id.trim().slice(0, 64)
+      requestSessionId
+        ? requestSessionId.slice(0, 64)
         : `fe-${crypto.randomUUID()}`;
 
     const prior = history.slice(-20).map((row) => ({
       id: crypto.randomUUID(),
       role: normalizeRole(row?.role),
-      content: String(row?.content ?? ''),
+      content: String(row?.content == null ? "" : row.content),
     }));
 
     const correlationId = crypto.randomUUID();
 
-    const out = await compiledGraph.invoke(
-      createInitialAgentState({
-        sessionId,
-        correlationId,
-        messages: [
-          ...prior,
-          {
-            id: crypto.randomUUID(),
-            role: 'user',
-            content: text,
-          },
-        ],
-        _signal: signal,
-      }),
-      // Use correlationId as thread_id so each invocation starts from a clean checkpoint.
-      { configurable: { thread_id: correlationId } },
-    );
+    let out;
+    try {
+      out = await compiledGraph.invoke(
+        createInitialAgentState({
+          sessionId,
+          correlationId,
+          messages: [
+            ...prior,
+            {
+              id: crypto.randomUUID(),
+              role: "user",
+              content: text,
+            },
+          ],
+          _signal: signal,
+        }),
+        // Use correlationId as thread_id so each invocation starts from a clean checkpoint.
+        { configurable: { thread_id: correlationId } },
+      );
+    } finally {
+      if (stopTokenStream) stopTokenStream();
+    }
 
-    const suggestions = Array.isArray(out?.suggestions) ? out.suggestions : [];
-    const answer = String(out?.finalAnswer ?? '').trim();
+    const answer = String(
+      out?.finalAnswer == null
+        ? ""
+        : out.finalAnswer,
+    ).trim();
     const toolResults = Array.isArray(out?.toolResults) ? out.toolResults : [];
     const liveSupportPublicIds = collectLiveSupportIds(toolResults);
     const liveSupportDeferredOpening =
@@ -192,20 +175,14 @@ export function createFeChatAgentRuntime(opts = {}) {
       success: true,
       session_id: sessionId,
       assistant: JSON.stringify({
-        answer:
-          answer ||
-          '(Trống) — kiểm tra provider LLM, embedding/RAG, và kết nối API.',
-        suggestions: suggestions
-          .map((s) => {
-            const textValue = String(s ?? '').trim();
-            return textValue ? { text: textValue, action: '', params: {} } : null;
-          })
-          .filter(Boolean)
-          .slice(0, 5),
+        answer: answer
+          ? answer
+          : "(Trống) — kiểm tra provider LLM, embedding/RAG, và kết nối API.",
+        suggestions: deriveGr45ToolSuggestions(toolResults),
       }),
       metadata: {
         ai: {
-          runtime: 'fe_agent',
+          runtime: "fe_agent",
           outcome,
           planner_loops_signal: out?.signals?.planner_loop,
           rag_hits: ragContext.length,
@@ -221,7 +198,7 @@ export function createFeChatAgentRuntime(opts = {}) {
     };
   }
 
-  return { invoke, tools, sessions, compiledGraph };
+  return { invoke, tools, sessions, compiledGraph, bus };
 }
 
 export function createDefaultFeChatAgentRuntime(opts = {}) {
@@ -239,6 +216,10 @@ export function resetDefaultFeChatAgentRuntime() {
   defaultRuntime = null;
 }
 
-export async function invokeFeChatAgent(message, opts = null, signal = undefined) {
+export async function invokeFeChatAgent(
+  message,
+  opts = null,
+  signal = undefined,
+) {
   return ensureDefaultFeChatAgentRuntime().invoke(message, opts, signal);
 }

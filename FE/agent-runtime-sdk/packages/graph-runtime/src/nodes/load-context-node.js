@@ -1,4 +1,5 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
+import { errorText, textOrEmpty, valueOr } from "../value.js";
 
 const DEFAULT_MAX_CONTEXT_MESSAGES = 20;
 
@@ -8,7 +9,7 @@ function dedupeMessages(messages = []) {
   return messages.filter((message) => {
     const key = message.id
       ? `id:${message.id}`
-      : `${message.role}:${String(message.content ?? "").slice(0, 500)}`;
+      : `${message.role}:${textOrEmpty(message.content).slice(0, 500)}`;
 
     if (seen.has(key)) return false;
 
@@ -17,7 +18,6 @@ function dedupeMessages(messages = []) {
   });
 }
 
-/** @param graphDependencies */
 export function createLoadContextNode(graphDependencies) {
   return async function loadContextGraphNode(graphState) {
     graphDependencies.bus?.emit("stage", {
@@ -27,8 +27,7 @@ export function createLoadContextNode(graphDependencies) {
     });
 
     const maxMessages =
-      graphDependencies.config?.maxContextMessages ??
-      DEFAULT_MAX_CONTEXT_MESSAGES;
+      valueOr(graphDependencies.config?.maxContextMessages, DEFAULT_MAX_CONTEXT_MESSAGES);
 
     let conversationMessages = Array.isArray(graphState.messages)
       ? graphState.messages
@@ -76,7 +75,7 @@ export function createLoadContextNode(graphDependencies) {
           loaded,
           count: conversationMessages.length,
           error: error
-            ? String(error?.message ?? error).slice(0, 300)
+            ? errorText(error).slice(0, 300)
             : undefined,
         }),
       ],

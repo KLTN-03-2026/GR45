@@ -1,6 +1,6 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
+import { valueOr } from "../value.js";
 
-/** @param graphDependencies */
 export function createToolExecutorNode(graphDependencies) {
   return async function toolExecutorGraphNode(graphState) {
     graphDependencies.bus?.emit("stage", {
@@ -9,13 +9,13 @@ export function createToolExecutorNode(graphDependencies) {
       correlationId: graphState.correlationId,
     });
 
-    const requestHeaders = (await graphDependencies.getHeaders?.()) ?? {};
+    const requestHeaders = valueOr(await graphDependencies.getHeaders?.(), {});
     const toolExecutionContext = {
       correlationId: graphState.correlationId,
       sessionId: graphState.sessionId,
       headers: requestHeaders,
       bus: graphDependencies.bus,
-      signal: graphState._signal ?? graphDependencies.signal,
+      signal: valueOr(graphState._signal, graphDependencies.signal),
       confirmToolCall: graphDependencies.confirmToolCall,
     };
 

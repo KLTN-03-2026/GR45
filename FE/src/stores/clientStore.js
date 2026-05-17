@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import authApi from '@/api/authApi.js';
 
 // Key localStorage của Khách Hàng
@@ -111,10 +111,32 @@ export const useClientStore = defineStore('client', () => {
     }
   }
 
-  return { 
-    token, user, loading, error, isTokenVerified, isLoggedIn, 
+  function syncFromChatbot(event) {
+    const { token: t, user: u } = event.detail ?? {};
+    if (t) {
+      token.value = t;
+      isTokenVerified.value = true;
+      localStorage.setItem(TOKEN_KEY, t);
+    }
+    if (u && typeof u === 'object') {
+      user.value = u;
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+    }
+  }
+
+  function syncLogoutFromChatbot() {
+    logout();
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('chatbot:client:login', syncFromChatbot);
+    window.addEventListener('chatbot:client:logout', syncLogoutFromChatbot);
+  }
+
+  return {
+    token, user, loading, error, isTokenVerified, isLoggedIn,
     isAuthModalOpen, authMode,
     login, logout, updateUser, openAuthModal, closeAuthModal,
-    fetchProfile 
+    fetchProfile
   };
 });

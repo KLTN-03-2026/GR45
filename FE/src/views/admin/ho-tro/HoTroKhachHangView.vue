@@ -219,11 +219,19 @@ const selectSession = async (session) => {
           const pid = String(detail?.public_id || "").trim();
           if (pid !== String(session.public_id || "").trim()) return;
 
+          // Khách thoát chat hoặc admin resolve → khoá soạn + đánh dấu đã resolve.
+          const closedAtIso = new Date().toISOString();
+          const markResolved =
+            detail?.kind === "resolved" || detail?.kind === "customer_disconnected";
+
           if (sameLiveSupportSessionId(currentSessionId.value, session.id)) {
             currentSessionDetails.value = {
               ...(currentSessionDetails.value || {}),
               staff_can_reply: false,
               thread_archived: true,
+              ...(markResolved
+                ? { status: "resolved", resolved_at: currentSessionDetails.value?.resolved_at || closedAtIso }
+                : {}),
             };
           }
 
@@ -235,6 +243,9 @@ const selectSession = async (session) => {
               ...sessions.value[idx],
               staff_can_reply: false,
               thread_archived: true,
+              ...(markResolved
+                ? { status: "resolved", resolved_at: sessions.value[idx].resolved_at || closedAtIso }
+                : {}),
             };
           }
         },
@@ -653,7 +664,7 @@ const formatTime = (isoString) => {
             v-if="currentSessionDetails?.thread_archived"
             class="px-3 py-2 bg-warning-subtle border-bottom small text-dark"
           >
-            Phiên đã đóng / resolve hoặc không còn nhận tin — chỉ xem lịch sử.
+            Phiên đã resolve hoặc không còn nhận tin — chỉ xem lịch sử.
           </div>
 
           <div

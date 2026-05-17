@@ -523,7 +523,7 @@ class TrackingHanhTrinhService
     private function assertCanViewByUser(ChuyenXe $chuyenXe, $user): void
     {
         if (!$user) {
-            throw new \Exception('Ban chua dang nhap.');
+            throw new \Exception('Bạn chưa đăng nhập.');
         }
 
         if ($user instanceof Admin) {

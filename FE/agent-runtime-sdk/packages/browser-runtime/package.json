@@ -1,0 +1,29 @@
+{
+  "name": "@fe-agent/browser-runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/runtime/browser-agent-runtime.js",
+  "exports": {
+    ".": "./src/runtime/browser-agent-runtime.js",
+    "./config": "./src/config/browser-runtime-config.js",
+    "./providers/auth-headers": "./src/providers/auth-headers.js",
+    "./providers/authenticated-vector-provider": "./src/providers/authenticated-vector-provider.js",
+    "./providers/browser-agent-providers": "./src/providers/browser-agent-providers.js",
+    "./providers/browser-session-provider": "./src/providers/browser-session-provider.js",
+    "./runtime": "./src/runtime/browser-agent-runtime.js"
+  },
+  "dependencies": {
+    "@fe-agent/core": "0.1.0",
+    "@fe-agent/graph-runtime": "0.1.0",
+    "@fe-agent/rag": "0.1.0",
+    "@fe-agent/shared-zod-schemas": "0.1.0",
+    "@fe-agent/streaming": "0.1.0",
+    "@fe-agent/tools": "0.1.0"
+  },
+  "scripts": {
+    "build": "node -e \"console.log('js package, no build')\""
+  },
+  "files": [
+    "src"
+  ]
+}

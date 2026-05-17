@@ -230,6 +230,7 @@ final class LiveSupportBusSafeNhaXeStaffService
             return $session->fresh(['nhaXe']);
         }
 
+        $session->status = 'resolved';
         $session->resolved_at = now();
         $session->resolved_by_admin_id = $admin->id;
         $session->resolved_by_nha_xe_id = null;
@@ -251,6 +252,7 @@ final class LiveSupportBusSafeNhaXeStaffService
             return $session->fresh(['nhaXe']);
         }
 
+        $session->status = 'resolved';
         $session->resolved_at = now();
         $session->resolved_by_nha_xe_id = $nhaXe->id;
         $session->resolved_by_admin_id = null;
@@ -468,7 +470,7 @@ final class LiveSupportBusSafeNhaXeStaffService
     private function defaultCreateStatus(): string
     {
         /** @var array<int, string>|mixed $list */
-        $list = config('live_support.allowed_session_statuses', ['open', 'closed', 'done']);
+        $list = config('live_support.allowed_session_statuses', ['open', 'resolved']);
         $list = is_array($list) && count($list) > 0
             ? array_values(array_filter($list, fn ($s) => is_string($s) && $s !== ''))
             : ['open'];

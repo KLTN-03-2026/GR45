@@ -83,10 +83,7 @@ function balancedJsonSlice(text, brace) {
 
 const UI_ANSWER_NEEDLE = '{"answer"';
 
-/**
- * Giống BE AssistantUiJsonExtractor: prose + `{"answer":...}` hoặc answer lồng JSON.
- * @returns {{ answer: string, suggestions: unknown[] } | null}
- */
+
 export function parseAssistantUiPayload(rawText) {
   const raw = String(rawText || "").trim();
   if (!raw) return null;
@@ -148,10 +145,7 @@ export function parseAssistantUiPayload(rawText) {
   return { answer, suggestions };
 }
 
-/**
- * Chuẩn hoá assistant: FE runtime trả `{ answer, suggestions }`, Laravel có thể trả JSON string hoặc prose + `{"answer":...}`.
- * @returns {{ answer: string, suggestions: unknown[] } | null}
- */
+
 export function coerceAssistantStructured(assistant) {
   if (assistant == null || assistant === "") return null;
   if (typeof assistant === "object" && !Array.isArray(assistant)) {
@@ -259,14 +253,7 @@ async function persistFeChatAiMessageLog({
   }
 }
 
-/**
- * Chat AI một lần (JSON).
- *
- * @param {string} message
- * @param {AbortSignal} [signal]
- * @param {{ latitude?: number, longitude?: number, history?: { role: string, content: string }[], session_id?: string } | null} [opts]
- * @returns {Promise<{ success: boolean, assistant?: string, metadata?: { ai?: Record<string, unknown> }, message?: string }>}
- */
+
 export async function callChatAiMessage(message, signal, opts = null) {
   if (isFeChatAgentRuntime()) {
     const { invokeFeChatAgent } = await import('@fe-agent/gr45-fe-chat-runtime');
@@ -371,15 +358,7 @@ export async function callChatAiMessage(message, signal, opts = null) {
   return body;
 }
 
-/**
- * Gửi tin khách trong phiên live support (REST) — không qua chatbot.
- * Admin / nhà xe nhận qua WebSocket; widget đã subscribe `live-support.session.{publicId}`.
- *
- * @param {string} publicId
- * @param {string} bodyText
- * @param {AbortSignal} [signal]
- * @returns {Promise<{ success: boolean, data?: unknown, message?: string }>}
- */
+
 export async function postLiveSupportCustomerMessage(publicId, bodyText, signal) {
   const pid = String(publicId || "").trim();
   const body = String(bodyText || "").trim();
@@ -422,13 +401,7 @@ export async function postLiveSupportCustomerMessage(publicId, bodyText, signal)
   return json;
 }
 
-/**
- * Khách chủ động thoát chat trực tiếp — đóng phiên (admin không reply tiếp).
- *
- * @param {string} publicId
- * @param {string} [chatWidgetSessionKey]
- * @param {AbortSignal} [signal]
- */
+
 export async function postLiveSupportCustomerClose(
   publicId,
   chatWidgetSessionKey,

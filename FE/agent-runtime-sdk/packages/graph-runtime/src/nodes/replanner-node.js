@@ -1,6 +1,6 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
+import { anyTrue, valueOr } from "../value.js";
 
-/** @param graphDependencies @param runtimeConfiguration */
 export function createReplannerNode(graphDependencies, runtimeConfiguration) {
   return async function replannerGraphNode(graphState) {
     graphDependencies.bus?.emit("stage", {
@@ -11,14 +11,17 @@ export function createReplannerNode(graphDependencies, runtimeConfiguration) {
 
     const replannerSignalsPatch = {
       rag_fallback: Boolean(
-        graphState.observations.some(
-          (observationRow) => observationRow.ok === false
-        ) || graphState.plan?.needs_rag_fallback
+        anyTrue(
+          graphState.observations.some(
+            (observationRow) => observationRow.ok === false
+          ),
+          graphState.plan?.needs_rag_fallback,
+        )
       ),
       needs_replan: false,
     };
 
-    if ((graphState.signals.planner_loop ?? 0) >= runtimeConfiguration.maxPlannerLoops) {
+    if (valueOr(graphState.signals.planner_loop, 0) >= runtimeConfiguration.maxPlannerLoops) {
       replannerSignalsPatch.replan_terminal = true;
     }
 

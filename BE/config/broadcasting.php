@@ -11,7 +11,7 @@ return [
     | framework when an event needs to be broadcast. You may set this to
     | any of the connections defined in the "connections" array below.
     |
-    | Supported: "reverb", "pusher", "ably", "redis", "log", "null"
+    | Supported: "reverb", "ably", "redis", "log", "null"
     |
     */
 
@@ -43,25 +43,6 @@ return [
             ],
             'client_options' => [
                 // Tránh treo request phút khi Reverb không lên hoặc host sai (ShouldBroadcastNow / shutdown broadcast).
-                'timeout' => (float) env('BROADCAST_HTTP_TIMEOUT', 3),
-                'connect_timeout' => (float) env('BROADCAST_HTTP_CONNECT_TIMEOUT', 1),
-            ],
-        ],
-
-        'pusher' => [
-            'driver' => 'pusher',
-            'key' => env('PUSHER_APP_KEY'),
-            'secret' => env('PUSHER_APP_SECRET'),
-            'app_id' => env('PUSHER_APP_ID'),
-            'options' => [
-                'cluster' => env('PUSHER_APP_CLUSTER'),
-                'host' => env('PUSHER_HOST') ?: 'api-'.env('PUSHER_APP_CLUSTER', 'mt1').'.pusher.com',
-                'port' => env('PUSHER_PORT', 443),
-                'scheme' => env('PUSHER_SCHEME', 'https'),
-                'encrypted' => true,
-                'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
-            ],
-            'client_options' => [
                 'timeout' => (float) env('BROADCAST_HTTP_TIMEOUT', 3),
                 'connect_timeout' => (float) env('BROADCAST_HTTP_CONNECT_TIMEOUT', 1),
             ],

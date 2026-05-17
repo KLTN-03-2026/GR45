@@ -206,6 +206,7 @@ final class LiveSupportCustomerStaffService
             return $session->fresh(['khachHang', 'nhaXe']);
         }
 
+        $session->status = 'resolved';
         $session->resolved_at = now();
         $session->resolved_by_admin_id = $admin->id;
         $session->resolved_by_nha_xe_id = null;
@@ -228,6 +229,7 @@ final class LiveSupportCustomerStaffService
             return $session->fresh(['khachHang', 'nhaXe']);
         }
 
+        $session->status = 'resolved';
         $session->resolved_at = now();
         $session->resolved_by_nha_xe_id = $nhaXe->id;
         $session->resolved_by_admin_id = null;

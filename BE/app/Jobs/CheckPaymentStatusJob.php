@@ -58,7 +58,7 @@ class CheckPaymentStatusJob implements ShouldQueue
                 }
             }
 
-            // Bắn sự kiện Pusher
+            // Bắn sự kiện realtime qua Laravel Reverb.
             $ve->loadMissing('chuyenXe.tuyenDuong');
             event(new VeHuyTuDongEvent($ve));
         }

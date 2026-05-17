@@ -1,16 +1,17 @@
 import { RuntimeSignalsSchema } from "@fe-agent/shared-zod-schemas";
 import { Annotation } from "@langchain/langgraph";
+import { valueOr } from "../value.js";
 
 export const AgentAnnotation = Annotation.Root({
   sessionId: Annotation(),
   correlationId: Annotation(),
   messages: Annotation({
-    reducer: (previousMessages, nextMessages) => nextMessages ?? [],
+    reducer: (previousMessages, nextMessages) => valueOr(nextMessages, []),
     default: () => [],
   }),
   signals: Annotation({
     reducer: (previousSignals, patch) =>
-      RuntimeSignalsSchema.parse({ ...previousSignals, ...(patch ?? {}) }),
+      RuntimeSignalsSchema.parse({ ...previousSignals, ...valueOr(patch, {}) }),
     default: () => RuntimeSignalsSchema.parse({}),
   }),
   plan: Annotation({
@@ -24,26 +25,26 @@ export const AgentAnnotation = Annotation.Root({
   }),
   pendingToolCalls: Annotation({
     reducer: (unusedPreviousPendingCalls, nextPendingCalls) =>
-      nextPendingCalls ?? [],
+      valueOr(nextPendingCalls, []),
     default: () => [],
   }),
   completedToolCalls: Annotation({
-    reducer: (previousIds, nextIds) => previousIds.concat(nextIds ?? []),
+    reducer: (previousIds, nextIds) => previousIds.concat(valueOr(nextIds, [])),
     default: () => [],
   }),
   toolResults: Annotation({
     reducer: (previousResults, nextResults) =>
-      previousResults.concat(nextResults ?? []),
+      previousResults.concat(valueOr(nextResults, [])),
     default: () => [],
   }),
   ragContext: Annotation({
     reducer: (unusedPreviousRagContext, nextRagContext) =>
-      nextRagContext ?? [],
+      valueOr(nextRagContext, []),
     default: () => [],
   }),
   observations: Annotation({
     reducer: (previousObservations, nextObservations) =>
-      previousObservations.concat(nextObservations ?? []),
+      previousObservations.concat(valueOr(nextObservations, [])),
     default: () => [],
   }),
   finalAnswer: Annotation({
@@ -51,14 +52,9 @@ export const AgentAnnotation = Annotation.Root({
       nextFinalAnswer,
     default: () => undefined,
   }),
-  suggestions: Annotation({
-    reducer: (unusedPreviousSuggestions, nextSuggestions) =>
-      nextSuggestions ?? [],
-    default: () => [],
-  }),
   journal: Annotation({
     reducer: (previousJournal, nextJournal) =>
-      previousJournal.concat(nextJournal ?? []),
+      previousJournal.concat(valueOr(nextJournal, [])),
     default: () => [],
   }),
   // Per-request AbortSignal for cancellation; not serialized.

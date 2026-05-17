@@ -10,7 +10,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast khi có tin mới trong live support (Reverb / Pusher protocol).
+ * Broadcast khi có tin mới trong live support qua Laravel Reverb.
  */
 final class LiveSupportMessageSentEvent implements ShouldBroadcastNow
 {
