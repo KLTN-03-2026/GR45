@@ -1,4 +1,5 @@
 <script setup>
+// Driver Schedule View with HMR reload
 import { ref, computed, onMounted, watch } from "vue";
 import driverApi from "@/api/driverApi";
 import BaseModal from "@/components/common/BaseModal.vue";
@@ -36,9 +37,18 @@ const lichTrinhTram = ref([]);
 
 // --- Tên tháng và ngày tiếng Việt ---
 const monthNames = [
-  "Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4",
-  "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8",
-  "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12",
+  "Tháng 1",
+  "Tháng 2",
+  "Tháng 3",
+  "Tháng 4",
+  "Tháng 5",
+  "Tháng 6",
+  "Tháng 7",
+  "Tháng 8",
+  "Tháng 9",
+  "Tháng 10",
+  "Tháng 11",
+  "Tháng 12",
 ];
 
 const dayNames = ["CN", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
@@ -55,7 +65,8 @@ const firstDayOfMonth = computed(() => {
 // Tính số ngày tháng trước cần hiển thị
 const prevMonthDays = computed(() => {
   const prevMonth = currentMonth.value === 0 ? 11 : currentMonth.value - 1;
-  const prevYear = currentMonth.value === 0 ? currentYear.value - 1 : currentYear.value;
+  const prevYear =
+    currentMonth.value === 0 ? currentYear.value - 1 : currentYear.value;
   return new Date(prevYear, prevMonth + 1, 0).getDate();
 });
 
@@ -72,7 +83,11 @@ const calendarWeeks = computed(() => {
 
   // Các ngày của tháng hiện tại
   for (let d = 1; d <= daysInMonth.value; d++) {
-    const dateStr = formatToDateString(currentYear.value, currentMonth.value, d);
+    const dateStr = formatToDateString(
+      currentYear.value,
+      currentMonth.value,
+      d,
+    );
     currentWeek.push({ day: d, date: dateStr, isOtherMonth: false });
     if (currentWeek.length === 7) {
       weeks.push(currentWeek);
@@ -96,8 +111,16 @@ const calendarWeeks = computed(() => {
 const fetchMonthTrips = async () => {
   try {
     isLoading.value = true;
-    const startDate = formatToDateString(currentYear.value, currentMonth.value, 1);
-    const endDate = formatToDateString(currentYear.value, currentMonth.value, daysInMonth.value);
+    const startDate = formatToDateString(
+      currentYear.value,
+      currentMonth.value,
+      1,
+    );
+    const endDate = formatToDateString(
+      currentYear.value,
+      currentMonth.value,
+      daysInMonth.value,
+    );
     const params = {
       ngay_bat_dau: startDate,
       ngay_ket_thuc: endDate,
@@ -135,7 +158,11 @@ const extractDateFromISO = (isoStr) => {
 // Kiểm tra ngày có phải hôm nay không
 const isToday = (dateStr) => {
   if (!dateStr) return false;
-  const todayStr = formatToDateString(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayStr = formatToDateString(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
   return dateStr === todayStr;
 };
 
@@ -202,7 +229,12 @@ const formatToDateString = (year, month, day) => {
 const formatDate = (ds) => {
   if (!ds) return "";
   const d = new Date(ds);
-  return d.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return d.toLocaleDateString("vi-VN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 };
 
 const formatTime = (ts) => (ts ? ts.substring(0, 5) : "--:--");
@@ -224,6 +256,19 @@ const getStatusClass = (s) => {
   return "status-default";
 };
 
+const statsGioLam = ref({ gio_du_kien: 0, gio_thuc_te: 0, tuan_hien_tai: "" });
+
+const fetchThongKeGioLam = async () => {
+  try {
+    const res = await driverApi.getThongKeGioLam();
+    if (res.success) {
+      statsGioLam.value = res.data;
+    }
+  } catch (error) {
+    console.error("Lỗi khi lấy thống kê giờ làm:", error);
+  }
+};
+
 // Theo dõi thay đổi tháng để fetch lại dữ liệu
 watch([currentMonth, currentYear], () => {
   fetchMonthTrips();
@@ -231,11 +276,72 @@ watch([currentMonth, currentYear], () => {
 
 onMounted(() => {
   fetchMonthTrips();
+  fetchThongKeGioLam();
 });
 </script>
 
 <template>
   <div class="lich-trinh-wrapper pb-24">
+    <!-- Thống kê làm việc -->
+    <div class="stats-overview-modern mb-4">
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <div
+            class="stat-card modern-card p-3 d-flex flex-column justify-content-center h-100 bg-white rounded shadow-sm border-0 border-start border-4"
+            style="border-left-color: #6366f1 !important"
+          >
+            <h6
+              class="text-secondary fw-semibold mb-1 d-flex align-items-center"
+            >
+              <CalendarDays class="icon-inline text-info me-2" size="18" />
+              Tuần hiện tại
+            </h6>
+            <div class="fs-6 fw-medium text-dark mt-auto">
+              {{ statsGioLam.tuan_hien_tai }}
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4">
+          <div
+            class="stat-card modern-card p-3 d-flex align-items-center h-100 bg-white rounded shadow-sm border-0 border-start border-4"
+            style="border-left-color: var(--primary-color) !important"
+          >
+            <div
+              class="stat-icon-wrapper text-primary me-3 p-2 rounded-circle"
+              style="background-color: rgba(var(--primary-color-rgb), 0.1)"
+            >
+              <Clock size="24" />
+            </div>
+            <div>
+              <div class="text-secondary small fw-medium mb-1">Giờ dự kiến</div>
+              <div class="fs-4 fw-bold text-dark lh-1">
+                {{ statsGioLam.gio_du_kien
+                }}<span class="fs-6 text-muted fw-normal ms-1">giờ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-4">
+          <div
+            class="stat-card modern-card p-3 d-flex align-items-center h-100 bg-white rounded shadow-sm border-0 border-start border-4 border-success"
+          >
+            <div
+              class="stat-icon-wrapper bg-success bg-opacity-10 text-success me-3 p-2 rounded-circle"
+            >
+              <CircleDot size="24" />
+            </div>
+            <div>
+              <div class="text-secondary small fw-medium mb-1">Giờ thực tế</div>
+              <div class="fs-4 fw-bold text-dark lh-1">
+                {{ statsGioLam.gio_thuc_te
+                }}<span class="fs-6 text-muted fw-normal ms-1">giờ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Header bar -->
     <div class="lt-header">
       <div class="lt-header-left">
@@ -300,7 +406,11 @@ onMounted(() => {
         <table class="cal-table">
           <thead>
             <tr>
-              <th v-for="name in dayNames" :key="name" :class="{ 'th-sun': name === 'CN' }">
+              <th
+                v-for="name in dayNames"
+                :key="name"
+                :class="{ 'th-sun': name === 'CN' }"
+              >
                 {{ name }}
               </th>
             </tr>
@@ -315,16 +425,23 @@ onMounted(() => {
                   'cell-other-month': cell.isOtherMonth,
                   'cell-today': isToday(cell.date),
                   'cell-sunday': dIdx === 0 && !cell.isOtherMonth,
-                  'cell-has-trips': !cell.isOtherMonth && tripsByDate[cell.date]?.length > 0,
+                  'cell-has-trips':
+                    !cell.isOtherMonth && tripsByDate[cell.date]?.length > 0,
                 }"
               >
                 <!-- Số ngày -->
-                <div class="cell-day-num" :class="{ 'today-badge': isToday(cell.date) }">
+                <div
+                  class="cell-day-num"
+                  :class="{ 'today-badge': isToday(cell.date) }"
+                >
                   {{ cell.day }}
                 </div>
 
                 <!-- Danh sách chuyến xe hiển thị trực tiếp trên ô lịch -->
-                <div v-if="!cell.isOtherMonth && tripsByDate[cell.date]" class="cell-trips">
+                <div
+                  v-if="!cell.isOtherMonth && tripsByDate[cell.date]"
+                  class="cell-trips"
+                >
                   <div
                     v-for="trip in tripsByDate[cell.date]"
                     :key="trip.id"
@@ -333,8 +450,12 @@ onMounted(() => {
                     @click.stop="openTripDetail(trip)"
                     :title="`${formatTime(trip.gio_khoi_hanh)} - ${trip.tuyen_duong?.ten_tuyen_duong || 'Chuyến xe'}`"
                   >
-                    <span class="chip-time">{{ formatTime(trip.gio_khoi_hanh) }}</span>
-                    <span class="chip-name">{{ trip.tuyen_duong?.ten_tuyen_duong || "Chuyến xe" }}</span>
+                    <span class="chip-time">{{
+                      formatTime(trip.gio_khoi_hanh)
+                    }}</span>
+                    <span class="chip-name">{{
+                      trip.tuyen_duong?.ten_tuyen_duong || "Chuyến xe"
+                    }}</span>
                   </div>
                 </div>
               </td>
@@ -362,7 +483,10 @@ onMounted(() => {
       <div v-else-if="selectedChuyen" class="detail-content">
         <!-- Trạng thái + ngày -->
         <div class="detail-status-row">
-          <span class="detail-status-badge" :class="getStatusClass(selectedChuyen.trang_thai)">
+          <span
+            class="detail-status-badge"
+            :class="getStatusClass(selectedChuyen.trang_thai)"
+          >
             {{ formatTrangThai(selectedChuyen.trang_thai) }}
           </span>
           <span class="detail-date">
@@ -410,61 +534,103 @@ onMounted(() => {
               <Clock class="detail-info-icon icon-blue" />
               <div>
                 <span class="detail-info-label">Giờ khởi hành</span>
-                <span class="detail-info-value">{{ formatTime(selectedChuyen.gio_khoi_hanh) }}</span>
+                <span class="detail-info-value">{{
+                  formatTime(selectedChuyen.gio_khoi_hanh)
+                }}</span>
               </div>
             </div>
             <div class="detail-info-item">
               <Bus class="detail-info-icon icon-purple" />
               <div>
                 <span class="detail-info-label">Biển số xe</span>
-                <span class="detail-info-value">{{ selectedChuyen.xe?.bien_so || "Chưa P.Công" }}</span>
+                <span class="detail-info-value">{{
+                  selectedChuyen.xe?.bien_so || "Chưa P.Công"
+                }}</span>
               </div>
             </div>
             <div class="detail-info-item">
               <Navigation class="detail-info-icon icon-green" />
               <div>
                 <span class="detail-info-label">Quãng đường</span>
-                <span class="detail-info-value">{{ selectedChuyen.tuyen_duong?.quang_duong || "0" }} km</span>
+                <span class="detail-info-value"
+                  >{{ selectedChuyen.tuyen_duong?.quang_duong || "0" }} km</span
+                >
               </div>
             </div>
             <div class="detail-info-item">
               <CircleDot class="detail-info-icon icon-amber" />
               <div>
                 <span class="detail-info-label">Số trạm dừng</span>
-                <span class="detail-info-value">{{ lichTrinhTram.length || selectedChuyen.tuyen_duong?.tram_dungs?.length || 0 }} trạm</span>
+                <span class="detail-info-value"
+                  >{{
+                    lichTrinhTram.length ||
+                    selectedChuyen.tuyen_duong?.tram_dungs?.length ||
+                    0
+                  }}
+                  trạm</span
+                >
               </div>
             </div>
           </div>
         </div>
 
         <!-- Danh sách trạm dừng -->
-        <div v-if="lichTrinhTram.length || selectedChuyen.tuyen_duong?.tram_dungs?.length" class="detail-section">
+        <div
+          v-if="
+            lichTrinhTram.length ||
+            selectedChuyen.tuyen_duong?.tram_dungs?.length
+          "
+          class="detail-section"
+        >
           <h4 class="detail-section-title">
             <MapPin class="section-icon" />
             Lộ trình trạm dừng
           </h4>
           <div class="stops-timeline">
             <div
-              v-for="(tram, idx) in (lichTrinhTram.length ? lichTrinhTram : selectedChuyen.tuyen_duong?.tram_dungs || [])"
+              v-for="(tram, idx) in lichTrinhTram.length
+                ? lichTrinhTram
+                : selectedChuyen.tuyen_duong?.tram_dungs || []"
               :key="tram.id"
               class="timeline-item"
             >
               <div class="timeline-left">
-                <div class="timeline-marker" :class="tram.loai_tram === 'don' ? 'marker-pickup' : 'marker-dropoff'">
+                <div
+                  class="timeline-marker"
+                  :class="
+                    tram.loai_tram === 'don'
+                      ? 'marker-pickup'
+                      : 'marker-dropoff'
+                  "
+                >
                   <span class="marker-num">{{ idx + 1 }}</span>
                 </div>
                 <div
-                  v-if="idx < (lichTrinhTram.length ? lichTrinhTram : selectedChuyen.tuyen_duong?.tram_dungs || []).length - 1"
+                  v-if="
+                    idx <
+                    (lichTrinhTram.length
+                      ? lichTrinhTram
+                      : selectedChuyen.tuyen_duong?.tram_dungs || []
+                    ).length -
+                      1
+                  "
                   class="timeline-connector"
                 ></div>
               </div>
               <div class="timeline-content">
                 <span class="timeline-name">{{ tram.ten_tram }}</span>
                 <div class="timeline-meta">
-                  <span class="timeline-type" :class="tram.loai_tram === 'don' ? 'type-pickup' : 'type-dropoff'">
+                  <span
+                    class="timeline-type"
+                    :class="
+                      tram.loai_tram === 'don' ? 'type-pickup' : 'type-dropoff'
+                    "
+                  >
                     {{ tram.loai_tram === "don" ? "Đón khách" : "Trả khách" }}
                   </span>
-                  <span v-if="tram.dia_chi" class="timeline-addr">{{ tram.dia_chi }}</span>
+                  <span v-if="tram.dia_chi" class="timeline-addr">{{
+                    tram.dia_chi
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -472,9 +638,19 @@ onMounted(() => {
         </div>
 
         <!-- Nút vào điều khiển -->
-        <div class="detail-actions" v-if="['hoat_dong', 'ChoChay', 'dang_di_chuyen'].includes(selectedChuyen.trang_thai)">
+        <div
+          class="detail-actions"
+          v-if="
+            ['hoat_dong', 'ChoChay', 'dang_di_chuyen'].includes(
+              selectedChuyen.trang_thai,
+            )
+          "
+        >
           <router-link
-            :to="{ name: 'driver-dashboard', query: { chuyen: String(selectedChuyen.id) } }"
+            :to="{
+              name: 'driver-dashboard',
+              query: { chuyen: String(selectedChuyen.id) },
+            }"
             class="btn-go-drive"
           >
             <Navigation class="btn-drive-icon" />
@@ -506,7 +682,11 @@ onMounted(() => {
 
   min-height: 100vh;
   padding: 20px;
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 /* ====================================== */
@@ -531,7 +711,11 @@ onMounted(() => {
   width: 46px;
   height: 46px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-primary-dark)
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -589,10 +773,18 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.legend-ready { background: var(--color-ready); }
-.legend-running { background: var(--color-running); }
-.legend-done { background: var(--color-done); }
-.legend-cancel { background: var(--color-cancel); }
+.legend-ready {
+  background: var(--color-ready);
+}
+.legend-running {
+  background: var(--color-running);
+}
+.legend-done {
+  background: var(--color-done);
+}
+.legend-cancel {
+  background: var(--color-cancel);
+}
 
 .btn-today {
   display: inline-flex;
@@ -706,8 +898,12 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ====================================== */
@@ -993,12 +1189,16 @@ onMounted(() => {
 
 .start-dot {
   background: var(--color-done);
-  box-shadow: 0 0 0 2px var(--color-done), 0 2px 6px rgba(16, 185, 129, 0.3);
+  box-shadow:
+    0 0 0 2px var(--color-done),
+    0 2px 6px rgba(16, 185, 129, 0.3);
 }
 
 .end-dot {
   background: var(--color-cancel);
-  box-shadow: 0 0 0 2px var(--color-cancel), 0 2px 6px rgba(239, 68, 68, 0.3);
+  box-shadow:
+    0 0 0 2px var(--color-cancel),
+    0 2px 6px rgba(239, 68, 68, 0.3);
 }
 
 .endpoint-info {
@@ -1063,10 +1263,18 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.icon-blue { color: var(--color-ready); }
-.icon-purple { color: #8b5cf6; }
-.icon-green { color: var(--color-done); }
-.icon-amber { color: var(--color-running); }
+.icon-blue {
+  color: var(--color-ready);
+}
+.icon-purple {
+  color: #8b5cf6;
+}
+.icon-green {
+  color: var(--color-done);
+}
+.icon-amber {
+  color: var(--color-running);
+}
 
 .detail-info-label {
   display: block;

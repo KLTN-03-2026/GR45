@@ -18,4 +18,6 @@ interface ChuyenXeRepositoryInterface
     public function changeVehicle(int $idChuyenXe, int $newIdXe);
     public function autoGenerate();
     public function hoanThanh(int $id);
+    public function notifyMissingDrivers();
+    public function autoAssignDrivers(string $maNhaXe);
 }

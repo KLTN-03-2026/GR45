@@ -1,4 +1,6 @@
+// Driver API integration for BusSafe
 import axiosClient from './axiosClient';
+
 
 const driverApi = {
   
@@ -48,6 +50,10 @@ const driverApi = {
    */
   getStats() {
     return axiosClient.get('/v1/tai-xe/stats');
+  },
+
+  getThongKeGioLam() {
+    return axiosClient.get('/v1/tai-xe/chuyen-xe/thong-ke-gio-lam');
   },
 
   /**

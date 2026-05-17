@@ -117,7 +117,9 @@ const handleNotificationClick = (note) => {
 
   const type = note.type?.toLowerCase() || "";
 
-  if (type === "alert" || type === "warning" || type === "danger") {
+  if (type === "driver_assignment" || note.title === "Cảnh báo phân công") {
+    router.push("/nha-xe/chuyen-xe");
+  } else if (type === "alert" || type === "warning" || type === "danger") {
     router.push("/nha-xe/canh-bao");
   } else if (type === "wallet") {
     router.push("/nha-xe/vi-nha-xe");

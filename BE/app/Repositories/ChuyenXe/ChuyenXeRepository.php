@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use App\Jobs\SendDriverScheduleEmailJob;
 
 class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 {
@@ -118,7 +119,13 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
             $query->where('trang_thai', $filters['trang_thai']);
         }
 
-        return $query->orderByDesc('ngay_khoi_hanh')->orderByDesc('created_at')->paginate($filters['per_page'] ?? 15);
+        $todayStr = Carbon::today()->toDateString();
+        return $query
+            ->orderByRaw("CASE WHEN ngay_khoi_hanh >= ? THEN 0 ELSE 1 END ASC", [$todayStr])
+            ->orderByRaw("CASE WHEN ngay_khoi_hanh >= ? THEN ngay_khoi_hanh END ASC", [$todayStr])
+            ->orderByRaw("CASE WHEN ngay_khoi_hanh < ? THEN ngay_khoi_hanh END DESC", [$todayStr])
+            ->orderByRaw("gio_khoi_hanh ASC")
+            ->paginate($filters['per_page'] ?? 15);
     }
 
     public function getByTaiXe(array $filters = [])
@@ -178,6 +185,25 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
         }
 
         $data['trang_thai'] = $this->normalizeStatus($data['trang_thai'] ?? 'hoat_dong');
+        if (empty($data['tong_tien'])) {
+            $data['tong_tien'] = $tuyenDuong->gia_ve_co_ban ?? 0;
+        }
+
+        // Kiểm tra trùng lặp chuyến xe cho tuyến đường cùng ngày và giờ
+        $ngay = Carbon::parse($data['ngay_khoi_hanh'])->toDateString();
+        $gio = Carbon::parse($data['gio_khoi_hanh'])->format('H:i:s');
+        $duplicate = $this->model->where('id_tuyen_duong', $data['id_tuyen_duong'])
+            ->whereDate('ngay_khoi_hanh', $ngay)
+            ->whereTime('gio_khoi_hanh', $gio)
+            ->exists();
+        if ($duplicate) {
+            throw new \Exception("Tuyến đường này đã có chuyến xe khởi hành vào lúc " . Carbon::parse($gio)->format('H:i') . " ngày " . Carbon::parse($ngay)->format('d-m-Y') . ". Vui lòng chọn khung giờ khác.");
+        }
+
+        if (empty($data['so_ngay'])) {
+            $data['so_ngay'] = $tuyenDuong->so_ngay ?? 1;
+        }
+
         $this->validateAssignmentRules($data);
 
         $trip = $this->model->create($data);
@@ -215,6 +241,9 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
             if (!($user instanceof \App\Models\Admin) && $user->ma_nha_xe != $newTuyen->ma_nha_xe) {
                 throw new \Exception('Tuyến đường mới không thuộc quyền quản lý của bạn.');
             }
+            if (empty($data['so_ngay'])) {
+                $data['so_ngay'] = $newTuyen->so_ngay ?? 1;
+            }
         }
 
         $oldDriverId = (int) $chuyenXe->id_tai_xe;
@@ -228,8 +257,27 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
             'ngay_khoi_hanh' => $data['ngay_khoi_hanh'] ?? $chuyenXe->ngay_khoi_hanh,
             'gio_khoi_hanh' => $data['gio_khoi_hanh'] ?? Carbon::parse($chuyenXe->gio_khoi_hanh)->format('H:i'),
             'trang_thai' => $this->normalizeStatus($data['trang_thai'] ?? $chuyenXe->trang_thai),
+            'so_ngay' => $data['so_ngay'] ?? $chuyenXe->so_ngay ?? 1,
         ];
         $this->validateAssignmentRules($payload, $id);
+
+        // Kiểm tra trùng lặp chuyến xe cho tuyến đường cùng ngày và giờ (loại trừ chính chuyến này)
+        $ngay = Carbon::parse($payload['ngay_khoi_hanh'])->toDateString();
+        $gio = Carbon::parse($payload['gio_khoi_hanh'])->format('H:i:s');
+        $duplicate = $this->model->where('id_tuyen_duong', $payload['id_tuyen_duong'])
+            ->whereDate('ngay_khoi_hanh', $ngay)
+            ->whereTime('gio_khoi_hanh', $gio)
+            ->where('id', '!=', $id)
+            ->exists();
+        if ($duplicate) {
+            throw new \Exception("Tuyến đường này đã có chuyến xe khởi hành vào lúc " . Carbon::parse($gio)->format('H:i') . " ngày " . Carbon::parse($ngay)->format('d-m-Y') . ". Vui lòng chọn khung giờ khác.");
+        }
+
+        if (array_key_exists('tong_tien', $data) && empty($data['tong_tien'])) {
+            $idTuyen = $data['id_tuyen_duong'] ?? $chuyenXe->id_tuyen_duong;
+            $tuyen = TuyenDuong::find($idTuyen);
+            $data['tong_tien'] = $tuyen->gia_ve_co_ban ?? 0;
+        }
 
         $data['trang_thai'] = $payload['trang_thai'];
         $chuyenXe->update($data);
@@ -344,6 +392,9 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
     private function estimateDurationMinutes(TuyenDuong $route): int
     {
+        if (!empty($route->gio_du_kien)) {
+            return (int) ($route->gio_du_kien * 60);
+        }
         $distanceKm = (float) ($route->quang_duong ?? 0);
         if ($distanceKm > 0) {
             // Tạm ước lượng 40 km/h khi chưa có thời lượng chuẩn.
@@ -354,6 +405,10 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
     private function validateAssignmentRules(array $payload, ?int $excludeTripId = null): void
     {
+        if (empty($payload['id_tai_xe']) || empty($payload['id_xe'])) {
+            return;
+        }
+
         $driver = TaiXe::with('hoSo')->find((int) $payload['id_tai_xe']);
         $route = TuyenDuong::find((int) $payload['id_tuyen_duong']);
         $vehicle = Xe::with('loaiXe')->find((int) $payload['id_xe']);
@@ -362,25 +417,30 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
             throw new \Exception('Dữ liệu phân công không hợp lệ.');
         }
 
-        $startAt = Carbon::parse($payload['ngay_khoi_hanh'] . ' ' . $payload['gio_khoi_hanh']);
+        $dateOnly = Carbon::parse($payload['ngay_khoi_hanh'])->toDateString();
+        $timeOnly = Carbon::parse($payload['gio_khoi_hanh'])->format('H:i:s');
+        $startAt = Carbon::parse($dateOnly . ' ' . $timeOnly);
         $durationMinutes = $this->estimateDurationMinutes($route);
         $endAt = (clone $startAt)->addMinutes($durationMinutes);
 
+        $yesterday = (clone $startAt)->subDays(1)->toDateString();
+        $tomorrow = (clone $startAt)->addDays(1)->toDateString();
+
         $existingTrips = $this->model->query()
             ->where('id_tai_xe', $driver->id)
-            ->whereDate('ngay_khoi_hanh', $startAt->toDateString())
+            ->whereBetween('ngay_khoi_hanh', [$yesterday, $tomorrow])
             ->when($excludeTripId, fn($q) => $q->where('id', '!=', $excludeTripId))
             ->with('tuyenDuong')
             ->get();
 
-        $totalMinutes = $durationMinutes;
+        $routeSoNgay = $route->so_ngay ?? 1;
+
         foreach ($existingTrips as $trip) {
             $tripDate = Carbon::parse($trip->ngay_khoi_hanh)->toDateString();
-            $tripTime = Carbon::parse($trip->gio_khoi_hanh)->format('H:i');
+            $tripTime = Carbon::parse($trip->gio_khoi_hanh)->format('H:i:s');
             $tripStart = Carbon::parse($tripDate . ' ' . $tripTime);
             $tripDuration = $this->estimateDurationMinutes($trip->tuyenDuong);
             $tripEnd = (clone $tripStart)->addMinutes($tripDuration);
-            $totalMinutes += $tripDuration;
 
             $isOverlap = $startAt < $tripEnd && $endAt > $tripStart;
             if ($isOverlap) {
@@ -398,12 +458,8 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
             }
         }
 
-        $totalHours = $totalMinutes / 60.0;
-        if ($totalHours > self::MAX_DRIVING_HOURS_PER_DAY) {
-            throw new \Exception('Quá tải giờ lái: tổng thời gian lái trong ngày vượt ngưỡng an toàn.');
-        }
-
         $this->validateDriverLicenseConstraint($driver, $vehicle);
+        $this->validateSliding24HoursLimit($driver, $startAt, $endAt, $durationMinutes, $routeSoNgay, $excludeTripId);
     }
 
     private function validateDriverLicenseConstraint(TaiXe $driver, Xe $vehicle): void
@@ -471,18 +527,12 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
     private function notifyDriverScheduleChange(?TaiXe $driver, ChuyenXe $trip, string $action): void
     {
-        if (!$driver || !$driver->email) return;
-        $actionText = $action === 'new' ? 'lịch mới' : 'thay đổi lịch';
-        $subject = "BusSafe: Cập nhật {$actionText}";
-        $content = "Tài xế {$driver->email} có {$actionText} cho chuyến #{$trip->id} "
-            . "vào {$trip->ngay_khoi_hanh} {$trip->gio_khoi_hanh}.";
+        if (!$driver || !$driver->email || !$trip) return;
 
         try {
-            Mail::raw($content, function ($message) use ($driver, $subject) {
-                $message->to($driver->email)->subject($subject);
-            });
+            SendDriverScheduleEmailJob::dispatch($driver->id, $trip->id, $action);
         } catch (\Throwable $e) {
-            Log::warning('Không gửi được email thông báo lịch trình cho tài xế.', [
+            Log::warning('Không thể xếp hàng email thông báo lịch trình cho tài xế.', [
                 'driver_id' => $driver->id,
                 'trip_id' => $trip->id,
                 'error' => $e->getMessage(),
@@ -626,7 +676,8 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
                             'ngay_khoi_hanh' => $date->format('Y-m-d'),
                             'gio_khoi_hanh' => $tuyen->gio_khoi_hanh,
                             'thanh_toan_sau' => 0,
-                            'tong_tien' => 0,
+                            'so_ngay' => $tuyen->so_ngay ?? 1,
+                            'tong_tien' => $tuyen->gia_ve_co_ban ?? 0,
                             'trang_thai' => 'hoat_dong', // 1: Hoạt động (Chờ chạy/Sẵn sàng)
                         ]);
                         $count++;
@@ -694,5 +745,438 @@ class ChuyenXeRepository implements ChuyenXeRepositoryInterface
 
             return $chuyenXe;
         });
+    }
+
+    private function validateSliding24HoursLimit(
+        TaiXe $driver,
+        Carbon $startAt,
+        Carbon $endAt,
+        int $durationMinutes,
+        int $soNgay,
+        ?int $excludeTripId = null
+    ): void {
+        // Lấy tất cả các chuyến của tài xế này (ngoại trừ chuyến đang sửa và chuyến đã hủy)
+        $allTrips = $this->model->query()
+            ->where('id_tai_xe', $driver->id)
+            ->where('trang_thai', '!=', 'huy')
+            ->when($excludeTripId, fn($q) => $q->where('id', '!=', $excludeTripId))
+            ->with('tuyenDuong')
+            ->get()
+            ->map(function ($trip) {
+                $tDateOnly = Carbon::parse($trip->ngay_khoi_hanh)->toDateString();
+                $tTimeOnly = Carbon::parse($trip->gio_khoi_hanh)->format('H:i:s');
+                $tripStart = Carbon::parse($tDateOnly . ' ' . $tTimeOnly);
+                $duration = $this->estimateDurationMinutes($trip->tuyenDuong);
+                return [
+                    'start' => $tripStart,
+                    'end' => (clone $tripStart)->addMinutes($duration),
+                    'duration' => $duration,
+                    'so_ngay' => $trip->tuyenDuong->so_ngay ?? 1
+                ];
+            })
+            ->toArray();
+
+        // Thêm chuyến xe hiện tại đang đề xuất
+        $allTrips[] = [
+            'start' => $startAt,
+            'end' => $endAt,
+            'duration' => $durationMinutes,
+            'so_ngay' => $soNgay
+        ];
+
+        // Tạo danh sách các checkpoint (điểm kiểm tra) để quét tất cả các cửa sổ 24h khả thi
+        $checkPoints = [];
+        foreach ($allTrips as $trip) {
+            $checkPoints[] = $trip['start'];
+            $checkPoints[] = $trip['end']->copy()->subHours(24);
+        }
+
+        // Lọc trùng checkpoints
+        $uniqueCheckPoints = [];
+        foreach ($checkPoints as $cp) {
+            $ts = $cp->timestamp;
+            $uniqueCheckPoints[$ts] = $cp;
+        }
+
+        foreach ($uniqueCheckPoints as $cp) {
+            $windowStart = $cp;
+            $windowEnd = (clone $cp)->addHours(24);
+
+            $drivingMinutesInWindow = 0;
+            foreach ($allTrips as $trip) {
+                $overlapStart = $trip['start']->max($windowStart);
+                $overlapEnd = $trip['end']->min($windowEnd);
+
+                if ($overlapStart < $overlapEnd) {
+                    $overlapDuration = $overlapStart->diffInMinutes($overlapEnd);
+                    $factor = ($trip['so_ngay'] >= 2) ? 0.5 : 1.0;
+                    $drivingMinutesInWindow += ($overlapDuration * $factor);
+                }
+            }
+
+            if ($drivingMinutesInWindow > 12 * 60) {
+                $hours = round($drivingMinutesInWindow / 60, 2);
+                throw new \Exception("Vi phạm luật GT: Tài xế sẽ lái xe tổng cộng {$hours} tiếng trong một cửa sổ 24 giờ liên tục (vượt quá giới hạn pháp lý 12 tiếng/24h). Không thể phân công.");
+            }
+        }
+    }
+
+    public function notifyMissingDrivers()
+    {
+        $user = Auth::guard('sanctum')->user();
+        if (!$user instanceof \App\Models\Admin) {
+            throw new \Exception('Chỉ Admin mới có quyền gửi thông báo nhắc nhở phân công tài xế.');
+        }
+
+        // Lấy tất cả chuyến xe chưa có tài xế từ hôm nay trở đi
+        $upcomingTrips = $this->model->query()
+            ->whereNull('id_tai_xe')
+            ->where('ngay_khoi_hanh', '>=', Carbon::today()->toDateString())
+            ->where('trang_thai', '!=', 'huy')
+            ->with(['tuyenDuong.nhaXe'])
+            ->get();
+
+        if ($upcomingTrips->isEmpty()) {
+            return 0;
+        }
+
+        // Nhóm theo nhà xe
+        $grouped = $upcomingTrips->groupBy(function ($trip) {
+            return $trip->tuyenDuong->ma_nha_xe ?? 'unknown';
+        });
+
+        $sentCount = 0;
+        foreach ($grouped as $maNhaXe => $trips) {
+            if ($maNhaXe === 'unknown' || $trips->isEmpty()) {
+                continue;
+            }
+
+            $firstTrip = $trips->first();
+            $nhaXe = $firstTrip->tuyenDuong->nhaXe ?? null;
+            if (!$nhaXe || !$nhaXe->email) {
+                continue;
+            }
+
+            $subject = "BusSafe: Cảnh báo chưa phân công tài xế cho chuyến xe";
+            $content = "Kính gửi nhà xe {$nhaXe->ten_nha_xe},\n\n";
+            $content .= "Hệ thống BusSafe phát hiện các chuyến xe sau đây của nhà xe chưa được phân công tài xế. Vui lòng truy cập trang quản trị nhà xe để phân công ngay:\n\n";
+
+            foreach ($trips as $trip) {
+                $content .= "- Chuyến #{$trip->id}: Tuyến {$trip->tuyenDuong->ten_tuyen_duong} khởi hành lúc {$trip->gio_khoi_hanh} ngày {$trip->ngay_khoi_hanh}\n";
+            }
+
+            $content .= "\nTrân trọng,\nBan quản trị BusSafe.";
+
+            try {
+                Mail::raw($content, function ($message) use ($nhaXe, $subject) {
+                    $message->to($nhaXe->email)->subject($subject);
+                });
+                $sentCount++;
+            } catch (\Throwable $e) {
+                Log::warning("Không gửi được email nhắc nhở phân công tài xế cho nhà xe {$nhaXe->ten_nha_xe}.", [
+                    'ma_nha_xe' => $maNhaXe,
+                    'error' => $e->getMessage()
+                ]);
+            }
+
+            // Gửi thông báo realtime qua Reverb
+            try {
+                $tripsCount = $trips->count();
+                $alertMessage = "Bạn có {$tripsCount} chuyến xe sắp tới chưa được phân công tài xế! Vui lòng cập nhật ngay.";
+                event(new \App\Events\ChuyenXeChuaPhanCongDriverEvent($maNhaXe, $tripsCount, $alertMessage));
+            } catch (\Throwable $e) {
+                Log::warning("Không gửi được event realtime nhắc nhở phân công tài xế cho nhà xe {$nhaXe->ten_nha_xe}.", [
+                    'ma_nha_xe' => $maNhaXe,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        return $sentCount;
+    }
+
+    public function autoAssignDrivers(string $maNhaXe)
+    {
+        // Tăng giới hạn thời gian thực thi (PHP sẽ không ngắt sau 30s) vì gửi email qua SMTP tốn nhiều thời gian
+        set_time_limit(300);
+
+        // 1. Lấy danh sách tài xế đang hoạt động của nhà xe
+        $drivers = TaiXe::with('hoSo')
+            ->where('ma_nha_xe', $maNhaXe)
+            ->where('tinh_trang', 'hoat_dong')
+            ->get();
+
+        if ($drivers->isEmpty()) {
+            throw new \Exception('Nhà xe chưa có tài xế nào ở trạng thái hoạt động.');
+        }
+
+        // 2. Lấy các chuyến xe chưa có tài xế trong vòng 7 ngày tới
+        $today = Carbon::today();
+        $sevenDaysLater = Carbon::today()->addDays(7);
+
+        $upcomingTrips = $this->model->query()
+            ->whereNull('id_tai_xe')
+            ->where('trang_thai', '!=', 'huy')
+            ->whereDate('ngay_khoi_hanh', '>=', $today->toDateString())
+            ->whereDate('ngay_khoi_hanh', '<=', $sevenDaysLater->toDateString())
+            ->whereHas('tuyenDuong', function ($q) use ($maNhaXe) {
+                $q->where('ma_nha_xe', $maNhaXe);
+            })
+            ->with(['tuyenDuong', 'xe.loaiXe'])
+            ->orderBy('ngay_khoi_hanh')
+            ->orderBy('gio_khoi_hanh')
+            ->get();
+
+        if ($upcomingTrips->isEmpty()) {
+            return [
+                'total_trips' => 0,
+                'assigned_count' => 0,
+                'success_trips' => [],
+                'failed_trips' => []
+            ];
+        }
+
+        // 3. Lấy tất cả các chuyến đã được gán của nhà xe này trong khoảng thời gian trượt (sub 2 days đến add 9 days)
+        $existingTrips = $this->model->query()
+            ->whereNotNull('id_tai_xe')
+            ->where('trang_thai', '!=', 'huy')
+            ->whereDate('ngay_khoi_hanh', '>=', $today->copy()->subDays(2)->toDateString())
+            ->whereDate('ngay_khoi_hanh', '<=', $sevenDaysLater->copy()->addDays(2)->toDateString())
+            ->whereHas('tuyenDuong', function ($q) use ($maNhaXe) {
+                $q->where('ma_nha_xe', $maNhaXe);
+            })
+            ->with('tuyenDuong')
+            ->get();
+
+        // Nhóm các chuyến xe đã gán theo từng tài xế để kiểm soát thời gian
+        $driverTrips = [];
+        foreach ($drivers as $driver) {
+            $driverTrips[$driver->id] = [];
+        }
+        foreach ($existingTrips as $trip) {
+            if (isset($driverTrips[$trip->id_tai_xe])) {
+                $driverTrips[$trip->id_tai_xe][] = $trip;
+            }
+        }
+
+        $successTrips = [];
+        $failedTrips = [];
+
+        foreach ($upcomingTrips as $trip) {
+            $tuyen = $trip->tuyenDuong;
+            $vehicle = $trip->xe;
+
+            // Nếu chuyến chưa được gán xe, không thể kiểm tra hạng bằng lái, nhưng ta vẫn tạm xếp dựa theo thời gian
+            $requiredRank = 0;
+            if ($vehicle) {
+                $requiredRank = $this->requiredLicenseRankForVehicle($vehicle);
+            }
+
+            $timeOnly = Carbon::parse($trip->gio_khoi_hanh)->format('H:i:s');
+            $startAt = Carbon::parse($trip->ngay_khoi_hanh->toDateString() . ' ' . $timeOnly);
+            $durationMinutes = $this->estimateDurationMinutes($tuyen);
+            $endAt = (clone $startAt)->addMinutes($durationMinutes);
+
+            $eligibleDrivers = [];
+
+            foreach ($drivers as $driver) {
+                // Ràng buộc 1: Kiểm tra hạng bằng lái (nếu có xe)
+                if ($vehicle) {
+                    $driverLicenseRaw = (string) ($driver->hoSo->hang_bang_lai ?? '');
+                    $driverRank = $this->driverLicenseRank($driverLicenseRaw);
+                    if ($driverRank < $requiredRank) {
+                        continue; // Không đủ hạng bằng lái
+                    }
+                }
+
+                // Ràng buộc 2: Tránh trùng lịch & Đảm bảo khoảng nghỉ tối thiểu (30 phút)
+                $hasOverlapOrNoRest = false;
+                foreach ($driverTrips[$driver->id] as $assigned) {
+                    $assignedTimeOnly = Carbon::parse($assigned->gio_khoi_hanh)->format('H:i:s');
+                    $assignedStart = Carbon::parse($assigned->ngay_khoi_hanh->toDateString() . ' ' . $assignedTimeOnly);
+                    $assignedDuration = $this->estimateDurationMinutes($assigned->tuyenDuong);
+                    $assignedEnd = (clone $assignedStart)->addMinutes($assignedDuration);
+
+                    // Trùng giờ
+                    $isOverlap = $startAt < $assignedEnd && $endAt > $assignedStart;
+                    if ($isOverlap) {
+                        $hasOverlapOrNoRest = true;
+                        break;
+                    }
+
+                    // Không đủ khoảng nghỉ tối thiểu 30 phút giữa các chuyến
+                    $gapMinutes = null;
+                    if ($startAt >= $assignedEnd) {
+                        $gapMinutes = $assignedEnd->diffInMinutes($startAt);
+                    } elseif ($assignedStart >= $endAt) {
+                        $gapMinutes = $endAt->diffInMinutes($assignedStart);
+                    }
+
+                    if ($gapMinutes !== null && $gapMinutes < 30) {
+                        $hasOverlapOrNoRest = true;
+                        break;
+                    }
+                }
+
+                if ($hasOverlapOrNoRest) {
+                    continue; // Trùng lịch hoặc không đủ thời gian nghỉ ngơi
+                }
+
+                // Ràng buộc 3: Luật lái xe tối đa 12h trong bất kỳ cửa sổ 24h trượt nào
+                $isValid24h = $this->checkSliding24HoursLimitForDriver(
+                    $driverTrips[$driver->id],
+                    $startAt,
+                    $endAt,
+                    $durationMinutes,
+                    $tuyen->so_ngay ?? 1
+                );
+
+                if (!$isValid24h) {
+                    continue; // Vi phạm luật 12 tiếng/24h
+                }
+
+                // Nếu thỏa mãn tất cả ràng buộc cứng, đưa vào danh sách ứng viên
+                // Tính điểm tối ưu: tổng số phút đã gán chạy trong 7 ngày tới (để cân bằng tải)
+                $accumulatedMinutes = 0;
+                foreach ($driverTrips[$driver->id] as $assigned) {
+                    // Chỉ cộng dồn các chuyến nằm trong phạm vi 7 ngày tới
+                    $assignedDate = Carbon::parse($assigned->ngay_khoi_hanh);
+                    if ($assignedDate >= $today && $assignedDate <= $sevenDaysLater) {
+                        $tripDuration = $this->estimateDurationMinutes($assigned->tuyenDuong);
+                        $tripFactor = (($assigned->tuyenDuong->so_ngay ?? 1) >= 2) ? 0.5 : 1.0;
+                        $accumulatedMinutes += ($tripDuration * $tripFactor);
+                    }
+                }
+
+                $eligibleDrivers[] = [
+                    'driver' => $driver,
+                    'accumulated_minutes' => $accumulatedMinutes
+                ];
+            }
+
+            if (empty($eligibleDrivers)) {
+                $failedTrips[] = [
+                    'trip_id' => $trip->id,
+                    'tuyen_duong' => $tuyen->ten_tuyen_duong,
+                    'ngay_khoi_hanh' => $trip->ngay_khoi_hanh->toDateString(),
+                    'gio_khoi_hanh' => Carbon::parse($trip->gio_khoi_hanh)->format('H:i'),
+                    'reason' => 'Không tìm thấy tài xế nào thỏa mãn ràng buộc an toàn (12h/24h), khoảng nghỉ hoặc hạng bằng lái phù hợp.'
+                ];
+                continue;
+            }
+
+            // Thuật toán tối ưu (Soft Constraint): Chọn tài xế có tổng số phút chạy tích lũy thấp nhất
+            usort($eligibleDrivers, function ($a, $b) {
+                return $a['accumulated_minutes'] <=> $b['accumulated_minutes'];
+            });
+
+            $bestCandidate = $eligibleDrivers[0];
+            $selectedDriver = $bestCandidate['driver'];
+
+            // Ghi nhận chuyến xe cho tài xế này trong bộ nhớ tạm
+            $driverTrips[$selectedDriver->id][] = $trip;
+
+            $successTrips[] = [
+                'trip_id' => $trip->id,
+                'tuyen_duong' => $tuyen->ten_tuyen_duong,
+                'ngay_khoi_hanh' => $trip->ngay_khoi_hanh->toDateString(),
+                'gio_khoi_hanh' => Carbon::parse($trip->gio_khoi_hanh)->format('H:i'),
+                'driver_id' => $selectedDriver->id,
+                'driver_name' => $selectedDriver->ho_va_ten,
+                'accumulated_hours' => round($bestCandidate['accumulated_minutes'] / 60, 2)
+            ];
+        }
+
+        // 4. Tiến hành lưu tất cả các chuyến xe thành công vào DB trong Database Transaction
+        if (!empty($successTrips)) {
+            DB::transaction(function () use ($successTrips) {
+                foreach ($successTrips as $item) {
+                    $this->model->where('id', $item['trip_id'])->update([
+                        'id_tai_xe' => $item['driver_id']
+                    ]);
+                }
+            });
+
+            // Gửi thông báo đến từng tài xế được xếp lịch
+            foreach ($successTrips as $item) {
+                try {
+                    $driver = TaiXe::with('hoSo')->find($item['driver_id']);
+                    $trip = $this->model->find($item['trip_id']);
+                    $this->notifyDriverScheduleChange($driver, $trip, 'new');
+                } catch (\Throwable $e) {
+                    Log::warning("Không gửi được thông báo xếp lịch tự động cho tài xế #{$item['driver_id']}: " . $e->getMessage());
+                }
+            }
+        }
+
+        return [
+            'total_trips' => $upcomingTrips->count(),
+            'assigned_count' => count($successTrips),
+            'success_trips' => $successTrips,
+            'failed_trips' => $failedTrips
+        ];
+    }
+
+    private function checkSliding24HoursLimitForDriver(
+        array $assignedTrips,
+        Carbon $newStart,
+        Carbon $newEnd,
+        int $newDuration,
+        int $newSoNgay
+    ): bool {
+        // Gom tất cả các khoảng chạy xe
+        $allPeriods = [];
+        foreach ($assignedTrips as $trip) {
+            $tTimeOnly = Carbon::parse($trip->gio_khoi_hanh)->format('H:i:s');
+            $tStart = Carbon::parse($trip->ngay_khoi_hanh->toDateString() . ' ' . $tTimeOnly);
+            $tDuration = $this->estimateDurationMinutes($trip->tuyenDuong);
+            $allPeriods[] = [
+                'start' => $tStart,
+                'end' => (clone $tStart)->addMinutes($tDuration),
+                'so_ngay' => $trip->tuyenDuong->so_ngay ?? 1
+            ];
+        }
+
+        // Thêm chuyến xe đang đề xuất gán vào
+        $allPeriods[] = [
+            'start' => $newStart,
+            'end' => $newEnd,
+            'so_ngay' => $newSoNgay
+        ];
+
+        // Tạo các mốc thời gian checkpoint để quét cửa sổ 24h trượt
+        $checkPoints = [];
+        foreach ($allPeriods as $p) {
+            $checkPoints[] = $p['start'];
+            $checkPoints[] = $p['end']->copy()->subHours(24);
+        }
+
+        $uniqueCheckPoints = [];
+        foreach ($checkPoints as $cp) {
+            $uniqueCheckPoints[$cp->timestamp] = $cp;
+        }
+
+        foreach ($uniqueCheckPoints as $cp) {
+            $windowStart = $cp;
+            $windowEnd = (clone $cp)->addHours(24);
+
+            $drivingMinutesInWindow = 0;
+            foreach ($allPeriods as $p) {
+                $overlapStart = $p['start']->max($windowStart);
+                $overlapEnd = $p['end']->min($windowEnd);
+
+                if ($overlapStart < $overlapEnd) {
+                    $overlapDuration = $overlapStart->diffInMinutes($overlapEnd);
+                    $factor = ($p['so_ngay'] >= 2) ? 0.5 : 1.0;
+                    $drivingMinutesInWindow += ($overlapDuration * $factor);
+                }
+            }
+
+            if ($drivingMinutesInWindow > 12 * 60) {
+                return false; // Vi phạm lái xe quá 12h trong 24h
+            }
+        }
+
+        return true;
     }
 }

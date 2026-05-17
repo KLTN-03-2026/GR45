@@ -150,6 +150,17 @@ const initEchoConnection = () => {
           message: msg,
           icon: "success",
         });
+      })
+      .listen(".chuyen_xe.chua_phan_cong_driver", (event) => {
+        console.log("🚨 Nhận thông báo chưa phân công tài xế:", event);
+        const msg = event.message || `Bạn có chuyến xe chưa được phân công tài xế.`;
+        showToast(msg, "error");
+        operatorStore.addNotification({
+          type: "driver_assignment",
+          title: "Cảnh báo phân công",
+          message: msg,
+          icon: "alert",
+        });
       });
   }
 };

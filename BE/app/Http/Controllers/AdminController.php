@@ -8,9 +8,97 @@ use App\Http\Requests\Admin\UpdateAdminRequest;
 use App\Http\Requests\Admin\LoginAdminRequest;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use App\Models\TramDung;
 
 class AdminController extends Controller
 {
+    public function getToaDo(Request $request)
+    {
+        // Lấy danh sách các trạm chưa có tọa độ để tránh request thừa
+        $trams = TramDung::all();
+
+        if ($trams->isEmpty()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Tất cả các trạm đã có tọa độ, không cần cập nhật.'
+            ]);
+        }
+
+        // Cấu hình tăng thời gian thực thi (tránh lỗi 504 Timeout)
+        // Nếu có hơn 100 trạm, khuyên dùng Laravel Queue Job thay vì API chạy trực tiếp
+        set_time_limit(0);
+
+        $updatedCount = 0;
+        $failedTrams = [];
+
+        foreach ($trams as $tram) {
+            // Ưu tiên tìm bằng địa chỉ, nếu không có thì tìm bằng tên trạm
+            $searchQuery = $tram->dia_chi ?? $tram->ten_tram;
+
+            if (empty($searchQuery)) {
+                $failedTrams[] = [
+                    'id' => $tram->id,
+                    'reason' => 'Không có địa chỉ và tên trạm để tìm kiếm.'
+                ];
+                continue;
+            }
+
+            try {
+                // Gọi API của Nominatim
+                $response = Http::withHeaders([
+                    // BẮT BUỘC: Thay đổi email thành email thật của bạn
+                    'User-Agent' => 'thainht177@gmail.com'
+                ])->get('https://nominatim.openstreetmap.org/search', [
+                    'q' => $searchQuery,
+                    'format' => 'json',
+                    'limit' => 1 // Lấy 1 kết quả chính xác nhất
+                ]);
+
+                if ($response->successful() && count($response->json()) > 0) {
+                    $locationData = $response->json()[0];
+
+                    // Cập nhật tọa độ vào DB
+                    // Lưu ý: Tùy hệ thống của bạn quy định X là vĩ độ(lat) hay kinh độ(lon).
+                    // Ở đây mặc định X = vĩ độ (Lat), Y = kinh độ (Lon)
+                    $tram->update([
+                        'toa_do_x' => $locationData['lat'],
+                        'toa_do_y' => $locationData['lon'],
+                    ]);
+
+                    $updatedCount++;
+                } else {
+                    $failedTrams[] = [
+                        'id' => $tram->id,
+                        'name' => $searchQuery,
+                        'reason' => 'API không trả về kết quả cho địa chỉ này.'
+                    ];
+                }
+            } catch (\Exception $e) {
+                Log::error("Lỗi cập nhật tọa độ trạm ID {$tram->id}: " . $e->getMessage());
+                $failedTrams[] = [
+                    'id' => $tram->id,
+                    'reason' => 'Lỗi kết nối API.'
+                ];
+            }
+
+            // BẮT BUỘC BỞI NOMINATIM: Dừng 1 giây trước khi gọi request tiếp theo
+            sleep(1);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Quá trình cập nhật hoàn tất.',
+            'data' => [
+                'total_processed' => $trams->count(),
+                'updated_success' => $updatedCount,
+                'failed_count' => count($failedTrams),
+                'failed_details' => $failedTrams
+            ]
+        ]);
+    }
+
     protected $adminService;
 
     public function __construct(AdminService $adminService)

@@ -100,6 +100,7 @@ const adminApi = {
 
   // --- QUẢN LÝ CHUYẾN XE ---
   autoGenerateTrips: () => axiosClient.post('/v1/admin/chuyen-xe/auto-generate'),
+  notifyMissingDrivers: () => axiosClient.post('/v1/admin/chuyen-xe/notify-missing-drivers'),
   getTrips: (params) => axiosClient.get('/v1/admin/chuyen-xe', { params }),
   getTripDetails: (id) => axiosClient.get(`/v1/admin/chuyen-xe/${id}`),
   createTrip: (data) => axiosClient.post('/v1/admin/chuyen-xe', data),

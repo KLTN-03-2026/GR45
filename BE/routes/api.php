@@ -60,7 +60,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('voucher/public', [KhachHangController::class, 'getVoucherCongKhai']);
     Route::middleware('auth.khach-hang')->group(function () {
-        Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
+        Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'token hợp lệ.', 'data' => auth()->user()]));
         Route::post('dang-xuat', [KhachHangController::class, 'logout']);
         Route::get('profile', [KhachHangController::class, 'profile']);
         Route::put('profile', [KhachHangController::class, 'updateProfile']);
@@ -90,6 +90,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('map/direction', [MapProxyController::class, 'direction']);
     Route::get('map/osrm-route', [MapProxyController::class, 'osrmRoute']);
+    Route::get('map/geocode', [MapProxyController::class, 'geocode']);
 
     Route::get('tinh-thanh', [KhachHangController::class, 'getProvinces']);
     Route::get('chuyen-xe/search', [KhachHangController::class, 'searchChuyenXe']);
@@ -142,7 +143,7 @@ Route::prefix('v1')->group(function () {
     Route::prefix('tai-xe')->group(function () {
         Route::post('dang-nhap', [TaiXeController::class, 'login']);
         Route::middleware('auth.tai-xe')->group(function () {
-            Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
+            Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
             Route::post('dang-xuat', [TaiXeController::class, 'logout']);
             Route::get('profile', [TaiXeController::class, 'profile']);
             Route::post('doi-mat-khau', [TaiXeController::class, 'doiMatKhau']);
@@ -152,6 +153,7 @@ Route::prefix('v1')->group(function () {
             Route::get('cau-hinh-ai', [BaoDongController::class, 'getCauHinhAi']);
 
             Route::get('chuyen-xe/lich-trinh-ca-nhan', [ChuyenXeController::class, 'getLichTrinhCaNhan']);
+            Route::get('chuyen-xe/thong-ke-gio-lam', [ChuyenXeController::class, 'thongKeGioLam']);
             Route::get('stats', [TaiXeController::class, 'stats']);
             Route::get('upcoming-trips', [TaiXeController::class, 'upcomingTrips']);
 
@@ -211,6 +213,7 @@ Route::prefix('v1')->group(function () {
             Route::get('chuyen-xe', [ChuyenXeController::class, 'index']);
             Route::get('chuyen-xe/dang-chay', [ChuyenXeController::class, 'getActiveTrips']);
             Route::get('chuyen-xe/da-hoan-thanh', [ChuyenXeController::class, 'getCompletedTrips']);
+            Route::post('chuyen-xe/auto-assign-drivers', [ChuyenXeController::class, 'autoAssignDrivers']);
             Route::get('chuyen-xe/{id}', [ChuyenXeController::class, 'show']);
             Route::post('chuyen-xe', [ChuyenXeController::class, 'store']);
             Route::put('chuyen-xe/{id}', [ChuyenXeController::class, 'update']);
@@ -340,7 +343,7 @@ Route::prefix('v1')->group(function () {
         Route::post('login', [AdminController::class, 'login']);
 
         Route::middleware('auth.admin')->group(function () {
-            Route::get('check-token', fn () => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
+            Route::get('check-token', fn() => response()->json(['success' => true, 'message' => 'Token hợp lệ.', 'data' => auth()->user()]));
             Route::get('phan-quyen', [AdminController::class, 'getPhanQuyen']);
             Route::get('chuc-nangs', [ChucNangController::class, 'index']);
             Route::get('chuc-vus', [ChucVuController::class, 'index']);
@@ -404,6 +407,7 @@ Route::prefix('v1')->group(function () {
 
             // Chuyến xe
             Route::post('chuyen-xe/auto-generate', [ChuyenXeController::class, 'autoGenerate'])->middleware('permission:auto-generate-chuyen-xe');
+            Route::post('chuyen-xe/notify-missing-drivers', [ChuyenXeController::class, 'notifyMissingDrivers'])->middleware('permission:auto-generate-chuyen-xe');
             Route::get('chuyen-xe', [ChuyenXeController::class, 'index'])->middleware('permission:xem-chuyen-xe');
             Route::get('chuyen-xe/dang-chay', [ChuyenXeController::class, 'getActiveTrips'])->middleware('permission:xem-tracking-chuyen-xe');
             Route::get('chuyen-xe/da-hoan-thanh', [ChuyenXeController::class, 'getCompletedTrips'])->middleware('permission:xem-tracking-chuyen-xe');
@@ -506,4 +510,6 @@ Route::prefix('v1')->group(function () {
             Route::patch('vi-nha-xe/yeu-cau-rut-tien/{id}/tu-choi', [AdminViNhaXeController::class, 'tuChoiRutTien']);
         });
     });
+
+    Route::get('toa-do', [AdminController::class, 'getToaDo']);
 });

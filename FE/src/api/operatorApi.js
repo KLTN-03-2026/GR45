@@ -91,6 +91,7 @@ const operatorApi = {
   getActiveTrips: () => axiosClient.get('/v1/nha-xe/chuyen-xe/dang-chay'),
   getCompletedTrips: (params) => axiosClient.get('/v1/nha-xe/chuyen-xe/da-hoan-thanh', { params }),
   getTripStops: (id) => axiosClient.get(`/v1/chuyen-xe/${id}/tram-dung`),
+  autoAssignDrivers: () => axiosClient.post('/v1/nha-xe/chuyen-xe/auto-assign-drivers'),
 
   // --- VOUCHER ---
   getVouchers: () => axiosClient.get('/v1/nha-xe/voucher'),
