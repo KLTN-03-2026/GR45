@@ -1,5 +1,6 @@
-import { unwrapSyntheticReplyEnvelope } from "@fe-agent/core";
-import { REPLY_MATCH_CUSTOMER_LANGUAGE_INSTRUCTION } from "./reply-language-policy.js";
+import { unwrapSyntheticReplyEnvelope } from "@fe-agent/core/model-json";
+import { REPLY_MATCH_CUSTOMER_LANGUAGE_INSTRUCTION } from "../reply/reply-language-policy.js";
+import { textOrEmpty, valueOr } from "../value.js";
 
 const MAX_CORPUS = 6000;
 const MAX_DRAFT = 2500;
@@ -12,19 +13,19 @@ const CONTACT_RE =
   /(?:https?:\/\/\S+)|(?:www\.\S+)|(?:\+?\d[\d\s.-]{7,})|(?:[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,})/gi;
 
 function compact(value, max) {
-  return String(value ?? "")
+  return textOrEmpty(value)
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max);
 }
 
 function extractAllowedContacts(corpus) {
-  const found = String(corpus ?? "").match(CONTACT_RE);
-  return [...new Set(found || [])];
+  const found = textOrEmpty(corpus).match(CONTACT_RE);
+  return [...new Set(valueOr(found, []))];
 }
 
 function stripUnknownContacts(reply, allowedContacts) {
-  return String(reply ?? "").replace(CONTACT_RE, (match) => {
+  return textOrEmpty(reply).replace(CONTACT_RE, (match) => {
     return allowedContacts.includes(match) ? match : "";
   });
 }
@@ -32,7 +33,7 @@ function stripUnknownContacts(reply, allowedContacts) {
 function hardSanitizeReply(reply, allowedCorpus) {
   const allowedContacts = extractAllowedContacts(allowedCorpus);
 
-  let out = String(reply ?? "");
+  let out = textOrEmpty(reply);
 
   out = stripUnknownContacts(out, allowedContacts);
 

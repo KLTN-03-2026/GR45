@@ -215,7 +215,7 @@ class ChuyenXeController extends Controller
                 if (!$preview['stored']) {
                     return response()->json([
                         'success' => true,
-                        'message' => 'Bo qua diem tracking khong can luu.',
+                        'message' => 'Bỏ qua điểm tracking không cần lưu.',
                         'data' => [
                             'stored' => false,
                             'reason' => $preview['reason'],
@@ -226,12 +226,12 @@ class ChuyenXeController extends Controller
 
                 StoreTrackingPointJob::dispatch($payload)->onQueue('tracking');
 
-                // Broadcast realtime qua Pusher
+                // Broadcast realtime qua Laravel Reverb.
                 broadcast(new TrackingUpdatedEvent($chuyenXe->id, $payload));
 
                 return response()->json([
                     'success' => true,
-                    'message' => 'Da nhan du lieu tracking, he thong se xu ly qua hang doi.',
+                    'message' => 'Đã nhận dữ liệu tracking, hệ thống sẽ xử lý qua hàng đợi.',
                     'data' => [
                         'stored' => true,
                         'queued' => true,
@@ -245,7 +245,7 @@ class ChuyenXeController extends Controller
             if (!$result['stored']) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'Bo qua diem tracking khong can luu.',
+                    'message' => 'Bỏ qua điểm tracking không cần lưu.',
                     'data' => [
                         'stored' => false,
                         'reason' => $result['reason'],
@@ -253,12 +253,12 @@ class ChuyenXeController extends Controller
                 ]);
             }
 
-            // Broadcast realtime qua Pusher
+            // Broadcast realtime qua Laravel Reverb.
             broadcast(new TrackingUpdatedEvent($chuyenXe->id, $payload));
 
             return response()->json([
                 'success' => true,
-                'message' => 'Luu vi tri thanh cong.',
+                'message' => 'Lưu vị trí thành công.',
                 'data' => $result['tracking'],
             ]);
         } catch (\Exception $e) {
@@ -271,7 +271,7 @@ class ChuyenXeController extends Controller
         try {
             $user = auth('sanctum')->user();
             if (!$user) {
-                throw new \Exception('Ban chua dang nhap.');
+                throw new \Exception('Bạn chưa đăng nhập.');
             }
 
             $request->validate([
@@ -334,7 +334,7 @@ class ChuyenXeController extends Controller
         try {
             $user = auth('sanctum')->user();
             if (!$user) {
-                throw new \Exception('Ban chua dang nhap.');
+                throw new \Exception('Bạn chưa đăng nhập.');
             }
 
             $maNhaXe = null;
@@ -357,7 +357,7 @@ class ChuyenXeController extends Controller
         try {
             $user = auth('sanctum')->user();
             if (!$user) {
-                throw new \Exception('Ban chua dang nhap.');
+                throw new \Exception('Bạn chưa đăng nhập.');
             }
 
             $maNhaXe = null;

@@ -1,8 +1,4 @@
 import {
-  createLangChainLlmDeps,
-  createLangChainRagEmbedderDeps,
-} from "@fe-agent/core";
-import {
   RuntimeConfigSchema,
   RuntimeSignalsSchema,
 } from "@fe-agent/shared-zod-schemas";
@@ -24,57 +20,22 @@ import { createIntentDetectionNode } from "./nodes/intent-detection-node.js";
 import { createLoadContextNode } from "./nodes/load-context-node.js";
 import { createObservationNode } from "./nodes/observation-node.js";
 import { createPlannerNodeHandler } from "./nodes/planner-node.js";
-import { createPlannerRunnable } from "./nodes/planner-runnable.js";
+import { createPlannerRunnable } from "./planner/planner-runnable.js";
 import { createRagRetrieverNode } from "./nodes/rag-retriever-node.js";
 import { createReplannerNode } from "./nodes/replanner-node.js";
 import { createSaveStateNode } from "./nodes/save-state-node.js";
-import { createSuggestionGeneratorNode } from "./nodes/suggestion-generator-node.js";
 import { createSynthesizerNode } from "./nodes/synthesizer-node.js";
 import { createToolExecutorNode } from "./nodes/tool-executor-node.js";
 import { createToolRouterNode } from "./nodes/tool-router-node.js";
+import { resolveGraphRuntimeDependencies } from "./runtime-dependencies.js";
+import { valueOr } from "./value.js";
 
 export function compileAgentGraph(graphDependencies) {
   const runtimeConfiguration = RuntimeConfigSchema.parse(
-    graphDependencies.config ?? {}
+    valueOr(graphDependencies.config, {})
   );
-  const llm =
-    graphDependencies.llm ??
-    createLangChainLlmDeps({
-      ollamaModel: graphDependencies.ollamaModel,
-      ollamaChatModel: graphDependencies.ollamaChatModel,
-      ollamaBaseUrl: graphDependencies.ollamaBaseUrl,
-      ollamaKeepAlive: graphDependencies.ollamaKeepAlive,
-      ollamaNumCtx: graphDependencies.ollamaNumCtx,
-      groqKey: graphDependencies.groqKey,
-      groqApiKey: graphDependencies.groqApiKey,
-      groqModel: graphDependencies.groqModel,
-      groqBaseUrl: graphDependencies.groqBaseUrl,
-      fetchImpl: graphDependencies.fetchImpl,
-      signal: graphDependencies.signal,
-    });
-  const rag =
-    graphDependencies.rag && !graphDependencies.rag.embedder
-      ? {
-          ...graphDependencies.rag,
-          embedder: createLangChainRagEmbedderDeps({
-            ollamaEmbedModel: graphDependencies.ollamaEmbedModel,
-            ollamaBaseUrl: graphDependencies.ollamaBaseUrl,
-            huggingFaceKey: graphDependencies.huggingFaceKey,
-            huggingFaceApiKey: graphDependencies.huggingFaceApiKey,
-            huggingFaceModel: graphDependencies.huggingFaceModel,
-            huggingFaceEmbedModel: graphDependencies.huggingFaceEmbedModel,
-            huggingFaceEndpointUrl: graphDependencies.huggingFaceEndpointUrl,
-            huggingFaceProvider: graphDependencies.huggingFaceProvider,
-            fetchImpl: graphDependencies.fetchImpl,
-            signal: graphDependencies.signal,
-          }),
-        }
-      : graphDependencies.rag;
-  const resolvedGraphDependencies = {
-    ...graphDependencies,
-    llm,
-    rag,
-  };
+  const resolvedGraphDependencies =
+    resolveGraphRuntimeDependencies(graphDependencies);
 
   const plannerRunnable = createPlannerRunnable({
     llm: resolvedGraphDependencies.llm,
@@ -120,10 +81,6 @@ export function compileAgentGraph(graphDependencies) {
         useRestrictedAnswerSourcesOnly
       )
     )
-    .addNode(
-      "suggestion_generator",
-      createSuggestionGeneratorNode(resolvedGraphDependencies)
-    )
     .addNode("save_state", createSaveStateNode(resolvedGraphDependencies))
     .addEdge(START, "load_context")
     .addEdge("load_context", "intent_detection")
@@ -161,36 +118,34 @@ export function compileAgentGraph(graphDependencies) {
       ["planner", "rag_retriever", "synthesizer"]
     )
     .addEdge("rag_retriever", "synthesizer")
-    .addEdge("synthesizer", "suggestion_generator")
-    .addEdge("suggestion_generator", "save_state")
+    .addEdge("synthesizer", "save_state")
     .addEdge("save_state", END);
 
   const explicitCheckpointer = graphDependencies.checkpointer;
   const resolvedCheckpointer =
-    explicitCheckpointer === false || explicitCheckpointer === null
+    [false, null].includes(explicitCheckpointer)
       ? undefined
-      : explicitCheckpointer ?? new MemorySaver();
+      : valueOr(explicitCheckpointer, new MemorySaver());
 
   return graph.compile({ checkpointer: resolvedCheckpointer });
 }
 
 export function createInitialAgentState(statePatch) {
-  const correlationIdentifier = statePatch.correlationId ?? crypto.randomUUID();
+  const correlationIdentifier = valueOr(statePatch.correlationId, crypto.randomUUID());
   return {
     sessionId: statePatch.sessionId,
     correlationId: correlationIdentifier,
-    messages: statePatch.messages ?? [],
-    signals: RuntimeSignalsSchema.parse(statePatch.signals ?? {}),
+    messages: valueOr(statePatch.messages, []),
+    signals: RuntimeSignalsSchema.parse(valueOr(statePatch.signals, {})),
     plan: statePatch.plan,
     activeStepIndex: statePatch.activeStepIndex,
-    pendingToolCalls: statePatch.pendingToolCalls ?? [],
-    completedToolCalls: statePatch.completedToolCalls ?? [],
-    toolResults: statePatch.toolResults ?? [],
-    ragContext: statePatch.ragContext ?? [],
-    observations: statePatch.observations ?? [],
+    pendingToolCalls: valueOr(statePatch.pendingToolCalls, []),
+    completedToolCalls: valueOr(statePatch.completedToolCalls, []),
+    toolResults: valueOr(statePatch.toolResults, []),
+    ragContext: valueOr(statePatch.ragContext, []),
+    observations: valueOr(statePatch.observations, []),
     finalAnswer: statePatch.finalAnswer,
-    suggestions: statePatch.suggestions ?? [],
-    journal: statePatch.journal ?? [],
-    _signal: statePatch._signal ?? undefined,
+    journal: valueOr(statePatch.journal, []),
+    _signal: valueOr(statePatch._signal, undefined),
   };
 }

@@ -31,13 +31,10 @@ function resolveReverbWsHost(configHostRaw) {
 }
 
 /**
- * Echo ↔ Laravel **Reverb**:
- * Laravel Echo ≥2 có `broadcaster: 'reverb'` → gộp đúng tùy chọn WS (cluster rỗng, host/port của bạn).
- * Dùng `broadcaster: 'pusher'` + cluster `mt1` trên **Reverb self-host** dễ khiến pusher-js cư xử như Cloud (thử wss không cần, trỏ sai).
+ * Echo ↔ Laravel Reverb.
  *
- * Nếu đủ **VITE_PUSHER_APP_KEY**: kết nối Pusher Cloud (`sockjs*.pusher.com`).
- *
- * BE Reverb: `BROADCAST_CONNECTION=reverb` + chạy `php artisan reverb:start` (cùng REVERB_SERVER_PORT / VITE_REVERB_PORT).
+ * BE: `BROADCAST_CONNECTION=reverb` + chạy `php artisan reverb:start`
+ * cùng `REVERB_SERVER_PORT` / `VITE_REVERB_PORT`.
  */
 export function buildLaravelEchoTransportOptions() {
   if (typeof window !== 'undefined') {
@@ -45,9 +42,6 @@ export function buildLaravelEchoTransportOptions() {
   }
 
   const reverbKey = String(import.meta.env.VITE_REVERB_APP_KEY ?? '').trim();
-  const pusherKey = String(import.meta.env.VITE_PUSHER_APP_KEY ?? '').trim();
-  const pusherCluster =
-    String(import.meta.env.VITE_PUSHER_APP_CLUSTER ?? 'mt1').trim() || 'mt1';
 
   const scheme = (import.meta.env.VITE_REVERB_SCHEME || 'http').toLowerCase();
   const portRaw = import.meta.env.VITE_REVERB_PORT;
@@ -84,15 +78,6 @@ export function buildLaravelEchoTransportOptions() {
     };
   }
 
-  if (pusherKey.length > 0) {
-    return {
-      broadcaster: 'pusher',
-      key: pusherKey,
-      cluster: pusherCluster,
-      forceTLS: true,
-    };
-  }
-
   return null;
 }
 
@@ -106,24 +91,20 @@ function normalizedApiUrl() {
   return apiUrl;
 }
 
-/**
- * Echo cho api prefix `v1/nha-xe` (chat hỗ trợ, kênh private nhà xe, …).
- * @param {string | null} token Bearer nhà xe
- */
+
 export function createEcho(token = null) {
   const transport = buildLaravelEchoTransportOptions();
   if (!transport) {
     console.error(
       '[Echo] Thiếu cấu hình realtime. Trong FE .env: ' +
-        '(1) Reverb: VITE_REVERB_APP_KEY + host/port + BE `php artisan reverb:start`, hoặc ' +
-        '(2) Pusher Cloud: VITE_PUSHER_APP_KEY + VITE_PUSHER_APP_CLUSTER. ' +
+        'cần VITE_REVERB_APP_KEY + host/port + BE `php artisan reverb:start`. ' +
         'Restart `npm run dev`.',
     );
     return null;
   }
 
   const apiUrl = normalizedApiUrl();
-  /** @type Record<string, unknown> */
+  
   const options = { ...transport };
 
   if (token) {

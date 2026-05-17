@@ -2,10 +2,7 @@
  * Nhãn người gửi hiển thị trong bubble live support (khách ↔ admin/nhà xe hoặc nhà xe ↔ BusSafe).
  */
 
-/**
- * @param {Record<string, unknown>|null|undefined} session - currentSessionDetails
- * @param {Record<string, unknown>} msg
- */
+
 export function liveSupportBubbleSenderLabelCustomerThread(session, msg) {
   if (!msg) return "";
   const role = msg.role;
@@ -28,10 +25,7 @@ export function liveSupportBubbleSenderLabelCustomerThread(session, msg) {
   );
 }
 
-/**
- * @param {Record<string, unknown>|null|undefined} session
- * @param {Record<string, unknown>} msg
- */
+
 export function liveSupportBubbleSenderLabelBusafeThread(session, msg) {
   if (!msg) return "";
   if (msg.role === "assistant") {

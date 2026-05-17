@@ -8,13 +8,13 @@ import { createEcho } from "@/utils/echo.js";
  * `viewer`: vai trò UI — ảnh hưởng map `sender_type` → `role` bubble (admin | user | assistant).
  */
 export function useLiveSupportChannel(viewer = "admin_panel") {
-  /** @type {ReturnType<typeof createEcho> | undefined} */
+  
   let echoInstance;
 
   /** Kênh `live-support.inbox.customer` — refetch sidebar admin khi có phiên/tin (không cần subscribe từng public_id). */
   let customerInboxSubscribed = false;
 
-  /** @type {import('vue').Ref<Map<string, string>>} */
+  
   const subscribedChannels = ref(new Map());
 
   const getEcho = () => {
@@ -54,11 +54,7 @@ export function useLiveSupportChannel(viewer = "admin_panel") {
     created_at: data.created_at,
   });
 
-  /**
-   * @param {string} publicId - UUID public_id của phiên live support
-   * @param {(msg: object) => void} onMessage
-   * @param {{ onSessionEnded?: (detail: { kind: 'resolved' | 'customer_disconnected', public_id: string }) => void }} [options]
-   */
+  
   const subscribe = (publicId, onMessage, options = {}) => {
     if (!publicId || subscribedChannels.value.has(publicId)) return;
 
@@ -88,10 +84,7 @@ export function useLiveSupportChannel(viewer = "admin_panel") {
     subscribedChannels.value.set(publicId, channelName);
   };
 
-  /**
-   * Ping realtime danh sách phiên khách ↔ admin — payload chỉ có ids (FE refetch API).
-   * @param {(detail: { session_id?: number, public_id?: string, preview?: string | null, updated_at?: string, kind?: string }) => void} onPing
-   */
+  
   const subscribeCustomerInbox = (onPing) => {
     const echo = getEcho();
     if (!echo || customerInboxSubscribed) return;

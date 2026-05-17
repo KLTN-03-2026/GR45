@@ -367,7 +367,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  // Dọn dẹp: rời kênh Pusher khi rời khỏi trang đặt vé
+  // Dọn dẹp: rời kênh Reverb khi rời khỏi trang đặt vé
   if (echoInstance.value && tripId) {
     try {
       echoInstance.value.leaveChannel(`chuyen-xe.${tripId}`);
@@ -378,7 +378,7 @@ onUnmounted(() => {
 });
 
 /**
- * Subscribe vào kênh Pusher công khai `chuyen-xe.{id}`.
+ * Subscribe vào kênh Reverb công khai `chuyen-xe.{id}`.
  * Gọi sau khi fetchInitialData() hoàn tất và tripId có giá trị.
  */
 const subscribeToSeatUpdates = () => {
@@ -427,7 +427,7 @@ const subscribeToSeatUpdates = () => {
       });
     isRealtimeConnected.value = true;
   } catch (err) {
-    // Pusher không khả dụng — không ảnh hưởng luồng đặt vé
+    // Reverb không khả dụng — không ảnh hưởng luồng đặt vé
     console.warn("[SeatMap] Không thể kết nối realtime:", err.message);
   }
 };

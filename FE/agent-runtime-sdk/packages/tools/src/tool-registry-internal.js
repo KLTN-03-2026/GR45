@@ -1,4 +1,4 @@
-import { CircuitOpenError } from "@fe-agent/core";
+import { CircuitOpenError } from "@fe-agent/core/errors";
 
 export function anySignal(signals) {
   const usableSignals = signals.filter(Boolean);

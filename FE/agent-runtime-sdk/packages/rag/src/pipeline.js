@@ -73,20 +73,7 @@ export async function ingestPdfToVectorCollection(input) {
   });
 }
 
-/**
- * Nạp PDF từ buffer (Node) qua pdf-parse, chunk, embed rồi upsert — truyền embedder + vector giống `ingestPdfToVectorCollection`.
- *
- * @param {object} input
- * @param {Uint8Array | import("node:buffer").Buffer} input.pdfBuffer
- * @param {{ embedTexts: (a: { texts: string[] }) => Promise<number[][]> }} input.embedder
- * @param {{ upsert: (a: object) => Promise<unknown> }} input.vector
- * @param {string} input.collection
- * @param {string} [input.docId]
- * @param {number} [input.chunkSize]
- * @param {number} [input.overlap]
- * @param {number} [input.embedBatchSize]
- * @param {number} [input.maxChunks] Giới hạn số chunk (còn lại bỏ qua).
- */
+// Nạp PDF từ buffer (Node) qua pdf-parse, chunk, embed rồi upsert.
 export async function ingestPdfBufferToVectorCollection(input) {
   const docId =
     typeof input.docId === "string" && input.docId.trim()

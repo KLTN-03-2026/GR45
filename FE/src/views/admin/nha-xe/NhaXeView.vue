@@ -128,11 +128,7 @@ const safeNumber = (value) => {
   return Number.isFinite(n) ? n : 0
 }
 
-/**
- * Hiển thị thông báo toast tự động ẩn sau 3 giây
- * @param {string} message - Nội dung thông báo
- * @param {'success'|'error'} type - Loại thông báo
- */
+
 const showToast = (message, type = 'success') => {
   toast.message = message
   toast.type = type
@@ -143,22 +139,13 @@ const showToast = (message, type = 'success') => {
   }, 3000)
 }
 
-/**
- * Chuẩn hoá response từ axios về dạng { data: [], current_page, last_page, total }
- * Hỗ trợ cả response phân trang lồng nhau và mảng thẳng
- * @param {*} res - Response trả về từ axios
- */
+
 const extractResponseData = (res) => {
   const data = res?.data ?? res
   return data?.data?.data ? data.data : (Array.isArray(data?.data) ? data : { data: Array.isArray(data) ? data : [] })
 }
 
-/**
- * Chuẩn hoá dữ liệu một nhà xe từ API về định dạng thống nhất để hiển thị
- * — gộp các trường từ ho_so, dia_chi_nha_xe, tai_khoan_nhan_tien về một mức
- * @param {Object} item - Dữ liệu nhà xe thô từ API
- * @returns {Object} Dữ liệu nhà xe đã chuẩn hoá
- */
+
 const normalizeOperator = (item) => {
   const hoSo = item.ho_so || {}
   return {
@@ -173,19 +160,10 @@ const normalizeOperator = (item) => {
   }
 }
 
-/**
- * Chuẩn hoá trạng thái nhà xe về key thống nhất
- * — hỗ trợ cả giá trị số (1/0) lẫn chuỗi
- * @param {string|number} status - Giá trị trạng thái thô
- * @returns {'hoat_dong'|'cho_duyet'|'khoa'|'unknown'}
- */
+
 const getStatusKey = (status) => ({ 1: 'hoat_dong', 0: 'khoa', hoat_dong: 'hoat_dong', cho_duyet: 'cho_duyet', khoa: 'khoa' }[status] || 'unknown')
 
-/**
- * Trả về nhãn và class CSS badge tương ứng với trạng thái nhà xe
- * @param {string|number} status - Trạng thái nhà xe
- * @returns {{ text: string, cls: string }}
- */
+
 const getStatusMeta = (status) => ({
   hoat_dong: { text: 'Hoạt động', cls: 'badge-green' },
   cho_duyet: { text: 'Chờ duyệt', cls: 'badge-yellow' },
@@ -211,10 +189,7 @@ const dashboardStats = computed(() => {
   return stats
 })
 
-/**
- * Tải danh sách nhà xe từ API theo bộ lọc và trang hiện tại
- * @param {number} page - Số trang cần tải (mặc định: 1)
- */
+
 const fetchOperators = async (page = 1) => {
   loading.value = true
   try {
@@ -250,10 +225,7 @@ const resetForm = () => {
 /** Mở modal thêm mới nhà xe (reset form, chuyển mode sang 'add') */
 const openAddModal = async () => { formMode.value = 'add'; resetForm(); await nextTick(); formModalInstance?.show() }
 
-/**
- * Mở modal chỉnh sửa nhà xe — điền sẵn dữ liệu từ item vào form
- * @param {Object} item - Nhà xe cần chỉnh sửa
- */
+
 const openEditModal = async (item) => {
   formMode.value = 'edit'
   resetForm()
@@ -273,11 +245,7 @@ const openEditModal = async (item) => {
   formModalInstance?.show()
 }
 
-/**
- * Xây dựng payload gửi lên API từ dữ liệu form hiện tại
- * — map tên field FE sang tên field BE, chỉ thêm password khi tạo mới
- * @returns {Object} Payload sẵn sàng gửi API
- */
+
 const buildFormPayload = () => {
   const fd = new FormData()
   fd.append('ten_nha_xe', form.ten_nha_xe)
@@ -341,22 +309,13 @@ const saveForm = async () => {
   }
 }
 
-/**
- * Kiểm tra nhà xe có ít nhất một tuyến đường đã được duyệt không
- * — điều kiện bắt buộc để kích hoạt hoặc duyệt tham gia hệ thống
- * @param {Object} operator - Nhà xe cần kiểm tra
- * @returns {Promise<boolean>}
- */
+
 const checkRoutes = async (operator) => {
   const res = await adminApi.getRoutes({ per_page: 100, search: operator.ma_nha_xe || operator.ten_nha_xe })
   return extractResponseData(res).data.some(r => ['hoat_dong', 'da_duyet'].includes(r.tinh_trang || r.trang_thai))
 }
 
-/**
- * Mở modal xác nhận hành động (duyệt / đổi trạng thái / xóa)
- * @param {'approve'|'toggle'|'delete'} action - Loại hành động
- * @param {Object} item - Nhà xe mục tiêu
- */
+
 const openConfirm = (action, item) => {
   confirmAction.value = action; confirmTarget.value = item;
   confirmTitle.value = { approve: 'Duyệt tham gia', toggle: 'Đổi trạng thái', delete: 'Xóa nhà xe' }[action]

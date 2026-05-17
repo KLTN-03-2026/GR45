@@ -96,10 +96,7 @@ export const useOperatorStore = defineStore('operator', () => {
     return true;
   }
 
-  /**
-   * Đăng nhập tự động: Thử đăng nhập Nhà xe, nếu sai thử Nhân viên
-   * @param {Object} credentials - { email, password }
-   */
+  
   async function login(credentials) {
     loading.value = true;
     error.value   = null;

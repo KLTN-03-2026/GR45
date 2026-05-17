@@ -2,9 +2,12 @@
   "name": "@fe-agent/core",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.js",
+  "main": "./src/errors.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/errors.js",
+    "./errors": "./src/errors.js",
+    "./langchain-providers": "./src/langchain-providers.js",
+    "./model-json": "./src/model-json.js"
   },
   "dependencies": {
     "@langchain/community": "^1.1.28",

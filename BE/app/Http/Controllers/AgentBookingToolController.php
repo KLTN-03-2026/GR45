@@ -19,20 +19,33 @@ final class AgentBookingToolController extends Controller
     public function paymentStatus(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'ma_ve' => 'required|string|max:64',
+            'ma_ve' => 'nullable|string|max:64',
+            'ma_thanh_toan' => 'nullable|string|max:64',
+            'payment_id' => 'nullable|string|max:64',
         ]);
+        $identifier = trim((string) ($data['ma_ve'] ?? ''));
+        $paymentCode = trim((string) ($data['ma_thanh_toan'] ?? $data['payment_id'] ?? ''));
+        if ($identifier === '' && $paymentCode === '') {
+            return response()->json(['success' => false, 'message' => 'Thiếu mã vé hoặc mã thanh toán.'], 422);
+        }
 
         /** @var Ve|null $ve */
         $ve = Ve::query()
             ->with(['thanhToan', 'chuyenXe'])
-            ->where('ma_ve', $data['ma_ve'])
+            ->when($identifier !== '', fn ($q) => $q->where('ma_ve', $identifier))
+            ->when($identifier === '' && $paymentCode !== '', function ($q) use ($paymentCode) {
+                $q->whereHas('thanhToan', function ($tt) use ($paymentCode) {
+                    $tt->where('ma_thanh_toan', $paymentCode)
+                        ->orWhere('ma_giao_dich', $paymentCode);
+                });
+            })
             ->first();
 
         if ($ve === null) {
             return response()->json(['success' => false, 'message' => 'Không tìm thấy vé.'], 404);
         }
 
-        $khachId = Auth::guard('khach_hang')->id();
+        $khachId = auth('khach_hang')->id();
         if ($ve->id_khach_hang !== null && (int) $ve->id_khach_hang !== (int) $khachId) {
             return response()->json([
                 'success' => false,
@@ -81,7 +94,7 @@ final class AgentBookingToolController extends Controller
             return response()->json(['success' => false, 'message' => 'Không tìm thấy vé.'], 404);
         }
 
-        $khachId = Auth::guard('khach_hang')->id();
+        $khachId = auth('khach_hang')->id();
         if ($ve->id_khach_hang !== null && (int) $ve->id_khach_hang !== (int) $khachId) {
             return response()->json([
                 'success' => false,

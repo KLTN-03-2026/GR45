@@ -2,7 +2,7 @@ import { ref, onUnmounted } from 'vue';
 import { createEcho } from '@/utils/echo.js';
 
 /**
- * Vue composable để subscribe/unsubscribe WebSocket chat support channels (Pusher).
+ * Vue composable để subscribe/unsubscribe WebSocket chat support channels (Laravel Reverb).
  * Dùng public channel không cần auth.
  *
  * Sử dụng:
@@ -12,7 +12,7 @@ import { createEcho } from '@/utils/echo.js';
  *   unsubscribeAll()                         // Dừng tất cả
  */
 export function useChatSupportChannel() {
-  /** @type {ReturnType<typeof createEcho> | undefined} */
+  
   let echoInstance;
   const subscribedChannels = ref(new Map()); // sessionId → channel name
 
@@ -23,11 +23,7 @@ export function useChatSupportChannel() {
     return echoInstance;
   };
 
-  /**
-   * Subscribe vào channel tracking của 1 session chat.
-   * @param {number} sessionId - ID của chat session
-   * @param {Function} onMessage - Callback nhận dữ liệu tin nhắn mới
-   */
+  
   const subscribe = (sessionId, onMessage) => {
     if (subscribedChannels.value.has(sessionId)) return; // Đã subscribe rồi
 

@@ -9,7 +9,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Khách đóng tab / reload — phiên chuyển status (vd. closed), admin không còn reply theo luồng mở.
+ * Khách đóng tab / reload — phiên chuyển status resolved, admin không còn reply theo luồng mở.
  */
 final class LiveSupportCustomerDisconnectedEvent implements ShouldBroadcastNow
 {

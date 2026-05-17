@@ -6,55 +6,57 @@ import {
   getKhachBearerHeaders,
   persistKhachToken,
   withQuery,
-} from "../api-helpers.js";
-import { COMMON_SLOTS, EXTENDED_SLOTS } from "../slots.js";
+} from "../../tools/api/api-client.js";
+import {
+  buildCompactToolDescription,
+  buildToolJsonSchemaFromSlots,
+} from "../../tools/slots/common-slots.js";
 
 const passthroughArgs = z.object({}).passthrough();
 
-function specText(spec) {
-  try {
-    return JSON.stringify(spec, null, 2);
-  } catch {
-    return String(spec);
-  }
-}
-
-function standardParametersSchema() {
-  const properties = {};
-  for (const [key, description] of Object.entries({ ...COMMON_SLOTS, ...EXTENDED_SLOTS })) {
-    properties[key] = { type: "string", description };
-  }
-  return {
-    type: "object",
-    properties,
-    additionalProperties: true,
-  };
-}
-
-const STANDARD_PARAMETERS = standardParametersSchema();
-
 export function createCatalogToolRegistrar(registry) {
   let activeToolContext = null;
+  const plannerPatterns = [];
+  /** @type {Map<string, (result: any) => Array<{text:string,action?:string,params?:object}>>} */
+  const toolSuggestions = new Map();
 
-  function register(toolName, slotSpec, tier, suggestionLabels, run) {
+  function getFastPlannerPatterns() {
+    return plannerPatterns.slice();
+  }
+
+  function getToolSuggestionsMap() {
+    return new Map(toolSuggestions);
+  }
+
+  function register(toolName, slotSpec, tier, labels, run, plannerPattern) {
+    if (Array.isArray(plannerPattern)) {
+      plannerPatterns.push(...plannerPattern);
+      for (const p of plannerPattern) {
+        if (p && typeof p.suggestions === "function") {
+          toolSuggestions.set(toolName, p.suggestions);
+        }
+      }
+    } else if (plannerPattern) {
+      plannerPatterns.push(plannerPattern);
+      if (typeof plannerPattern.suggestions === "function") {
+        toolSuggestions.set(toolName, plannerPattern.suggestions);
+      }
+    }
+
     registry.register({
       definition: {
         name: toolName,
-        description: [
-          `Tool \`${toolName}\` — GR45 khách (REST Laravel).`,
-          "Spec:",
-          specText(slotSpec),
-        ].join("\n"),
-        jsonSchema: STANDARD_PARAMETERS,
-        suggestionLabels,
+        description: buildCompactToolDescription(toolName, slotSpec),
+        jsonSchema: buildToolJsonSchemaFromSlots(slotSpec),
         tier,
+        labels,
       },
       argsSchema: passthroughArgs,
       execute: async (args, ctx) => {
         const previous = activeToolContext;
-        activeToolContext = ctx || null;
+        activeToolContext = ctx ? ctx : null;
         try {
-          return await run(args ?? {}, ctx);
+          return await run(args == null ? {} : args, ctx);
         } finally {
           activeToolContext = previous;
         }
@@ -63,11 +65,11 @@ export function createCatalogToolRegistrar(registry) {
   }
 
   async function jsonResult(path, opts) {
-    const headers = { ...(opts.headers || {}) };
+    const headers = { ...(opts.headers ? opts.headers : {}) };
     const method = opts.method ? String(opts.method).toUpperCase() : "GET";
     if (
       method !== "GET" &&
-      typeof opts.body === "string" &&
+      opts.body?.constructor === String &&
       opts.body !== "" &&
       !headers["Content-Type"] &&
       !headers["content-type"]
@@ -95,7 +97,7 @@ export function createCatalogToolRegistrar(registry) {
     const res = await apiFetch(path, {
       ...opts,
       headers,
-      signal: opts.signal || activeToolContext?.signal,
+      signal: opts.signal ? opts.signal : activeToolContext?.signal,
     });
     if (opts.persistToken && res.res.ok && res.body?.success === true) {
       persistKhachToken(res.body);
@@ -106,9 +108,15 @@ export function createCatalogToolRegistrar(registry) {
     return {
       ok: false,
       error:
-        typeof res.body?.message === "string"
+        res.body?.message?.constructor === String
           ? res.body.message
-          : JSON.stringify(res.body?.errors ?? res.body ?? res.res.status),
+          : JSON.stringify(
+              res.body?.errors == null
+                ? res.body == null
+                  ? res.res.status
+                  : res.body
+                : res.body.errors,
+            ),
     };
   }
 
@@ -134,13 +142,13 @@ export function createCatalogToolRegistrar(registry) {
 
   function positiveId(value, label) {
     const id = Number(value);
-    if (!Number.isInteger(id) || id <= 0) {
+    if ([!Number.isInteger(id), id <= 0].some(Boolean)) {
       return { ok: false, error: `Thiếu ${label} hợp lệ.` };
     }
     return { ok: true, id };
   }
 
-  async function exeTramDung(args, _kind) {
+  async function exeTramDung(args, kind) {
     const parsed = positiveId(args.trip_id, "trip_id");
     if (!parsed.ok) return parsed;
     const id = parsed.id;
@@ -151,7 +159,11 @@ export function createCatalogToolRegistrar(registry) {
     if (!result.ok) return result;
 
     const payload = result.data?.data;
-    const rows = Array.isArray(payload)
+    const rows = kind === "pickup" && Array.isArray(payload?.tram_don)
+      ? payload.tram_don
+      : kind === "dropoff" && Array.isArray(payload?.tram_tra)
+        ? payload.tram_tra
+        : Array.isArray(payload)
       ? payload
       : Array.isArray(payload?.data)
         ? payload.data
@@ -160,7 +172,7 @@ export function createCatalogToolRegistrar(registry) {
       ok: true,
       data: {
         success: true,
-        note: "Trả toàn bộ trạm — lọc đón/trả theo `loai_tram` ở FE/AgentToolController nếu cần.",
+        note: kind === "pickup" ? "Danh sách điểm đón." : "Danh sách điểm trả.",
         count: rows.length,
         data: rows,
       },
@@ -171,7 +183,9 @@ export function createCatalogToolRegistrar(registry) {
     bridgeProxyRequired,
     clearKhachToken,
     exeTramDung,
+    getFastPlannerPatterns,
     getKhachBearerHeaders,
+    getToolSuggestionsMap,
     jsonResult,
     positiveId,
     register,

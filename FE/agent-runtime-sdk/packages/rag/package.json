@@ -2,9 +2,12 @@
   "name": "@fe-agent/rag",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.js",
+  "main": "./src/pipeline.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/pipeline.js",
+    "./chunk": "./src/chunk.js",
+    "./pdf-node": "./src/pdf-node.js",
+    "./pipeline": "./src/pipeline.js"
   },
   "dependencies": {
     "@fe-agent/core": "0.1.0",

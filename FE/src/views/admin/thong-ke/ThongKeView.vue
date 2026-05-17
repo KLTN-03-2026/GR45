@@ -71,26 +71,16 @@ const baoCaoSetsPrimaryKpi = ref(false)
 const routeTop = ref([])
 const routeBottom = ref([])
 
-/** 
- * Mở bọc payload trả về từ API (xử lý case có/không có wrapper .data) 
- * @param {Object} res - Kết quả trả về từ axios
- */
+
 const unwrapApi = (res) => res?.success === false ? null : (res?.data ?? res)
 
-/** 
- * Lấy mảng dữ liệu (rows) từ response API (hỗ trợ cả phân trang và mảng thẳng)
- * @param {Object} res - Kết quả trả về từ axios
- * @returns {Array} Mảng dữ liệu
- */
+
 const extractPaginatedRows = (res) => {
   const p = unwrapApi(res)
   return Array.isArray(p?.data?.data) ? p.data.data : Array.isArray(p?.data) ? p.data : Array.isArray(p) ? p : []
 }
 
-/** 
- * Lấy meta thông tin phân trang (current_page, total...) từ response API 
- * @param {Object} res - Kết quả trả về từ axios
- */
+
 const extractPaginatedMeta = (res) => {
   const p = unwrapApi(res)
   const m = p?.data?.current_page ? p.data : (p && typeof p === 'object' ? p : {})
@@ -114,13 +104,7 @@ const normalizeTuyenRow = (x) => {
   }
 }
 
-/** 
- * Tầng 1: Lấy dữ liệu báo cáo chuyên dụng từ API Admin (Dashboard, Tuyến đường, Trạng thái vé).
- * Đây là nguồn dữ liệu ưu tiên cao nhất, nếu thành công sẽ set cờ `baoCaoSetsPrimaryKpi = true`.
- * @param {string} tuNgay - Ngày bắt đầu (YYYY-MM-DD)
- * @param {string} denNgay - Ngày kết thúc (YYYY-MM-DD)
- * @param {number} gen - Biến thế hệ để chống race condition khi gọi API nhiều lần
- */
+
 const fetchBaoCaoAdmin = async (tuNgay, denNgay, gen) => {
   if (!tuNgay || !denNgay) return
   const prm = { tu_ngay: tuNgay, den_ngay: denNgay }
@@ -245,14 +229,7 @@ const isDaThanhToan = (t) => {
 /** Lọc kiểm tra vé có thanh toán bằng tiền mặt không */
 const isTienMat = (t) => String(t?.phuong_thuc_thanh_toan ?? '').toLowerCase() === 'tien_mat'
 
-/** 
- * Tầng 3 (Fallback một phần): Lấy toàn bộ danh sách vé trong khoảng thời gian để tính toán nội bộ (Client-side)
- * Sử dụng để tính tỉ lệ lấp đầy ghế, phân bổ vé, tuyến đường (nếu API Tầng 1/2 không có).
- * Lấy tối đa 50 trang (5000 vé) để giới hạn tải.
- * @param {string} tuNgay - Ngày bắt đầu
- * @param {string} denNgay - Ngày kết thúc
- * @param {number} gen - Thế hệ request
- */
+
 const fetchTicketsAnalytics = async (tuNgay, denNgay, gen) => {
   const acc = []
   let page = 1

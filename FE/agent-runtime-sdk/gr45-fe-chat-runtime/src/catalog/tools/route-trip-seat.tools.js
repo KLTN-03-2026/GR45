@@ -8,310 +8,16 @@ import {
   findDirectionedProvinces,
   routeExistenceSearchRoutesArgsFromNorm,
   normalizedTextWantsTripScheduleOrDate,
-} from "../../fast-planner/text-utils.js";
+} from "../../domain/planner/text-utils.js";
 import {
   ROUTE_TOOL_SLOTS,
   SEAT_TOOL_SLOTS,
   TRIP_TOOL_SLOTS,
-} from "../slots.js";
-
-const FREE_SEAT_STATUSES = new Set([
-  "",
-  "trong",
-  "con_trong",
-  "available",
-  "empty",
-]);
-
-function asString(value) {
-  return String(value ?? "").trim();
-}
-
-function normalizeText(value) {
-  return asString(value)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d");
-}
-
-function pickDefinedQuery(source) {
-  return Object.fromEntries(
-    Object.entries(source).filter(
-      ([, value]) => value !== undefined && value !== null && asString(value) !== "",
-    ),
-  );
-}
-
-function hasAnyTripSearchTime(args) {
-  return Boolean(
-    asString(args.gio_khoi_hanh) ||
-      asString(args.gio_khoi_hanh_tu) ||
-      asString(args.gio_khoi_hanh_den),
-  );
-}
-
-function todayIsoInVnTz() {
-  // VN = UTC+7. Tránh phụ thuộc Intl trong runtime cũ.
-  const nowMs = Date.now() + 7 * 60 * 60 * 1000;
-  return new Date(nowMs).toISOString().slice(0, 10);
-}
-
-function isPastIsoDate(dateStr) {
-  const s = asString(dateStr);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  return s.localeCompare(todayIsoInVnTz()) < 0;
-}
-
-// Ghế format chấp nhận: chữ A–H (sàn xe giường nằm có tối đa H), kèm 1-2 chữ số.
-// Z99 / I99 / 1A / ABC — invalid.
-const SEAT_FORMAT_REGEX = /^[A-Ha-h](0?[1-9]|[12][0-9]|3[0-2])$/;
-
-function invalidSeatIds(seatIds) {
-  if (!Array.isArray(seatIds) || seatIds.length === 0) return [];
-  return seatIds
-    .map((id) => asString(id))
-    .filter((id) => id && !SEAT_FORMAT_REGEX.test(id));
-}
-
-function isInvalidTripIdInput(rawValue) {
-  if (rawValue === undefined || rawValue === null) return false;
-  const s = asString(rawValue);
-  if (!s) return false;
-  if (/^\d+$/.test(s)) return false;
-  return true;
-}
-
-function missingTripSearchSlots(args) {
-  const missing = [];
-  if (!asString(args.diem_di)) missing.push("diem_di");
-  if (!asString(args.diem_den)) missing.push("diem_den");
-  if (!asString(args.ngay_khoi_hanh)) missing.push("ngay_khoi_hanh");
-  if (!hasAnyTripSearchTime(args)) missing.push("gio_khoi_hanh");
-  return missing;
-}
-
-function buildTripSearchQuery(args) {
-  const exactTime = asString(args.gio_khoi_hanh);
-  return pickDefinedQuery({
-    diem_di: args.diem_di,
-    diem_den: args.diem_den,
-    ngay_khoi_hanh: args.ngay_khoi_hanh,
-    gio_khoi_hanh_tu: args.gio_khoi_hanh_tu ?? exactTime,
-    gio_khoi_hanh_den: args.gio_khoi_hanh_den ?? (exactTime || undefined),
-    gia_ve_tu: args.min_price,
-    gia_ve_den: args.max_price,
-    nha_xe: args.nha_xe,
-    ma_nha_xe: args.ma_nha_xe,
-    loai_xe: args.loai_xe,
-    tien_ich: Array.isArray(args.tien_ich)
-      ? args.tien_ich.join(",")
-      : args.tien_ich,
-    so_luong_ghe: args.so_luong_ghe,
-  });
-}
-
-function buildRouteSearchQuery(args) {
-  return pickDefinedQuery({
-    diem_di: args.diem_di,
-    diem_den: args.diem_den,
-    nha_xe: args.nha_xe,
-    ma_nha_xe: args.ma_nha_xe,
-    loai_xe: args.loai_xe,
-  });
-}
-
-function asksAboutSpecificOperatorWithoutNamingOne(args) {
-  const raw = normalizeText(args.raw_message);
-  return (
-    /\bnha xe\b/.test(raw) &&
-    !asString(args.nha_xe) &&
-    !asString(args.ma_nha_xe)
-  );
-}
-
-function hasNeedle(row, needle, keys) {
-  const n = normalizeText(needle);
-  if (!n) return true;
-
-  return keys.some((key) => normalizeText(row?.[key]).includes(n));
-}
-
-function hasTextNeedle(value, needle) {
-  const n = normalizeText(needle);
-  if (!n) return true;
-  return normalizeText(value).includes(n);
-}
-
-function hasStationCue(args) {
-  const text = normalizeText(
-    [args.raw_message, args.diem_di, args.diem_den].filter(Boolean).join(" "),
-  );
-
-  return /\b(tram|diem don|diem tra|ben xe|ben tau|ga|station|pickup|dropoff)\b/.test(
-    text,
-  );
-}
-
-/** BE public tuyến thường embed nhà xe trong `nha_xe: { ma_nha_xe, ten_nha_xe }`. */
-function routeRowOperatorHaystack(row) {
-  const item = row ?? {};
-  const nx = item.nha_xe && typeof item.nha_xe === "object" ? item.nha_xe : {};
-  const parts = [
-    item.ma_nha_xe,
-    item.ten_nha_xe,
-    nx.ma_nha_xe,
-    nx.ten_nha_xe,
-  ].filter((x) => asString(x) !== "");
-  return normalizeText(parts.join(" "));
-}
-
-function routeMatchesOperator(row, operator) {
-  const n = normalizeText(operator);
-  if (!n) return true;
-  const hay = routeRowOperatorHaystack(row);
-  return hay.includes(n);
-}
-
-function getTripRoute(row) {
-  return row?.tuyen_duong ?? row?.tuyenDuong ?? row?.route ?? {};
-}
-
-function filterRoutesClientSide(rows, args) {
-  const operator = args.ma_nha_xe ?? args.nha_xe;
-  const from = args.diem_di;
-  const to = args.diem_den;
-
-  if (!asString(operator) && !asString(from) && !asString(to)) {
-    return rows.map(normalizeRouteRow);
-  }
-
-  return rows
-    .filter((row) => {
-      const item = row ?? {};
-
-      return (
-        routeMatchesOperator(item, operator) &&
-        hasNeedle(item, from, ["diem_bat_dau", "diem_di"]) &&
-        hasNeedle(item, to, ["diem_ket_thuc", "diem_den"])
-      );
-    })
-    .map(normalizeRouteRow);
-}
-
-// Chuẩn hoá row tuyến đường để synthesizer KHÔNG diễn giải nhầm chiều/giờ.
-// BE trả gio/gio_ket_thuc là 1 hướng duy nhất (route = 1 direction). Khoá
-// schema rõ ràng để LLM không bịa "chiều đi / chiều về".
-function normalizeRouteRow(row) {
-  if (!row || typeof row !== "object") return row;
-  const diemDi = row.diem_di ?? row.diem_bat_dau ?? null;
-  const diemDen = row.diem_den ?? row.diem_ket_thuc ?? null;
-  const gioKhoiHanh = row.gio ?? row.gio_khoi_hanh ?? null;
-  const gioDenNoi = row.gio_ket_thuc ?? row.gio_den ?? row.gio_den_noi ?? null;
-  return {
-    ...row,
-    route_id: row.id ?? row.route_id ?? null,
-    huong: "one_way",
-    diem_di: diemDi,
-    diem_den: diemDen,
-    gio_khoi_hanh: gioKhoiHanh,
-    gio_den_noi: gioDenNoi,
-    note_for_synthesizer:
-      "Đây là MỘT chiều (one_way): diem_di → diem_den. gio_khoi_hanh là giờ bắt đầu chiều này. gio_den_noi là giờ đến cuối chiều này. KHÔNG được hiểu thành 'chiều về'.",
-  };
-}
-
-function filterTripsClientSide(rows, args) {
-  const from = args.diem_di;
-  const to = args.diem_den;
-
-  if (hasStationCue(args) || (!asString(from) && !asString(to))) {
-    return rows;
-  }
-
-  return rows.filter((row) => {
-    const route = getTripRoute(row);
-    const routeFrom =
-      route?.diem_bat_dau ??
-      route?.diem_di ??
-      row?.diem_bat_dau ??
-      row?.diem_di;
-    const routeTo =
-      route?.diem_ket_thuc ??
-      route?.diem_den ??
-      row?.diem_ket_thuc ??
-      row?.diem_den;
-
-    if (!asString(routeFrom) && !asString(routeTo)) {
-      return true;
-    }
-
-    return hasTextNeedle(routeFrom, from) && hasTextNeedle(routeTo, to);
-  });
-}
-
-function extractList(payload) {
-  const data = payload?.data;
-
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data?.items)) return payload.data.items;
-  if (Array.isArray(payload?.items)) return payload.items;
-
-  return [];
-}
-
-function isFreeSeat(seat) {
-  const status = normalizeText(seat?.tinh_trang ?? seat?.status ?? "");
-  return FREE_SEAT_STATUSES.has(status);
-}
-
-function publicTripSummary(jsonResult, positiveId, args) {
-  const parsed = positiveId(args.trip_id, "trip_id");
-  if (!parsed.ok) return Promise.resolve(parsed);
-
-  return jsonResult(`chuyen-xe/${parsed.id}/tom-tat`, {
-    method: "GET",
-    auth: "none",
-  });
-}
-
-function publicTripSeats(jsonResult, positiveId, args) {
-  const parsed = positiveId(args.trip_id, "trip_id");
-  if (!parsed.ok) return Promise.resolve(parsed);
-
-  return jsonResult(`chuyen-xe/${parsed.id}/ghe`, {
-    method: "GET",
-    auth: "none",
-  });
-}
-
-function compactTripPriceResult(result) {
-  if (!result.ok) return result;
-
-  const payload = result.data?.data ?? result.data ?? {};
-  const price =
-    payload.gia_ve ??
-    payload.gia_ve_co_ban ??
-    payload.price ??
-    payload.base_price ??
-    null;
-
-  return {
-    ok: true,
-    data: {
-      success: true,
-      base_price: price,
-      final_price: price,
-      currency: "VND",
-      raw: payload,
-    },
-  };
-}
+} from "../slots/route-trip-seat.slots.js";
 
 export function registerRouteTripSeatTools(ctx) {
-  const { exeTramDung, jsonResult, positiveId, register, stub, withQuery } = ctx;
+  const { exeTramDung, jsonResult, positiveId, register, stub, withQuery } =
+    ctx;
 
   register(
     "search_routes",
@@ -319,16 +25,34 @@ export function registerRouteTripSeatTools(ctx) {
     "safe",
     ["Tìm tuyến khác", "Đặt vé", "Liên hệ hỗ trợ"],
     async (args) => {
-      const maNhaXe = extractMaNhaXe(normalizeText(args.raw_message));
-      if (!asString(args.ma_nha_xe) && maNhaXe) {
+      const rawMessageNormalized = String(
+        args.raw_message == null ? "" : args.raw_message,
+      )
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+      const maNhaXe = extractMaNhaXe(rawMessageNormalized);
+      if (
+        !String(args.ma_nha_xe == null ? "" : args.ma_nha_xe).trim() &&
+        maNhaXe
+      ) {
         args.ma_nha_xe = maNhaXe;
       }
-      if (!asString(args.nha_xe) && !asString(args.ma_nha_xe)) {
+      if (
+        !String(args.nha_xe == null ? "" : args.nha_xe).trim() &&
+        !String(args.ma_nha_xe == null ? "" : args.ma_nha_xe).trim()
+      ) {
         const opName = extractOperatorNameLoose(args.raw_message);
         if (opName) args.nha_xe = opName;
       }
 
-      if (asksAboutSpecificOperatorWithoutNamingOne(args)) {
+      if (
+        /\bnha xe\b/.test(rawMessageNormalized) &&
+        !String(args.nha_xe == null ? "" : args.nha_xe).trim() &&
+        !String(args.ma_nha_xe == null ? "" : args.ma_nha_xe).trim()
+      ) {
         return {
           ok: false,
           data: {
@@ -348,36 +72,241 @@ export function registerRouteTripSeatTools(ctx) {
       // Bước 2 fallback: nếu có diem_di/diem_den nhưng kết quả rỗng và đang
       // filter theo nha_xe tự nhiên (không có ma_nha_xe), gọi lại BE không
       // truyền nha_xe, rồi client-side substring filter theo ten_nha_xe.
-      const query = buildRouteSearchQuery(args);
-      const result = await jsonResult(
-        withQuery("tuyen-duong/public", query),
-        { method: "GET", auth: "none" },
+      const query = Object.fromEntries(
+        Object.entries({
+          diem_di: args.diem_di,
+          diem_den: args.diem_den,
+          nha_xe: args.nha_xe,
+          ma_nha_xe: args.ma_nha_xe,
+          loai_xe: args.loai_xe,
+        }).filter(
+          ([, value]) =>
+            value !== undefined &&
+            value !== null &&
+            String(value).trim() !== "",
+        ),
       );
+      const result = await jsonResult(withQuery("tuyen-duong/public", query), {
+        method: "GET",
+        auth: "none",
+      });
       if (!result.ok) return result;
 
-      let rows = extractList(result.data);
-      let filtered = filterRoutesClientSide(rows, args);
+      const routeOperator =
+        args.ma_nha_xe == null ? args.nha_xe : args.ma_nha_xe;
+      const routeOperatorNormalized = String(
+        routeOperator == null ? "" : routeOperator,
+      )
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+      const routeFromNormalized = String(
+        args.diem_di == null ? "" : args.diem_di,
+      )
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+      const routeToNormalized = String(
+        args.diem_den == null ? "" : args.diem_den,
+      )
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+      let rows = Array.isArray(result.data?.data)
+        ? result.data.data
+        : Array.isArray(result.data?.data?.data)
+          ? result.data.data.data
+          : Array.isArray(result.data)
+            ? result.data
+            : Array.isArray(result.data?.data?.items)
+              ? result.data.data.items
+              : Array.isArray(result.data?.items)
+                ? result.data.items
+                : [];
+      let filtered = rows
+        .filter((row) => {
+          if (
+            !routeOperatorNormalized &&
+            !routeFromNormalized &&
+            !routeToNormalized
+          ) {
+            return true;
+          }
+          const item = row == null ? {} : row;
+          const nhaXe = item.nha_xe?.constructor === Object ? item.nha_xe : {};
+          const operatorHaystack = [
+            item.ma_nha_xe,
+            item.ten_nha_xe,
+            nhaXe.ma_nha_xe,
+            nhaXe.ten_nha_xe,
+          ]
+            .filter((value) => String(value == null ? "" : value).trim() !== "")
+            .join(" ")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d");
+          const fromHaystack = [item.diem_bat_dau, item.diem_di]
+            .join(" ")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d");
+          const toHaystack = [item.diem_ket_thuc, item.diem_den]
+            .join(" ")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/đ/g, "d");
+          return (
+            (!routeOperatorNormalized ||
+              operatorHaystack.includes(routeOperatorNormalized)) &&
+            (!routeFromNormalized ||
+              fromHaystack.includes(routeFromNormalized)) &&
+            (!routeToNormalized || toHaystack.includes(routeToNormalized))
+          );
+        })
+        .map((row) => {
+          if (!row || row.constructor !== Object) return row;
+          const diemDi =
+            row.diem_di == null ? (row.diem_bat_dau ?? null) : row.diem_di;
+          const diemDen =
+            row.diem_den == null ? (row.diem_ket_thuc ?? null) : row.diem_den;
+          const gioKhoiHanh =
+            row.gio == null ? (row.gio_khoi_hanh ?? null) : row.gio;
+          const gioDenNoi =
+            row.gio_ket_thuc == null
+              ? row.gio_den == null
+                ? row.gio_den_noi == null
+                  ? null
+                  : row.gio_den_noi
+                : row.gio_den
+              : row.gio_ket_thuc;
+          return {
+            ...row,
+            route_id: row.id == null ? (row.route_id ?? null) : row.id,
+            huong: "one_way",
+            diem_di: diemDi,
+            diem_den: diemDen,
+            gio_khoi_hanh: gioKhoiHanh,
+            gio_den_noi: gioDenNoi,
+            note_for_synthesizer:
+              "Đây là MỘT chiều (one_way): diem_di → diem_den. gio_khoi_hanh là giờ bắt đầu chiều này. gio_den_noi là giờ đến cuối chiều này. KHÔNG được hiểu thành 'chiều về'.",
+          };
+        });
 
       const needsFallback =
         filtered.length === 0 &&
-        asString(args.nha_xe) &&
-        !asString(args.ma_nha_xe) &&
-        (asString(args.diem_di) || asString(args.diem_den));
+        String(args.nha_xe == null ? "" : args.nha_xe).trim() &&
+        !String(args.ma_nha_xe == null ? "" : args.ma_nha_xe).trim() &&
+        (String(args.diem_di == null ? "" : args.diem_di).trim() ||
+          String(args.diem_den == null ? "" : args.diem_den).trim());
 
       let usedNameFallback = false;
       if (needsFallback) {
-        const broadQuery = buildRouteSearchQuery({
-          ...args,
-          nha_xe: undefined,
-          ma_nha_xe: undefined,
-        });
+        const broadQuery = Object.fromEntries(
+          Object.entries({
+            diem_di: args.diem_di,
+            diem_den: args.diem_den,
+            loai_xe: args.loai_xe,
+          }).filter(
+            ([, value]) =>
+              value !== undefined &&
+              value !== null &&
+              String(value).trim() !== "",
+          ),
+        );
         const broadResult = await jsonResult(
           withQuery("tuyen-duong/public", broadQuery),
           { method: "GET", auth: "none" },
         );
         if (broadResult.ok) {
-          rows = extractList(broadResult.data);
-          filtered = filterRoutesClientSide(rows, args);
+          rows = Array.isArray(broadResult.data?.data)
+            ? broadResult.data.data
+            : Array.isArray(broadResult.data?.data?.data)
+              ? broadResult.data.data.data
+              : Array.isArray(broadResult.data)
+                ? broadResult.data
+                : Array.isArray(broadResult.data?.data?.items)
+                  ? broadResult.data.data.items
+                  : Array.isArray(broadResult.data?.items)
+                    ? broadResult.data.items
+                    : [];
+          filtered = rows
+            .filter((row) => {
+              const item = row == null ? {} : row;
+              const nhaXe =
+                item.nha_xe?.constructor === Object ? item.nha_xe : {};
+              const operatorHaystack = [
+                item.ma_nha_xe,
+                item.ten_nha_xe,
+                nhaXe.ma_nha_xe,
+                nhaXe.ten_nha_xe,
+              ]
+                .filter(
+                  (value) => String(value == null ? "" : value).trim() !== "",
+                )
+                .join(" ")
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d");
+              const fromHaystack = [item.diem_bat_dau, item.diem_di]
+                .join(" ")
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d");
+              const toHaystack = [item.diem_ket_thuc, item.diem_den]
+                .join(" ")
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d");
+              return (
+                (!routeOperatorNormalized ||
+                  operatorHaystack.includes(routeOperatorNormalized)) &&
+                (!routeFromNormalized ||
+                  fromHaystack.includes(routeFromNormalized)) &&
+                (!routeToNormalized || toHaystack.includes(routeToNormalized))
+              );
+            })
+            .map((row) => {
+              if (!row || row.constructor !== Object) return row;
+              const diemDi =
+                row.diem_di == null ? (row.diem_bat_dau ?? null) : row.diem_di;
+              const diemDen =
+                row.diem_den == null
+                  ? (row.diem_ket_thuc ?? null)
+                  : row.diem_den;
+              const gioKhoiHanh =
+                row.gio == null ? (row.gio_khoi_hanh ?? null) : row.gio;
+              const gioDenNoi =
+                row.gio_ket_thuc == null
+                  ? row.gio_den == null
+                    ? row.gio_den_noi == null
+                      ? null
+                      : row.gio_den_noi
+                    : row.gio_den
+                  : row.gio_ket_thuc;
+              return {
+                ...row,
+                route_id: row.id == null ? (row.route_id ?? null) : row.id,
+                huong: "one_way",
+                diem_di: diemDi,
+                diem_den: diemDen,
+                gio_khoi_hanh: gioKhoiHanh,
+                gio_den_noi: gioDenNoi,
+                note_for_synthesizer:
+                  "Đây là MỘT chiều (one_way): diem_di → diem_den. gio_khoi_hanh là giờ bắt đầu chiều này. gio_den_noi là giờ đến cuối chiều này. KHÔNG được hiểu thành 'chiều về'.",
+              };
+            });
           usedNameFallback = true;
         }
       }
@@ -392,6 +321,46 @@ export function registerRouteTripSeatTools(ctx) {
         },
       };
     },
+    [
+      {
+        test: (n) =>
+          /\b(nha xe|operator|operated by)\b/.test(n) &&
+          Boolean(extractMaNhaXe(n)) &&
+          routeExistenceSearchRoutesArgsFromNorm(n) === null &&
+          !/\b(chuyen|trip)\b/.test(n) &&
+          !/\b(ngay|date)\b/.test(n),
+        build: (n) => ({
+          toolName: "search_routes",
+          rationale: "Khách hỏi tuyến đang khai thác theo nhà xe.",
+          arguments: { ma_nha_xe: extractMaNhaXe(n) },
+        }),
+        suggestions: (result) => {
+          if (result?.ok !== true) return [];
+          return [
+            { text: "Tìm chuyến xe", action: "", params: {} },
+            { text: "Liên hệ hỗ trợ", action: "", params: {} },
+          ];
+        },
+      },
+      {
+        test: (n) => routeExistenceSearchRoutesArgsFromNorm(n) !== null,
+        build: (n, _todayIso, rawText) => {
+          const args = routeExistenceSearchRoutesArgsFromNorm(n) ?? {};
+          const maNhaXe = extractMaNhaXe(n);
+          if (maNhaXe) args.ma_nha_xe = maNhaXe;
+          if (!args.nha_xe && !args.ma_nha_xe) {
+            const opName = extractOperatorNameLoose(rawText ?? n);
+            if (opName) args.nha_xe = opName;
+          }
+          return {
+            toolName: "search_routes",
+            rationale:
+              "Khách hỏi có tuyến giữa hai điểm — tra danh mục tuyến (không cần ngày).",
+            arguments: args,
+          };
+        },
+      },
+    ],
   );
 
   register(
@@ -408,6 +377,19 @@ export function registerRouteTripSeatTools(ctx) {
     "safe",
     ["Điểm đón gần đây", "Điểm trả"],
     (args) => exeTramDung(args, "pickup"),
+    {
+      test: (n) => /\b(diem don|tram don|pickup|noi don)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const id = extractTripId(n);
+        if (id) args.trip_id = id;
+        return {
+          toolName: "route_get_pickup_points",
+          rationale: "Khách xem điểm đón.",
+          arguments: args,
+        };
+      },
+    },
   );
 
   register(
@@ -416,15 +398,56 @@ export function registerRouteTripSeatTools(ctx) {
     "safe",
     ["Điểm trả", "Điểm đón"],
     (args) => exeTramDung(args, "dropoff"),
+    {
+      test: (n) => /\b(diem tra|tram tra|dropoff|noi tra)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const id = extractTripId(n);
+        if (id) args.trip_id = id;
+        return {
+          toolName: "route_get_dropoff_points",
+          rationale: "Khách xem điểm trả.",
+          arguments: args,
+        };
+      },
+    },
   );
 
   register(
     "search_trips",
     TRIP_TOOL_SLOTS.search_trips,
     "safe",
-    ["Tìm chuyến khác", "Lọc theo giờ", "Đặt vé", "Chọn ghế", "Chi tiết chuyến"],
+    [
+      "Tìm chuyến khác",
+      "Lọc theo giờ",
+      "Đặt vé",
+      "Chọn ghế",
+      "Chi tiết chuyến",
+    ],
     async (args) => {
-      const missingSlots = missingTripSearchSlots(args);
+      const missingSlots = [];
+      if (!String(args.diem_di == null ? "" : args.diem_di).trim()) {
+        missingSlots.push("diem_di");
+      }
+      if (!String(args.diem_den == null ? "" : args.diem_den).trim()) {
+        missingSlots.push("diem_den");
+      }
+      if (
+        !String(args.ngay_khoi_hanh == null ? "" : args.ngay_khoi_hanh).trim()
+      ) {
+        missingSlots.push("ngay_khoi_hanh");
+      }
+      if (
+        !String(args.gio_khoi_hanh == null ? "" : args.gio_khoi_hanh).trim() &&
+        !String(
+          args.gio_khoi_hanh_tu == null ? "" : args.gio_khoi_hanh_tu,
+        ).trim() &&
+        !String(
+          args.gio_khoi_hanh_den == null ? "" : args.gio_khoi_hanh_den,
+        ).trim()
+      ) {
+        missingSlots.push("gio_khoi_hanh");
+      }
       if (missingSlots.length > 0) {
         const questionBySlot = {
           diem_di: "Bạn muốn đi từ đâu?",
@@ -451,8 +474,16 @@ export function registerRouteTripSeatTools(ctx) {
         };
       }
 
-      if (isPastIsoDate(args.ngay_khoi_hanh)) {
-        const today = todayIsoInVnTz();
+      const dateText = String(
+        args.ngay_khoi_hanh == null ? "" : args.ngay_khoi_hanh,
+      ).trim();
+      const today = new Date(Date.now() + 7 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      if (
+        /^\d{4}-\d{2}-\d{2}$/.test(dateText) &&
+        dateText.localeCompare(today) < 0
+      ) {
         return {
           ok: false,
           data: {
@@ -470,7 +501,36 @@ export function registerRouteTripSeatTools(ctx) {
         };
       }
 
-      const query = buildTripSearchQuery(args);
+      const exactTime = String(
+        args.gio_khoi_hanh == null ? "" : args.gio_khoi_hanh,
+      ).trim();
+      const query = Object.fromEntries(
+        Object.entries({
+          diem_di: args.diem_di,
+          diem_den: args.diem_den,
+          ngay_khoi_hanh: args.ngay_khoi_hanh,
+          gio_khoi_hanh_tu:
+            args.gio_khoi_hanh_tu == null ? exactTime : args.gio_khoi_hanh_tu,
+          gio_khoi_hanh_den:
+            args.gio_khoi_hanh_den == null
+              ? exactTime || undefined
+              : args.gio_khoi_hanh_den,
+          gia_ve_tu: args.min_price,
+          gia_ve_den: args.max_price,
+          nha_xe: args.nha_xe,
+          ma_nha_xe: args.ma_nha_xe,
+          loai_xe: args.loai_xe,
+          tien_ich: Array.isArray(args.tien_ich)
+            ? args.tien_ich.join(",")
+            : args.tien_ich,
+          so_luong_ghe: args.so_luong_ghe,
+        }).filter(
+          ([, value]) =>
+            value !== undefined &&
+            value !== null &&
+            String(value).trim() !== "",
+        ),
+      );
 
       const result = await jsonResult(withQuery("chuyen-xe/search", query), {
         method: "GET",
@@ -479,8 +539,97 @@ export function registerRouteTripSeatTools(ctx) {
 
       if (!result.ok) return result;
 
-      const rows = extractList(result.data);
-      const filtered = filterTripsClientSide(rows, args);
+      const seatPayload = result.data?.data;
+      const rows = Array.isArray(seatPayload?.so_do_ghe)
+        ? seatPayload.so_do_ghe
+        : Array.isArray(seatPayload)
+          ? seatPayload
+          : Array.isArray(seatPayload?.data)
+            ? seatPayload.data
+            : Array.isArray(result.data)
+              ? result.data
+              : Array.isArray(seatPayload?.items)
+                ? seatPayload.items
+                : Array.isArray(result.data?.items)
+                  ? result.data.items
+                  : [];
+      const stationCueText = [args.raw_message, args.diem_di, args.diem_den]
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+      const tripFromNormalized = String(
+        args.diem_di == null ? "" : args.diem_di,
+      )
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+      const tripToNormalized = String(
+        args.diem_den == null ? "" : args.diem_den,
+      )
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d");
+      const filtered =
+        /\b(tram|diem don|diem tra|ben xe|ben tau|ga|station|pickup|dropoff)\b/.test(
+          stationCueText,
+        ) ||
+        (!tripFromNormalized && !tripToNormalized)
+          ? rows
+          : rows.filter((row) => {
+              const route =
+                row?.tuyen_duong == null
+                  ? row?.tuyenDuong == null
+                    ? row?.route == null
+                      ? {}
+                      : row.route
+                    : row.tuyenDuong
+                  : row.tuyen_duong;
+              const routeFrom =
+                route?.diem_bat_dau == null
+                  ? route?.diem_di == null
+                    ? row?.diem_bat_dau == null
+                      ? row?.diem_di
+                      : row.diem_bat_dau
+                    : route.diem_di
+                  : route.diem_bat_dau;
+              const routeTo =
+                route?.diem_ket_thuc == null
+                  ? route?.diem_den == null
+                    ? row?.diem_ket_thuc == null
+                      ? row?.diem_den
+                      : row.diem_ket_thuc
+                    : route.diem_den
+                  : route.diem_ket_thuc;
+              const routeFromNormalized = String(
+                routeFrom == null ? "" : routeFrom,
+              )
+                .trim()
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d");
+              const routeToNormalized = String(routeTo == null ? "" : routeTo)
+                .trim()
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/đ/g, "d");
+              if (!routeFromNormalized && !routeToNormalized) return true;
+              return (
+                (!tripFromNormalized ||
+                  routeFromNormalized.includes(tripFromNormalized)) &&
+                (!tripToNormalized ||
+                  routeToNormalized.includes(tripToNormalized))
+              );
+            });
 
       return {
         ok: true,
@@ -491,6 +640,84 @@ export function registerRouteTripSeatTools(ctx) {
         },
       };
     },
+    {
+      test: (n) => {
+        if (/\b(chuyen bay|may bay|tau hoa|duong sat|ve tau)\b/.test(n)) {
+          return false;
+        }
+        if (/\b(voucher|ma giam gia|khuyen mai)\b/.test(n)) {
+          return false;
+        }
+        if (
+          /\b(chi tiet chuyen|thong tin chuyen|so do ghe|kiem tra ghe|ghe .*con trong|diem don|diem tra)\b/.test(
+            n,
+          )
+        ) {
+          return false;
+        }
+
+        if (
+          routeExistenceSearchRoutesArgsFromNorm(n) !== null &&
+          !normalizedTextWantsTripScheduleOrDate(n)
+        ) {
+          return false;
+        }
+
+        const broadOpener =
+          /\b(tim|kiem|co|xem)\b.*\b(chuyen|xe|tuyen|lich)\b/.test(n);
+
+        const restDirection =
+          /\b(chuyen|xe|tuyen)\b.*\b(tu|di tu)\b.*\b(den|toi|ve)\b/.test(n) ||
+          /\b(di tu|tu)\s+\w+.*\b(den|toi|ve)\b/.test(n) ||
+          /\b(den|toi|ve)\s+\w+.*\b(tu|di tu)\b/.test(n) ||
+          /\btoi muon di\b/.test(n) ||
+          /\b(find|need)\b.*\b(bus|buses|coach|trip)\b/.test(n) ||
+          /\b(bus|buses|coach|trip)\b.*\bfrom\b.*\bto\b/.test(n) ||
+          /\bi want to travel\b/.test(n);
+
+        return Boolean(broadOpener || restDirection);
+      },
+      build: (n, todayIso, rawText) => {
+        const [diemDi, diemDen] = findDirectionedProvinces(rawText ?? n);
+        const args = {};
+        if (diemDi) args.diem_di = diemDi;
+        if (diemDen) args.diem_den = diemDen;
+        const date = extractDate(n, todayIso);
+        if (date) args.ngay_khoi_hanh = date;
+        const maNhaXe = extractMaNhaXe(n);
+        if (maNhaXe) args.ma_nha_xe = maNhaXe;
+        if (!args.nha_xe && !args.ma_nha_xe) {
+          const opName = extractOperatorNameLoose(rawText ?? n);
+          if (opName) args.nha_xe = opName;
+        }
+        Object.assign(args, extractTimeFilter(n));
+        return {
+          toolName: "search_trips",
+          rationale: "Khách tìm chuyến xe.",
+          arguments: args,
+        };
+      },
+      suggestions: (result) => {
+        if (result?.ok !== true) return [];
+        const inner = result?.data?.data;
+        const trips = Array.isArray(inner) ? inner : [];
+        if (trips.length === 0) return [];
+        const chips = [];
+        for (const trip of trips.slice(0, 2)) {
+          const id = trip?.id ?? trip?.id_chuyen_xe;
+          const label = trip?.ten_tuyen ?? trip?.diem_di ?? "Đặt vé";
+          if (id != null && String(id).trim() !== "") {
+            chips.push({
+              text: `Đặt vé — ${label}`.slice(0, 40),
+              action: "open_booking",
+              params: { id_chuyen_xe: String(id).trim() },
+            });
+          }
+        }
+        chips.push({ text: "Tìm chuyến khác", action: "", params: {} });
+        return chips;
+      },
+    },
   );
 
   register(
@@ -498,7 +725,29 @@ export function registerRouteTripSeatTools(ctx) {
     TRIP_TOOL_SLOTS.get_trip_detail,
     "safe",
     ["Chi tiết chuyến", "Đặt vé", "Chọn ghế"],
-    (args) => publicTripSummary(jsonResult, positiveId, args),
+    (args) => {
+      const parsed = positiveId(args.trip_id, "trip_id");
+      if (!parsed.ok) return Promise.resolve(parsed);
+      return jsonResult(`chuyen-xe/${parsed.id}/tom-tat`, {
+        method: "GET",
+        auth: "none",
+      });
+    },
+    {
+      test: (n) =>
+        /\b(chi tiet chuyen|thong tin chuyen)\b.*\b(\d+)\b/.test(n) ||
+        /\b(chuyen so|chuyen id|chuyen #)\s*\d+/.test(n),
+      build: (n) => {
+        const args = {};
+        const id = extractTripId(n);
+        if (id) args.trip_id = id;
+        return {
+          toolName: "trip_get_trip_detail",
+          rationale: "Khách xem chi tiết chuyến.",
+          arguments: args,
+        };
+      },
+    },
   );
 
   register(
@@ -507,21 +756,34 @@ export function registerRouteTripSeatTools(ctx) {
     "safe",
     ["Trạng thái chuyến", "Theo dõi chuyến"],
     async (args) => {
-      if (isInvalidTripIdInput(args.trip_id)) {
+      const tripIdText = String(
+        args.trip_id == null ? "" : args.trip_id,
+      ).trim();
+      if (tripIdText && !/^\d+$/.test(tripIdText)) {
         return {
           ok: false,
           data: {
             success: false,
-            invalid_trip_id: asString(args.trip_id),
-            error: `Mã chuyến "${asString(args.trip_id)}" không hợp lệ. Mã chuyến phải là dãy số nguyên dương.`,
+            invalid_trip_id: tripIdText,
+            error: `Mã chuyến "${tripIdText}" không hợp lệ. Mã chuyến phải là dãy số nguyên dương.`,
           },
-          error: `Invalid trip_id format: ${asString(args.trip_id)}`,
+          error: `Invalid trip_id format: ${tripIdText}`,
         };
       }
-      const result = await publicTripSummary(jsonResult, positiveId, args);
+      const parsed = positiveId(args.trip_id, "trip_id");
+      if (!parsed.ok) return parsed;
+      const result = await jsonResult(`chuyen-xe/${parsed.id}/tom-tat`, {
+        method: "GET",
+        auth: "none",
+      });
       if (!result.ok) return result;
 
-      const payload = result.data?.data ?? result.data ?? {};
+      const payload =
+        result.data?.data == null
+          ? result.data == null
+            ? {}
+            : result.data
+          : result.data.data;
 
       return {
         ok: true,
@@ -529,13 +791,29 @@ export function registerRouteTripSeatTools(ctx) {
           success: true,
           trip_id: args.trip_id,
           status:
-            payload.trang_thai ??
-            payload.tinh_trang ??
-            payload.status ??
-            null,
+            payload.trang_thai == null
+              ? payload.tinh_trang == null
+                ? payload.status == null
+                  ? null
+                  : payload.status
+                : payload.tinh_trang
+              : payload.trang_thai,
           raw: payload,
         },
       };
+    },
+    {
+      test: (n) => /\b(trang thai chuyen|chuyen da chay chua)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const id = extractTripId(n);
+        if (id) args.trip_id = id;
+        return {
+          toolName: "trip_get_trip_status",
+          rationale: "Khách xem trạng thái chuyến.",
+          arguments: args,
+        };
+      },
     },
   );
 
@@ -552,7 +830,14 @@ export function registerRouteTripSeatTools(ctx) {
     TRIP_TOOL_SLOTS.get_available_seats,
     "safe",
     ["Chọn ghế", "Sơ đồ ghế", "Đặt vé"],
-    (args) => publicTripSeats(jsonResult, positiveId, args),
+    (args) => {
+      const parsed = positiveId(args.trip_id, "trip_id");
+      if (!parsed.ok) return Promise.resolve(parsed);
+      return jsonResult(`chuyen-xe/${parsed.id}/ghe`, {
+        method: "GET",
+        auth: "none",
+      });
+    },
   );
 
   register(
@@ -560,9 +845,54 @@ export function registerRouteTripSeatTools(ctx) {
     TRIP_TOOL_SLOTS.get_trip_price,
     "safe",
     ["Giá vé", "Đặt vé"],
-    async (args) => compactTripPriceResult(
-      await publicTripSummary(jsonResult, positiveId, args),
-    ),
+    async (args) => {
+      const parsed = positiveId(args.trip_id, "trip_id");
+      if (!parsed.ok) return parsed;
+      const result = await jsonResult(`chuyen-xe/${parsed.id}/tom-tat`, {
+        method: "GET",
+        auth: "none",
+      });
+      if (!result.ok) return result;
+      const payload =
+        result.data?.data == null
+          ? result.data == null
+            ? {}
+            : result.data
+          : result.data.data;
+      const price =
+        payload.gia_ve == null
+          ? payload.gia_ve_co_ban == null
+            ? payload.price == null
+              ? payload.base_price == null
+                ? null
+                : payload.base_price
+              : payload.price
+            : payload.gia_ve_co_ban
+          : payload.gia_ve;
+      return {
+        ok: true,
+        data: {
+          success: true,
+          base_price: price,
+          final_price: price,
+          currency: "VND",
+          raw: payload,
+        },
+      };
+    },
+    {
+      test: (n) => /\b(gia ve|bao nhieu tien|gia chuyen|gia tien)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const id = extractTripId(n);
+        if (id) args.trip_id = id;
+        return {
+          toolName: "trip_get_trip_price",
+          rationale: "Khách hỏi giá vé.",
+          arguments: args,
+        };
+      },
+    },
   );
 
   register(
@@ -570,7 +900,27 @@ export function registerRouteTripSeatTools(ctx) {
     SEAT_TOOL_SLOTS.get_seat_map,
     "safe",
     ["Sơ đồ ghế", "Chọn ghế"],
-    (args) => publicTripSeats(jsonResult, positiveId, args),
+    (args) => {
+      const parsed = positiveId(args.trip_id, "trip_id");
+      if (!parsed.ok) return Promise.resolve(parsed);
+      return jsonResult(`chuyen-xe/${parsed.id}/ghe`, {
+        method: "GET",
+        auth: "none",
+      });
+    },
+    {
+      test: (n) => /\b(so do ghe|seat map)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const id = extractTripId(n);
+        if (id) args.trip_id = id;
+        return {
+          toolName: "seat_get_seat_map",
+          rationale: "Khách xem sơ đồ ghế.",
+          arguments: args,
+        };
+      },
+    },
   );
 
   register(
@@ -579,7 +929,13 @@ export function registerRouteTripSeatTools(ctx) {
     "safe",
     ["Ghế trống", "Chọn ghế"],
     async (args) => {
-      const badSeats = invalidSeatIds(args.seat_ids);
+      const badSeats = !Array.isArray(args.seat_ids)
+        ? []
+        : args.seat_ids
+            .map((id) => String(id == null ? "" : id).trim())
+            .filter(
+              (id) => id && !/^[A-Ha-h](0?[1-9]|[12][0-9]|3[0-2])$/.test(id),
+            );
       if (badSeats.length > 0) {
         return {
           ok: false,
@@ -591,11 +947,47 @@ export function registerRouteTripSeatTools(ctx) {
           error: `Invalid seat_ids: ${badSeats.join(",")}`,
         };
       }
-      const result = await publicTripSeats(jsonResult, positiveId, args);
+      const parsed = positiveId(args.trip_id, "trip_id");
+      if (!parsed.ok) return parsed;
+      const result = await jsonResult(`chuyen-xe/${parsed.id}/ghe`, {
+        method: "GET",
+        auth: "none",
+      });
       if (!result.ok) return result;
 
-      const rows = extractList(result.data);
-      const free = rows.filter(isFreeSeat);
+      const seatPayload = result.data?.data;
+      const rows = Array.isArray(seatPayload?.so_do_ghe)
+        ? seatPayload.so_do_ghe
+        : Array.isArray(seatPayload)
+          ? seatPayload
+          : Array.isArray(seatPayload?.data)
+            ? seatPayload.data
+            : Array.isArray(result.data)
+              ? result.data
+              : Array.isArray(seatPayload?.items)
+                ? seatPayload.items
+                : Array.isArray(result.data?.items)
+                  ? result.data.items
+                  : [];
+      const free = rows.filter((seat) => {
+        const status = String(
+          seat?.tinh_trang == null
+            ? seat?.trang_thai == null
+              ? seat?.status == null
+                ? ""
+                : seat.status
+              : seat.trang_thai
+            : seat.tinh_trang,
+        )
+          .trim()
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d");
+        return ["", "trong", "con_trong", "available", "empty"].includes(
+          status,
+        );
+      });
 
       return {
         ok: true,
@@ -607,6 +999,20 @@ export function registerRouteTripSeatTools(ctx) {
         },
       };
     },
+    {
+      test: (n) =>
+        /\b(con ghe|ghe trong|con trong|con bao nhieu ghe|available seats|kiem tra ghe)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const id = extractTripId(n);
+        if (id) args.trip_id = id;
+        return {
+          toolName: "seat_check_available_seats",
+          rationale: "Khách hỏi ghế trống.",
+          arguments: args,
+        };
+      },
+    },
   );
 
   register(
@@ -615,184 +1021,20 @@ export function registerRouteTripSeatTools(ctx) {
     "safe",
     ["Giữ ghế", "Đặt vé"],
     (args) => stub("seat_hold_seat", args),
+    {
+      test: (n) => /\b(giu ghe|hold seat)\b/.test(n),
+      build: (n) => {
+        const args = {};
+        const tripId = extractTripId(n);
+        if (tripId) args.trip_id = tripId;
+        const seats = extractSeatIds(n);
+        if (seats.length) args.seat_ids = seats;
+        return {
+          toolName: "seat_hold_seat",
+          rationale: "Khách giữ ghế.",
+          arguments: args,
+        };
+      },
+    },
   );
 }
-
-/**
- * Rule-base triggers for route / trip / seat.
- * Specific patterns (seat/trip-detail/price) BEFORE generic search.
- * search_routes (route existence) BEFORE search_trips (broad fallback).
- */
-export const ROUTE_TRIP_SEAT_TOOL_PATTERNS = [
-  // seat_get_seat_map — "sơ đồ ghế chuyến 12"
-  {
-    test: (n) => /\b(so do ghe|seat map)\b/.test(n),
-    build: (n) => {
-      const args = {};
-      const id = extractTripId(n);
-      if (id) args.trip_id = id;
-      return {
-        toolName: "seat_get_seat_map",
-        rationale: "Khách xem sơ đồ ghế.",
-        arguments: args,
-      };
-    },
-  },
-  // seat_check_available_seats — "ghế trống", "còn ghế nào"
-  {
-    test: (n) =>
-      /\b(con ghe|ghe trong|con bao nhieu ghe|available seats)\b/.test(n),
-    build: (n) => {
-      const args = {};
-      const id = extractTripId(n);
-      if (id) args.trip_id = id;
-      return {
-        toolName: "seat_check_available_seats",
-        rationale: "Khách hỏi ghế trống.",
-        arguments: args,
-      };
-    },
-  },
-  // seat_hold_seat
-  {
-    test: (n) => /\b(giu ghe|hold seat)\b/.test(n),
-    build: (n) => {
-      const args = {};
-      const tripId = extractTripId(n);
-      if (tripId) args.trip_id = tripId;
-      const seats = extractSeatIds(n);
-      if (seats.length) args.seat_ids = seats;
-      return {
-        toolName: "seat_hold_seat",
-        rationale: "Khách giữ ghế.",
-        arguments: args,
-      };
-    },
-  },
-  // trip_get_trip_price
-  {
-    test: (n) => /\b(gia ve|bao nhieu tien|gia chuyen|gia tien)\b/.test(n),
-    build: (n) => {
-      const args = {};
-      const id = extractTripId(n);
-      if (id) args.trip_id = id;
-      return {
-        toolName: "trip_get_trip_price",
-        rationale: "Khách hỏi giá vé.",
-        arguments: args,
-      };
-    },
-  },
-  // trip_get_trip_detail — "chi tiết chuyến 12"
-  {
-    test: (n) =>
-      /\b(chi tiet chuyen|thong tin chuyen)\b.*\b(\d+)\b/.test(n) ||
-      /\b(chuyen so|chuyen id|chuyen #)\s*\d+/.test(n),
-    build: (n) => {
-      const args = {};
-      const id = extractTripId(n);
-      if (id) args.trip_id = id;
-      return {
-        toolName: "trip_get_trip_detail",
-        rationale: "Khách xem chi tiết chuyến.",
-        arguments: args,
-      };
-    },
-  },
-  // route_get_pickup_points
-  {
-    test: (n) => /\b(diem don|tram don|pickup|noi don)\b/.test(n),
-    build: () => ({
-      toolName: "route_get_pickup_points",
-      rationale: "Khách xem điểm đón.",
-      arguments: {},
-    }),
-  },
-  // route_get_dropoff_points
-  {
-    test: (n) => /\b(diem tra|tram tra|dropoff|noi tra)\b/.test(n),
-    build: () => ({
-      toolName: "route_get_dropoff_points",
-      rationale: "Khách xem điểm trả.",
-      arguments: {},
-    }),
-  },
-  // search_routes — route existence between two points (no date/time)
-  {
-    test: (n) =>
-      /\b(nha xe|operator|operated by)\b/.test(n) &&
-      Boolean(extractMaNhaXe(n)) &&
-      routeExistenceSearchRoutesArgsFromNorm(n) === null &&
-      !/\b(chuyen|trip)\b/.test(n) &&
-      !/\b(ngay|date)\b/.test(n),
-    build: (n) => ({
-      toolName: "search_routes",
-      rationale: "Khách hỏi tuyến đang khai thác theo nhà xe.",
-      arguments: { ma_nha_xe: extractMaNhaXe(n) },
-    }),
-  },
-  // search_routes — route existence between two points (no date/time)
-  {
-    test: (n) => routeExistenceSearchRoutesArgsFromNorm(n) !== null,
-    build: (n, _todayIso, rawText) => {
-      const args = routeExistenceSearchRoutesArgsFromNorm(n) ?? {};
-      const maNhaXe = extractMaNhaXe(n);
-      if (maNhaXe) args.ma_nha_xe = maNhaXe;
-      if (!args.nha_xe && !args.ma_nha_xe) {
-        const opName = extractOperatorNameLoose(rawText ?? n);
-        if (opName) args.nha_xe = opName;
-      }
-      return {
-        toolName: "search_routes",
-        rationale:
-          "Khách hỏi có tuyến giữa hai điểm — tra danh mục tuyến (không cần ngày).",
-        arguments: args,
-      };
-    },
-  },
-  // search_trips — broad fallback for trip queries
-  {
-    test: (n) => {
-      if (
-        routeExistenceSearchRoutesArgsFromNorm(n) !== null &&
-        !normalizedTextWantsTripScheduleOrDate(n)
-      ) {
-        return false;
-      }
-
-      const broadOpener =
-        /\b(tim|kiem|co|xem)\b.*\b(chuyen|xe|tuyen|lich)\b/.test(n);
-
-      const restDirection =
-        /\b(chuyen|xe|tuyen)\b.*\b(tu|di tu)\b.*\b(den|toi|ve)\b/.test(n) ||
-        /\b(di tu|tu)\s+\w+.*\b(den|toi|ve)\b/.test(n) ||
-        /\b(den|toi|ve)\s+\w+.*\b(tu|di tu)\b/.test(n) ||
-        /\btoi muon di\b/.test(n) ||
-        /\b(find|need)\b.*\b(bus|buses|coach|trip)\b/.test(n) ||
-        /\b(bus|buses|coach|trip)\b.*\bfrom\b.*\bto\b/.test(n) ||
-        /\bi want to travel\b/.test(n);
-
-      return Boolean(broadOpener || restDirection);
-    },
-    build: (n, todayIso, rawText) => {
-      const [diemDi, diemDen] = findDirectionedProvinces(rawText ?? n);
-      const args = {};
-      if (diemDi) args.diem_di = diemDi;
-      if (diemDen) args.diem_den = diemDen;
-      const date = extractDate(n, todayIso);
-      if (date) args.ngay_khoi_hanh = date;
-      const maNhaXe = extractMaNhaXe(n);
-      if (maNhaXe) args.ma_nha_xe = maNhaXe;
-      if (!args.nha_xe && !args.ma_nha_xe) {
-        const opName = extractOperatorNameLoose(rawText ?? n);
-        if (opName) args.nha_xe = opName;
-      }
-      Object.assign(args, extractTimeFilter(n));
-      return {
-        toolName: "search_trips",
-        rationale: "Khách tìm chuyến xe.",
-        arguments: args,
-      };
-    },
-  },
-];

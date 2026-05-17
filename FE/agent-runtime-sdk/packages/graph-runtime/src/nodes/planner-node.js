@@ -1,13 +1,14 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
 import { PlannerOutputSchema } from "@fe-agent/shared-zod-schemas";
+import { errorText, textOrEmpty, valueOr } from "../value.js";
 
 function getLastUserMessage(messages = []) {
-  return [...messages].reverse().find((m) => m?.role === "user")?.content ?? "";
+  return textOrEmpty([...messages].reverse().find((m) => m?.role === "user")?.content);
 }
 
 function createFallbackPlan(userMessage) {
   return PlannerOutputSchema.parse({
-    goal: userMessage || "deliver_best_effort_answer",
+    goal: userMessage ? userMessage : "deliver_best_effort_answer",
     steps: [],
     stopCondition: "deliver_best_effort_answer",
     confidence: 0.35,
@@ -19,7 +20,7 @@ function createFallbackPlan(userMessage) {
 
 function createPdfOnlyPlan(userMessage) {
   return PlannerOutputSchema.parse({
-    goal: userMessage || "faq_from_pdf",
+    goal: userMessage ? userMessage : "faq_from_pdf",
     steps: [],
     stopCondition: "rag_pdf_only",
     confidence: 0.95,
@@ -42,7 +43,7 @@ export function createPlannerNodeHandler({
     });
 
     const userMessage = getLastUserMessage(graphState.messages);
-    const plannerLoop = Number(graphState.signals?.planner_loop ?? 0) + 1;
+    const plannerLoop = Number(valueOr(graphState.signals?.planner_loop, 0)) + 1;
 
     try {
       const plannerNodeOutput = isQuestionAnswerPdfOnly
@@ -68,7 +69,7 @@ export function createPlannerNodeHandler({
                   content: m.content,
                 }))
               : [],
-            signals: graphState.signals ?? {},
+            signals: valueOr(graphState.signals, {}),
           });
 
       const plan = PlannerOutputSchema.parse(plannerNodeOutput.plan);
@@ -107,7 +108,7 @@ export function createPlannerNodeHandler({
         },
         journal: [
           journalEntry("planner_error", {
-            error: String(error?.message ?? error).slice(0, 300),
+            error: errorText(error).slice(0, 300),
           }),
         ],
       };

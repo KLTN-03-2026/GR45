@@ -1,11 +1,12 @@
-import { unwrapSyntheticReplyEnvelope } from "@fe-agent/core";
-import { journalEntry } from "@fe-agent/observability";
+import { unwrapSyntheticReplyEnvelope } from "@fe-agent/core/model-json";
+import { journalEntry } from "../journal.js";
 import {
   composeRestrictedPolicyRefusalWithLanguageModel,
   enforceRestrictedReplyComplianceWithLanguageModel,
 } from "./compliance-language-model.js";
-import { coerceReplyForVietnameseAppUser } from "./reply-language-coerce.js";
-import { REPLY_MATCH_CUSTOMER_LANGUAGE_INSTRUCTION } from "./reply-language-policy.js";
+import { coerceReplyForVietnameseAppUser } from "../reply/reply-language-coerce.js";
+import { REPLY_MATCH_CUSTOMER_LANGUAGE_INSTRUCTION } from "../reply/reply-language-policy.js";
+import { isFunction, isString, textOrEmpty, valueOr } from "../value.js";
 
 /** Một phần prompt (luôn gắn khi restricted + có (B)) — nghiệp vụ clarification do LLM đọc JSON, không gate bằng hàm JS. */
 const CLARIFICATION_RULES_IN_PROMPT_VI = [
@@ -106,18 +107,13 @@ const KB_FALLBACK_RULES_IN_PROMPT_VI = [
   "- KHÔNG gợi ý khách gọi hotline / email ngoài tài liệu khi chỉ là thiếu dữ liệu KB.",
 ].join("\n");
 
-/**
- * @param graphDependencies
- * @param {boolean} isQuestionAnswerPdfOnly
- * @param {boolean} useRestrictedAnswerSourcesOnly
- */
 export function createSynthesizerNode(
   graphDependencies,
   isQuestionAnswerPdfOnly,
   useRestrictedAnswerSourcesOnly
 ) {
   const synthDomainLines =
-    typeof graphDependencies.synthesizerDomainInstructions === "string" &&
+    isString(graphDependencies.synthesizerDomainInstructions) &&
     graphDependencies.synthesizerDomainInstructions.trim()
       ? ["", graphDependencies.synthesizerDomainInstructions.trim(), ""]
       : [];
@@ -149,7 +145,7 @@ export function createSynthesizerNode(
 
     const retrievedSnippetText = graphState.ragContext
       .map((retrievalHit) =>
-        retrievalHit.text || (retrievalHit.metadata?.preview ?? "")
+        retrievalHit.text ? retrievalHit.text : valueOr(retrievalHit.metadata?.preview, "")
       )
       .filter(Boolean)
       .join("\n---\n")
@@ -159,7 +155,7 @@ export function createSynthesizerNode(
       .slice(-6)
       .map(
         (chatMessage) =>
-          `${chatMessage.role}: ${String(chatMessage.content ?? "").slice(0, MAX_MSG_CHARS)}`
+          `${chatMessage.role}: ${textOrEmpty(chatMessage.content).slice(0, MAX_MSG_CHARS)}`
       )
       .join("\n");
 
@@ -288,28 +284,29 @@ export function createSynthesizerNode(
 
     let finalReplyText;
 
-    const latestUserQuestionText =
+    const latestUserQuestionValue =
       [...graphState.messages]
         .reverse()
-        .find((chatMessage) => chatMessage.role === "user")?.content ?? "";
+        .find((chatMessage) => chatMessage.role === "user")?.content;
+    const latestUserQuestionText = textOrEmpty(latestUserQuestionValue);
 
     const hasNoDocumentOrToolSources =
       useRestrictedAnswerSourcesOnly &&
       !isQuestionAnswerPdfOnly &&
       !retrievedSnippetText.trim() &&
-      JSON.stringify(graphState.toolResults?.slice?.(-8) ?? []) === "[]";
+      JSON.stringify(valueOr(graphState.toolResults?.slice?.(-8), [])) === "[]";
 
     const deterministicToolReply =
       !isQuestionAnswerPdfOnly &&
-      typeof graphDependencies.synthesizerReplyOverride === "function"
-        ? String(
-            (await graphDependencies.synthesizerReplyOverride({
+      isFunction(graphDependencies.synthesizerReplyOverride)
+        ? textOrEmpty(
+            await graphDependencies.synthesizerReplyOverride({
               graphState,
               latestUserQuestionText,
               toolResults: graphState.toolResults,
               isQuestionAnswerPdfOnly,
               useRestrictedAnswerSourcesOnly,
-            })) ?? "",
+            }),
           ).trim()
         : "";
 
@@ -337,9 +334,9 @@ export function createSynthesizerNode(
       const rawSynthesisOutput =
         await graphDependencies.llm.completeJson(synthesisPrompt);
       finalReplyText = unwrapSyntheticReplyEnvelope(rawSynthesisOutput);
-      if (isQuestionAnswerPdfOnly || useRestrictedAnswerSourcesOnly) {
+      if ([isQuestionAnswerPdfOnly, useRestrictedAnswerSourcesOnly].some(Boolean)) {
         const allowedSourceCorpusText = `${retrievedSnippetText}\n${JSON.stringify(
-          graphState.toolResults?.slice(-8) ?? []
+          valueOr(graphState.toolResults?.slice(-8), [])
         )}`;
         finalReplyText = await enforceRestrictedReplyComplianceWithLanguageModel(
           graphDependencies.llm,

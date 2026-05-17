@@ -14,7 +14,7 @@ Backend của hệ thống BusSafe được xây dựng trên nền tảng **Lar
 | `spatie/laravel-permission`          | Quản lý phân quyền dựa trên vai trò (RBAC - Role-Based Access Control).                |
 | `cloudinary-labs/cloudinary-laravel` | Upload và lưu trữ snapshot bằng chứng vi phạm của tài xế lên Cloudinary.               |
 | `intervention/image`                 | Xử lý nén, định dạng và tối ưu hóa ảnh trước khi lưu trữ.                              |
-| `pusher/pusher-php-server`           | Đẩy sự kiện thời gian thực (Broadcasting) cho WebSockets (Live Tracking, Cảnh báo AI). |
+| `laravel/reverb`                     | WebSocket realtime cho Live Tracking, Live Support, cảnh báo AI và thông báo vé.       |
 | `smalot/pdfparser`                   | Trích xuất nội dung từ các file tri thức định dạng PDF phục vụ huấn luyện RAG.         |
 | `maatwebsite/excel`                  | Xuất file báo cáo doanh thu, hành trình và danh sách đặt vé dưới dạng Excel.           |
 
@@ -29,7 +29,7 @@ Backend của hệ thống BusSafe được xây dựng trên nền tảng **Lar
     - Tích lũy điểm thưởng thành viên và áp dụng Voucher khuyến mãi.
 3. **Giám sát & Quản trị AI Safety:**
     - Tiếp nhận snapshot, dữ liệu vi phạm của tài xế (ngủ gật, hút thuốc, dùng điện thoại) từ AI client-side gửi lên.
-    - Phát sự kiện cảnh báo thời gian thực về Dashboard điều hành của Nhà xe thông qua Pusher/Echo.
+    - Phát sự kiện cảnh báo thời gian thực về Dashboard điều hành của Nhà xe thông qua Laravel Reverb/Echo.
 4. **Chatbot AI & Công nghệ RAG (Retrieval-Augmented Generation):**
     - Cho phép Admin cập nhật tài liệu PDF/Docx để nạp cơ sở kiến thức.
     - Đồng bộ và nhúng (embedding) danh mục tỉnh thành phục vụ truy vấn chuyến đi thông minh.
@@ -55,7 +55,7 @@ Backend của hệ thống BusSafe được xây dựng trên nền tảng **Lar
     ```
 
 2. **Cấu hình môi trường (`.env`):**
-   Sao chép file cấu hình mẫu và cập nhật các thông số Database, Cloudinary, Pusher, SePay và AI:
+   Sao chép file cấu hình mẫu và cập nhật các thông số Database, Cloudinary, Reverb, SePay và AI:
 
     ```bash
     cp .env.example .env

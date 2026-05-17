@@ -15,8 +15,6 @@ export const ToolDefinitionSchema = z.object({
   jsonSchema: z.record(z.unknown()),
   tier: z.enum(["safe", "sensitive"]).default("safe"),
   parallelism: z.enum(["serial", "parallel"]).default("serial"),
-  /** Gợi ý UI — chỉ được lấy từ đây (không dùng LLM), thứ tự hiển thị theo thứ tự danh sách tool */
-  suggestionLabels: z.array(z.string().min(1)).max(12).default([]),
 });
 
 export const PlannerStepSchema = z.object({
@@ -112,7 +110,6 @@ export const AgentGraphStateSnapshotSchema = z.object({
   ragContext: z.array(RagChunkSchema).default([]),
   observations: z.array(z.record(z.unknown())).default([]),
   finalAnswer: z.string().optional(),
-  suggestions: z.array(z.string()).default([]),
   journal: z.array(ExecutionJournalEntrySchema).default([]),
 });
 

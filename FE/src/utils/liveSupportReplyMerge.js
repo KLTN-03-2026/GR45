@@ -1,4 +1,4 @@
-/** @param {unknown} a @param {unknown} b */
+
 function messageIdsMatch(a, b) {
   if (a == null || b == null) return false;
   return Number(a) === Number(b);
@@ -12,11 +12,7 @@ export function sameLiveSupportSessionId(a, b) {
   return na === nb && !Number.isNaN(na);
 }
 
-/**
- * Gộp payload reply API vào danh sách tin live support (không chờ Echo).
- * @param {import('vue').Ref<unknown[]>} messagesRef
- * @param {Record<string, unknown>|null|undefined} envelope axiosClient đã unwrap response.data
- */
+
 export function appendLiveSupportReplyFromEnvelope(messagesRef, envelope) {
   const m = envelope?.data;
   if (!m || m.id == null) return false;
@@ -36,12 +32,7 @@ export function appendLiveSupportReplyFromEnvelope(messagesRef, envelope) {
   return true;
 }
 
-/**
- * Tin optimistic ngay khi gửi; đặt role/admin_name khớp bản Echo (mapSenderToRole).
- * @param {import('vue').Ref<unknown[]>} messagesRef
- * @param {{ content: string, role: string, admin_name?: string|null }} payload
- * @returns {string} client_temp_id
- */
+
 export function appendOptimisticOutgoingMessage(messagesRef, payload) {
   const tempId = `opt-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const arr = messagesRef.value;
@@ -60,12 +51,7 @@ export function appendOptimisticOutgoingMessage(messagesRef, payload) {
   return tempId;
 }
 
-/**
- * Thay optimistic bằng payload server (hoặc gỡ nếu đã có dòng trùng id do Echo).
- * @param {import('vue').Ref<unknown[]>} messagesRef
- * @param {string} tempId
- * @param {Record<string, unknown>|null|undefined} envelope
- */
+
 export function finalizeOutgoingReply(messagesRef, tempId, envelope) {
   const arr = messagesRef.value;
   if (!Array.isArray(arr)) return false;
@@ -98,7 +84,7 @@ export function finalizeOutgoingReply(messagesRef, tempId, envelope) {
   return true;
 }
 
-/** @param {import('vue').Ref<unknown[]>} messagesRef @param {string} tempId */
+
 export function removeOptimisticMessage(messagesRef, tempId) {
   const arr = messagesRef.value;
   if (!Array.isArray(arr)) return;
@@ -106,11 +92,7 @@ export function removeOptimisticMessage(messagesRef, tempId) {
   if (i !== -1) arr.splice(i, 1);
 }
 
-/**
- * Echo tới: dedupe id số; hoặc thay dòng optimistic trùng role+content.
- * @param {import('vue').Ref<unknown[]>} messagesRef
- * @param {Record<string, unknown>} message payload đã normalize
- */
+
 export function mergeEchoLiveSupportMessage(messagesRef, message) {
   const arr = messagesRef.value;
   if (!Array.isArray(arr)) return;
@@ -130,12 +112,7 @@ export function mergeEchoLiveSupportMessage(messagesRef, message) {
   arr.push(message);
 }
 
-/**
- * Cập nhật preview sidebar sau khi staff reply.
- * @param {import('vue').Ref<unknown[]>} sessionsRef
- * @param {number|string|null|undefined} sessionId
- * @param {Record<string, unknown>} replyPayload envelope.data
- */
+
 export function bumpLiveSupportSessionPreview(sessionsRef, sessionId, replyPayload) {
   if (sessionId == null || !replyPayload) return;
   const list = sessionsRef.value;

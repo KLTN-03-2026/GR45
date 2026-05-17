@@ -8,11 +8,11 @@
 return [
 
     /*
-    | Danh sách trạng thái hợp lệ (comma-separated). VD: open,closed,done
+    | Danh sách trạng thái hợp lệ (comma-separated). VD: open,resolved
     */
     'allowed_session_statuses' => array_values(array_filter(array_map(
         'trim',
-        explode(',', env('LIVE_SUPPORT_SESSION_STATUSES', 'open,closed,done'))
+        explode(',', env('LIVE_SUPPORT_SESSION_STATUSES', 'open,resolved'))
     ))),
 
     /*

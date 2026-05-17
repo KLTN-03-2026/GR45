@@ -1,4 +1,5 @@
-import { journalEntry } from "@fe-agent/observability";
+import { journalEntry } from "../journal.js";
+import { errorText, textOrEmpty, valueOr } from "../value.js";
 
 const DEFAULT_MAX_SAVED_MESSAGES = 30;
 
@@ -25,18 +26,13 @@ export function createSaveStateNode(graphDependencies) {
     const assistantMessage = {
       id: safeRandomId(),
       role: "assistant",
-      content: String(graphState.finalAnswer ?? ""),
-      meta: {
-        suggestions: Array.isArray(graphState.suggestions)
-          ? graphState.suggestions.slice(0, 5)
-          : [],
-      },
+      content: textOrEmpty(graphState.finalAnswer),
     };
 
     const maxMessages =
-      graphDependencies.config?.maxSavedMessages ?? DEFAULT_MAX_SAVED_MESSAGES;
+      valueOr(graphDependencies.config?.maxSavedMessages, DEFAULT_MAX_SAVED_MESSAGES);
 
-    const messages = [...(graphState.messages ?? []), assistantMessage].slice(
+    const messages = [...valueOr(graphState.messages, []), assistantMessage].slice(
       -maxMessages,
     );
 
@@ -66,7 +62,7 @@ export function createSaveStateNode(graphDependencies) {
         journal: [
           journalEntry("save_state", {
             persisted: false,
-            error: String(error?.message ?? error).slice(0, 300),
+            error: errorText(error).slice(0, 300),
           }),
         ],
       };

@@ -7,11 +7,11 @@
   "exports": {
     ".": "./src/index.js",
     "./catalog": "./src/catalog/index.js",
-    "./gr45-planner-policy": "./src/gr45-planner-policy.js",
+    "./chat-widget-agent": "./src/chat-widget-agent.js",
     "./runtime": "./src/runtime.js"
   },
   "dependencies": {
-    "@fe-agent/sdk": "0.1.0",
+    "@fe-agent/browser-runtime": "0.1.0",
     "zod": "^3.24.0"
   },
   "scripts": {

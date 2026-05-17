@@ -151,7 +151,7 @@ class ThanhToanController extends Controller
                         $ve->thoi_gian_thanh_toan = now();
                         $ve->save();
 
-                        // Phát sự kiện realtime qua Pusher
+                        // Phát sự kiện realtime qua Laravel Reverb.
                         event(new \App\Events\VeDaThanhToanEvent($ve));
 
                         Log::info('SePay Webhook: Ticket paid successfully', ['ma_ve' => $ve->ma_ve, 'sepay_id' => $data['id']]);

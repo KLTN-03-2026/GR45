@@ -2,9 +2,9 @@
   "name": "@fe-agent/tools",
   "version": "0.1.0",
   "type": "module",
-  "main": "./src/index.js",
+  "main": "./src/tool-registry.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/tool-registry.js"
   },
   "dependencies": {
     "@fe-agent/core": "0.1.0",
