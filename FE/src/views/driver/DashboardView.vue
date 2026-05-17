@@ -167,8 +167,10 @@ const hoanThanhChuyenXe = async () => {
   }
 };
 
+// --- Unified Camera State ---
+const unifiedVideoRef = ref(null);
+
 // --- AI Camera State (Ngủ gật) ---
-const aiVideoRef = ref(null);
 const aiCanvasRef = ref(null);
 const aiStatus = ref("init"); // init | loading | normal | warning | danger | no_face | error
 const aiEar = ref(0);
@@ -178,7 +180,6 @@ const aiViolationCount = ref(0);
 let drowsinessAgent = null;
 
 // --- YOLO Camera State (Phát hiện vật thể vi phạm) ---
-const yoloVideoRef = ref(null);
 const yoloCanvasRef = ref(null);
 const yoloStatus = ref("init"); // init | loading | detecting | violation | error
 const yoloCameraOn = ref(false);
@@ -186,6 +187,31 @@ const yoloFps = ref(0);
 const yoloViolationCount = ref(0);
 const yoloDetections = ref([]); // Danh sách detections realtime
 let violationAgent = null;
+
+// --- Shared Camera Stream ---
+let sharedStream = null;
+let sharedStreamUsers = 0;
+
+const getSharedCameraStream = async () => {
+  if (!sharedStream) {
+    sharedStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false,
+    });
+  }
+  sharedStreamUsers++;
+  return sharedStream;
+};
+
+const releaseSharedCameraStream = () => {
+  if (sharedStreamUsers > 0) {
+    sharedStreamUsers--;
+  }
+  if (sharedStreamUsers === 0 && sharedStream) {
+    sharedStream.getTracks().forEach((t) => t.stop());
+    sharedStream = null;
+  }
+};
 
 const aiStatusLabel = computed(() => {
   const map = {
@@ -244,6 +270,7 @@ const yoloStatusColor = computed(() => {
 const toggleAiCamera = async () => {
   if (aiCameraOn.value) {
     drowsinessAgent?.stop();
+    releaseSharedCameraStream();
     aiCameraOn.value = false;
     aiStatus.value = "init";
     return;
@@ -251,11 +278,13 @@ const toggleAiCamera = async () => {
 
   try {
     aiStatus.value = "loading";
+    const stream = await getSharedCameraStream();
+    
     if (!drowsinessAgent) {
       drowsinessAgent = new DrowsinessAgent();
       await drowsinessAgent.init();
     }
-    drowsinessAgent.attachElements(aiVideoRef.value, aiCanvasRef.value);
+    drowsinessAgent.attachElements(unifiedVideoRef.value, aiCanvasRef.value);
     drowsinessAgent.setTripId(currentTrip.value.id);
     drowsinessAgent.setPosition(
       currentPosition.value.lat,
@@ -280,7 +309,7 @@ const toggleAiCamera = async () => {
       if (alerts.value.length > 20) alerts.value.pop();
     };
 
-    await drowsinessAgent.start();
+    await drowsinessAgent.start(stream);
     aiCameraOn.value = true;
     aiStatus.value = "normal";
 
@@ -293,6 +322,7 @@ const toggleAiCamera = async () => {
     });
   } catch (e) {
     console.error("Lỗi khởi động AI Camera:", e);
+    releaseSharedCameraStream();
     aiStatus.value = "error";
     alerts.value.unshift({
       id: Date.now(),
@@ -307,6 +337,7 @@ const toggleAiCamera = async () => {
 const toggleYoloCamera = async () => {
   if (yoloCameraOn.value) {
     violationAgent?.stop();
+    releaseSharedCameraStream();
     yoloCameraOn.value = false;
     yoloStatus.value = "init";
     yoloDetections.value = [];
@@ -315,6 +346,7 @@ const toggleYoloCamera = async () => {
 
   try {
     yoloStatus.value = "loading";
+    const stream = await getSharedCameraStream();
 
     // Khởi tạo agent nếu chưa có hoặc chưa load model thành công
     if (!violationAgent || !violationAgent.session) {
@@ -323,13 +355,13 @@ const toggleYoloCamera = async () => {
     }
 
     // Đảm bảo ref video/canvas đã sẵn sàng
-    if (!yoloVideoRef.value || !yoloCanvasRef.value) {
+    if (!unifiedVideoRef.value || !yoloCanvasRef.value) {
       throw new Error(
         "Video hoặc Canvas element chưa sẵn sàng. Vui lòng thử lại."
       );
     }
 
-    violationAgent.attachElements(yoloVideoRef.value, yoloCanvasRef.value);
+    violationAgent.attachElements(unifiedVideoRef.value, yoloCanvasRef.value);
     violationAgent.setTripId(currentTrip.value.id);
     violationAgent.setPosition(
       currentPosition.value.lat,
@@ -359,7 +391,7 @@ const toggleYoloCamera = async () => {
       if (alerts.value.length > 20) alerts.value.pop();
     };
 
-    await violationAgent.start();
+    await violationAgent.start(stream);
     yoloCameraOn.value = true;
     yoloStatus.value = "detecting";
 
@@ -371,6 +403,7 @@ const toggleYoloCamera = async () => {
     });
   } catch (e) {
     console.error("Lỗi khởi động YOLO Camera:", e);
+    releaseSharedCameraStream();
     yoloStatus.value = "error";
     // Reset agent nếu init fail để lần sau thử lại
     violationAgent = null;
@@ -1247,49 +1280,59 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- AI Camera -->
-          <div class="glass-card camera-card">
+          <!-- Unified Camera Card -->
+          <div class="glass-card camera-card unified-camera-card">
             <div class="card-header flex-between">
               <h3 class="card-title">
-                <Video class="icon" /> Camera AI Giám sát
+                <Video class="icon" /> Camera Tổng hợp (AI & Cabin)
               </h3>
               <div class="camera-controls">
-                <span v-if="aiCameraOn" class="live-tag">● LIVE</span>
-                <span class="fps-badge" v-if="aiCameraOn">{{ aiFps }} FPS</span>
                 <button
                   class="cam-toggle-btn"
                   :class="{ active: aiCameraOn }"
                   @click="toggleAiCamera"
+                  title="Giám sát Ngủ gật"
                 >
                   <Camera :size="16" />
-                  {{ aiCameraOn ? "Tắt" : "Bật" }}
+                  <span class="btn-text-short">Ngủ gật</span>
+                </button>
+                <button
+                  class="cam-toggle-btn yolo-toggle-btn"
+                  :class="{ active: yoloCameraOn }"
+                  @click="toggleYoloCamera"
+                  title="Giám sát Cabin (Dao, Hút thuốc)"
+                >
+                  <ScanLine :size="16" />
+                  <span class="btn-text-short">Cabin</span>
                 </button>
               </div>
             </div>
             <div class="camera-stream-container">
-              <!-- Video + Canvas overlay -->
+              <!-- Video gốc -->
               <video
-                ref="aiVideoRef"
+                ref="unifiedVideoRef"
                 class="ai-video"
                 autoplay
                 playsinline
                 muted
+                v-show="aiCameraOn || yoloCameraOn"
               ></video>
-              <canvas ref="aiCanvasRef" class="ai-canvas-overlay"></canvas>
+              
+              <!-- Canvases Overlay -->
+              <canvas ref="aiCanvasRef" class="ai-canvas-overlay" v-show="aiCameraOn"></canvas>
+              <canvas ref="yoloCanvasRef" class="ai-canvas-overlay yolo-canvas" v-show="yoloCameraOn"></canvas>
 
-              <!-- Placeholder khi chưa bật -->
-              <div v-if="!aiCameraOn" class="camera-placeholder">
+              <!-- Placeholder khi cả 2 tắt -->
+              <div v-if="!aiCameraOn && !yoloCameraOn" class="camera-placeholder">
                 <div class="cam-placeholder-content">
                   <ShieldAlert :size="32" />
-                  <span>Nhấn <strong>Bật</strong> để khởi động Camera AI</span>
-                  <span class="cam-hint"
-                    >Hệ thống sẽ giám sát ngủ gật bằng AI</span
-                  >
+                  <span>Nhấn <strong>Bật</strong> để khởi động tính năng giám sát</span>
+                  <span class="cam-hint">Hỗ trợ nhận diện Ngủ gật và Vi phạm trên xe</span>
                 </div>
-                <div class="scanning-line" v-if="aiStatus === 'loading'"></div>
+                <div class="scanning-line" v-if="aiStatus === 'loading' || yoloStatus === 'loading'"></div>
               </div>
 
-              <!-- EAR Gauge -->
+              <!-- EAR Gauge (Ngủ gật) -->
               <div v-if="aiCameraOn" class="ear-gauge">
                 <div class="ear-gauge-label">EAR</div>
                 <div class="ear-gauge-bar">
@@ -1306,84 +1349,7 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <!-- Status overlay -->
-              <div class="camera-status" :class="`cam-status-${aiStatus}`">
-                <div class="cam-status-left">
-                  <Eye v-if="aiStatus === 'normal'" :size="16" />
-                  <EyeOff
-                    v-else-if="aiStatus === 'danger' || aiStatus === 'warning'"
-                    :size="16"
-                  />
-                  <ShieldAlert v-else :size="16" />
-                  <span class="cam-status-text">{{ aiStatusLabel }}</span>
-                </div>
-                <div class="cam-status-right" v-if="aiCameraOn">
-                  <span v-if="aiViolationCount > 0" class="violation-count"
-                    >{{ aiViolationCount }} vi phạm</span
-                  >
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- YOLO Camera — Phát hiện vật thể vi phạm -->
-          <div class="glass-card yolo-camera-card">
-            <div class="card-header flex-between">
-              <h3 class="card-title">
-                <ScanLine class="icon" /> Camera Giám sát Cabin
-              </h3>
-              <div class="camera-controls">
-                <span v-if="yoloCameraOn" class="live-tag yolo-live"
-                  >● DETECT</span
-                >
-                <span class="fps-badge" v-if="yoloCameraOn"
-                  >{{ yoloFps }} FPS</span
-                >
-                <button
-                  class="cam-toggle-btn"
-                  :class="{ active: yoloCameraOn }"
-                  @click="toggleYoloCamera"
-                >
-                  <ScanLine :size="16" />
-                  {{ yoloCameraOn ? "Tắt" : "Bật" }}
-                </button>
-              </div>
-            </div>
-            <div class="camera-stream-container">
-              <!-- Video + Canvas overlay cho bounding box -->
-              <video
-                ref="yoloVideoRef"
-                class="ai-video yolo-video"
-                autoplay
-                playsinline
-                muted
-              ></video>
-              <canvas
-                ref="yoloCanvasRef"
-                class="ai-canvas-overlay yolo-canvas"
-              ></canvas>
-
-              <!-- Placeholder khi chưa bật -->
-              <div
-                v-if="!yoloCameraOn"
-                class="camera-placeholder yolo-placeholder"
-              >
-                <div class="cam-placeholder-content">
-                  <Swords :size="32" />
-                  <span
-                    >Nhấn <strong>Bật</strong> để khởi động YOLO Detection</span
-                  >
-                  <span class="cam-hint"
-                    >Phát hiện dao, hút thuốc, vi phạm trên xe</span
-                  >
-                </div>
-                <div
-                  class="scanning-line yolo-scan"
-                  v-if="yoloStatus === 'loading'"
-                ></div>
-              </div>
-
-              <!-- Danh sách detections realtime -->
+              <!-- Detections (YOLO) -->
               <div
                 v-if="yoloCameraOn && yoloDetections.length > 0"
                 class="yolo-detections-overlay"
@@ -1413,30 +1379,34 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <!-- Status overlay -->
-              <div
-                class="camera-status"
-                :class="`cam-status-${
-                  yoloStatus === 'violation'
-                    ? 'danger'
-                    : yoloStatus === 'detecting'
-                    ? 'normal'
-                    : yoloStatus
-                }`"
-              >
-                <div class="cam-status-left">
-                  <ScanLine v-if="yoloStatus === 'detecting'" :size="16" />
-                  <AlertTriangle
-                    v-else-if="yoloStatus === 'violation'"
-                    :size="16"
-                  />
-                  <ShieldAlert v-else :size="16" />
-                  <span class="cam-status-text">{{ yoloStatusLabel }}</span>
+              <!-- Combined Status Bar -->
+              <div class="unified-status-bar" v-if="aiCameraOn || yoloCameraOn">
+                <div class="camera-status" :class="`cam-status-${aiStatus}`" v-if="aiCameraOn">
+                  <div class="cam-status-left">
+                    <Eye v-if="aiStatus === 'normal'" :size="14" />
+                    <EyeOff
+                      v-else-if="aiStatus === 'danger' || aiStatus === 'warning'"
+                      :size="14"
+                    />
+                    <ShieldAlert v-else :size="14" />
+                    <span class="cam-status-text" title="AI Ngủ gật">AI: {{ aiStatusLabel }}</span>
+                  </div>
+                  <div class="cam-status-right">
+                    <span class="fps-badge">{{ aiFps }} FPS</span>
+                  </div>
                 </div>
-                <div class="cam-status-right" v-if="yoloCameraOn">
-                  <span v-if="yoloViolationCount > 0" class="violation-count"
-                    >{{ yoloViolationCount }} vi phạm</span
-                  >
+                <div class="camera-status" :class="`cam-status-${
+                  yoloStatus === 'violation' ? 'danger' : yoloStatus === 'detecting' ? 'normal' : yoloStatus
+                }`" v-if="yoloCameraOn">
+                  <div class="cam-status-left">
+                    <ScanLine v-if="yoloStatus === 'detecting'" :size="14" />
+                    <AlertTriangle v-else-if="yoloStatus === 'violation'" :size="14" />
+                    <ShieldAlert v-else :size="14" />
+                    <span class="cam-status-text" title="YOLO Cabin">Cabin: {{ yoloStatusLabel }}</span>
+                  </div>
+                  <div class="cam-status-right">
+                    <span class="fps-badge">{{ yoloFps }} FPS</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2309,6 +2279,19 @@ onUnmounted(() => {
   font-family: "JetBrains Mono", monospace;
 }
 /* Camera Status Bar */
+.unified-status-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  z-index: 5;
+}
+.unified-status-bar .camera-status {
+  position: relative;
+  flex: 1;
+}
+
 .camera-status {
   position: absolute;
   bottom: 0;
@@ -2338,6 +2321,9 @@ onUnmounted(() => {
 }
 .cam-status-text {
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .violation-count {
   background: rgba(239, 68, 68, 0.3);

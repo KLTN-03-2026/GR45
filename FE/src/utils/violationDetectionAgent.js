@@ -97,6 +97,7 @@ export class ViolationDetectionAgent {
     this.ctx = null;
     this.running = false;
     this.detectTimerId = null;
+    this.isExternalStream = false;
 
     // Cấu hình
     this.config = { ...DEFAULT_CONFIG };
@@ -160,20 +161,25 @@ export class ViolationDetectionAgent {
   /**
    * Bắt đầu camera + vòng lặp detect
    */
-  async start() {
+  async start(externalStream = null) {
     if (!this.session || !this.video) {
       throw new Error('Agent chưa init hoặc chưa attach video element');
     }
 
-    // Mở camera — ưu tiên camera sau (environment) để quay cabin
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-      },
-      audio: false,
-    });
+    this.isExternalStream = !!externalStream;
+    let stream = externalStream;
+
+    if (!stream) {
+      // Mở camera — ưu tiên camera sau (environment) để quay cabin
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
+        audio: false,
+      });
+    }
 
     this.video.srcObject = stream;
     await this.video.play();
@@ -200,7 +206,9 @@ export class ViolationDetectionAgent {
       this.detectTimerId = null;
     }
     if (this.video?.srcObject) {
-      this.video.srcObject.getTracks().forEach((t) => t.stop());
+      if (!this.isExternalStream) {
+        this.video.srcObject.getTracks().forEach((t) => t.stop());
+      }
       this.video.srcObject = null;
     }
     // Clear canvas
